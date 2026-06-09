@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { teamThemeStyle } from "../teamStyles";
 
 type Position = "PG" | "SG" | "SF" | "PF" | "C";
 type Achievement = { id: string; value: string; label: string };
@@ -12,12 +13,18 @@ type SeasonProjection = {
   tier: string;
   description: string;
 };
+type DraftSelection = {
+  team: string;
+  era?: string;
+  eraLabel: string;
+};
 type ResultPlayer = {
   position: Position;
   player: {
     id: string;
     name: string;
   };
+  selection?: DraftSelection;
   achievements: Achievement[];
 };
 type AllTimeResultPayload = {
@@ -32,12 +39,20 @@ type AllTimeResultPayload = {
 const ALL_TIME_RESULT_STORAGE_KEY = "nba82_all_time_result";
 
 function playerInitials(name: string) {
-  return name
+  const initials = name
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+
+  if (initials.length >= 2) {
+    return initials.slice(0, 2);
+  }
+
+  const fallback = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
+  return fallback.slice(0, 2).padEnd(2, fallback[0] ?? "?");
 }
 
 function formatLegacyScore(score: number) {
@@ -157,15 +172,15 @@ export default function AllTimeResultsPage() {
 
         <section className="season-result-board">
           <div className="grid gap-3">
-            {lineup.map((entry, index) => (
+            {lineup.map((entry) => (
               <ResultPlayerRow
                 key={entry.position}
                 achievements={entry.achievements}
-                eraLabel={selectedEraLabel}
+                fallbackEraLabel={selectedEraLabel}
+                fallbackTeam={selectedTeam}
                 player={entry.player}
                 position={entry.position}
-                team={selectedTeam}
-                toneIndex={index}
+                selection={entry.selection}
               />
             ))}
           </div>
@@ -185,21 +200,26 @@ export default function AllTimeResultsPage() {
 
 function ResultPlayerRow({
   achievements,
-  eraLabel,
+  fallbackEraLabel,
+  fallbackTeam,
   player,
   position,
-  team,
-  toneIndex,
+  selection,
 }: {
   achievements: Achievement[];
-  eraLabel: string;
+  fallbackEraLabel: string;
+  fallbackTeam: string;
   player: { id: string; name: string };
   position: Position;
-  team: string;
-  toneIndex: number;
+  selection?: DraftSelection;
 }) {
+  const displaySelection = {
+    team: selection?.team ?? fallbackTeam,
+    eraLabel: selection?.eraLabel ?? fallbackEraLabel,
+  };
+
   return (
-    <div className={`result-player-row result-player-row-${toneIndex % 5}`}>
+    <div className="result-player-row" style={teamThemeStyle(displaySelection.team)}>
       <div className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] items-center gap-4">
         <span className="result-player-token" aria-hidden="true">
           <span>{playerInitials(player.name)}</span>
@@ -207,8 +227,8 @@ function ResultPlayerRow({
         </span>
         <span className="min-w-0">
           <span className="block truncate text-lg font-black text-white">{player.name}</span>
-          <span className="mt-1 block truncate text-sm font-semibold text-[#cfd3df]">
-            {team} - {eraLabel}
+          <span className="result-player-meta mt-1 block truncate text-sm font-semibold">
+            {displaySelection.team} - {displaySelection.eraLabel}
           </span>
         </span>
       </div>

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
+import { teamThemeStyle } from "./teamStyles";
 
 type Position = "PG" | "SG" | "SF" | "PF" | "C";
 
@@ -12,6 +13,8 @@ type Accolades = {
   dpoy_count: number;
   roy_won: boolean;
   championship_rings: number;
+  most_improved?: number;
+  "6moy"?: number;
   olympic_gold_medals?: number;
   olympic_silver_medals?: number;
   olympic_bronze_medals?: number;
@@ -51,8 +54,13 @@ type Player = {
   accolades: Accolades;
 };
 
-type Lineup = Partial<Record<Position, Player>>;
 type TeamEra = { team: string; era: string };
+type DraftSelection = TeamEra & { eraLabel: string };
+type LineupSlot = {
+  player: Player;
+  selection: DraftSelection;
+};
+type Lineup = Partial<Record<Position, LineupSlot>>;
 type Achievement = { id: string; value: string; label: string };
 type AchievementDisplay = {
   id: string;
@@ -60,6 +68,7 @@ type AchievementDisplay = {
   count: (player: Player) => number;
   value?: (player: Player) => string;
   sortValue?: (player: Player) => number;
+  weight: number;
 };
 type PlacementStatus = "blocked" | "move" | "same" | "swap";
 type SeasonTier = {
@@ -83,6 +92,7 @@ type ResultPlayer = {
     id: string;
     name: string;
   };
+  selection: DraftSelection;
   achievements: Achievement[];
 };
 type AllTimeResultPayload = {
@@ -97,8 +107,8 @@ type AllTimeResultPayload = {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const ALL_TIME_RESULT_STORAGE_KEY = "nba82_all_time_result";
 const POSITIONS: Position[] = ["PG", "SG", "SF", "PF", "C"];
-const POSITION_PRIORITY_OPTIONS = ["None", ...POSITIONS] as const;
-type PositionPriority = (typeof POSITION_PRIORITY_OPTIONS)[number];
+const POSITION_FILTER_OPTIONS = ["All", "G", "F", "C"] as const;
+type PositionFilter = (typeof POSITION_FILTER_OPTIONS)[number];
 const CURRENT_NBA_TEAMS = [
   "ATL",
   "BKN",
@@ -131,7 +141,68 @@ const CURRENT_NBA_TEAMS = [
   "UTA",
   "WAS",
 ];
+const TEAM_FIRST_ERAS: Record<string, string> = {
+  ATL: "40's",
+  BKN: "60's",
+  BOS: "40's",
+  CHA: "80's",
+  CHI: "60's",
+  CLE: "70's",
+  DAL: "80's",
+  DEN: "60's",
+  DET: "40's",
+  GSW: "40's",
+  HOU: "60's",
+  IND: "60's",
+  LAC: "70's",
+  LAL: "40's",
+  MEM: "90's",
+  MIA: "80's",
+  MIL: "60's",
+  MIN: "80's",
+  NOP: "00's",
+  NYK: "40's",
+  OKC: "60's",
+  ORL: "80's",
+  PHI: "40's",
+  PHX: "60's",
+  POR: "70's",
+  SAC: "40's",
+  SAS: "60's",
+  TOR: "90's",
+  UTA: "70's",
+  WAS: "60's",
+};
 const DEFAULT_ERAS = ["90's", "00's", "10's", "20's"];
+const ACCOLADE_WEIGHTS = {
+  mvp_count: 10,
+  finals_mvp_count: 5,
+  dpoy_count: 5,
+  championship_rings: 3,
+  roy_won: 3,
+  all_nba_1st: 5,
+  all_nba_2nd: 3,
+  all_nba_3rd: 2,
+  all_def_1st: 3,
+  all_def_2nd: 2,
+  scoring_titles: 3,
+  assist_titles: 3,
+  rebound_titles: 3,
+  steal_titles: 3,
+  block_titles: 3,
+  olympic_gold_medals: 3,
+  olympic_silver_medals: 1,
+  olympic_bronze_medals: 0.5,
+  all_rookie_1st: 2,
+  all_rookie_2nd: 1.5,
+  all_star_selections: 2,
+  all_star_mvp_count: 3,
+  "6moy": 2,
+  most_improved: 2,
+  seasons_played: 0.5,
+} satisfies Partial<Record<keyof Accolades, number>>;
+type WeightedAccoladeKey = keyof typeof ACCOLADE_WEIGHTS;
+
 const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   {
     id: "goat",
@@ -139,56 +210,119 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     count: (player) => playerGoatRank(player),
     value: (player) => ordinalRank(playerGoatRank(player)),
     sortValue: (player) => player.goat_score ?? (playerGoatRank(player) ? 101 - playerGoatRank(player) : 0),
+    weight: Number.POSITIVE_INFINITY,
   },
-  { id: "mvp", label: "MVP", count: (player) => player.accolades.mvp_count },
-  { id: "fmvp", label: "FMVP", count: (player) => player.accolades.finals_mvp_count },
-  { id: "rings", label: "RING", count: (player) => player.accolades.championship_rings },
-  { id: "dpoy", label: "DPOY", count: (player) => player.accolades.dpoy_count },
-  { id: "roy", label: "ROY", count: (player) => (player.accolades.roy_won ? 1 : 0) },
-  { id: "all-nba-1st", label: "NBA1", count: (player) => player.accolades.all_nba_1st },
-  { id: "olympic-gold", label: "GOLD", count: (player) => player.accolades.olympic_gold_medals ?? 0 },
-  { id: "all-nba-2nd", label: "NBA2", count: (player) => player.accolades.all_nba_2nd },
-  { id: "all-defense-1st", label: "DEF1", count: (player) => player.accolades.all_def_1st },
-  { id: "all-rookie-1st", label: "ROOK1", count: (player) => player.accolades.all_rookie_1st ?? 0 },
-  { id: "all-star-mvp", label: "AS MVP", count: (player) => player.accolades.all_star_mvp_count ?? 0 },
-  { id: "scoring", label: "SCORING", count: (player) => player.accolades.scoring_titles },
-  { id: "assists", label: "ASSISTS", count: (player) => player.accolades.assist_titles },
-  { id: "rebounds", label: "REBOUNDS", count: (player) => player.accolades.rebound_titles },
-  { id: "steals", label: "STEALS", count: (player) => player.accolades.steal_titles },
-  { id: "blocks", label: "BLOCKS", count: (player) => player.accolades.block_titles },
-  { id: "all-nba-3rd", label: "NBA3", count: (player) => player.accolades.all_nba_3rd },
-  { id: "all-defense-2nd", label: "DEF2", count: (player) => player.accolades.all_def_2nd },
-  { id: "all-rookie-2nd", label: "ROOK2", count: (player) => player.accolades.all_rookie_2nd ?? 0 },
-  { id: "all-star", label: "ALL-STAR", count: (player) => player.accolades.all_star_selections },
-  { id: "olympic-silver", label: "SILVER", count: (player) => player.accolades.olympic_silver_medals ?? 0 },
-  { id: "olympic-bronze", label: "BRONZE", count: (player) => player.accolades.olympic_bronze_medals ?? 0 },
-  { id: "seasons", label: "SEASONS", count: (player) => player.accolades.seasons_played },
+  { id: "mvp", label: "MVP", count: (player) => player.accolades.mvp_count, weight: ACCOLADE_WEIGHTS.mvp_count },
+  {
+    id: "fmvp",
+    label: "FMVP",
+    count: (player) => player.accolades.finals_mvp_count,
+    weight: ACCOLADE_WEIGHTS.finals_mvp_count,
+  },
+  { id: "dpoy", label: "DPOY", count: (player) => player.accolades.dpoy_count, weight: ACCOLADE_WEIGHTS.dpoy_count },
+  {
+    id: "all-nba",
+    label: "ALL NBA",
+    count: (player) => player.accolades.all_nba_1st + player.accolades.all_nba_2nd + player.accolades.all_nba_3rd,
+    sortValue: (player) =>
+      weightedAccoladeScore(player, ["all_nba_1st", "all_nba_2nd", "all_nba_3rd"]),
+    weight: ACCOLADE_WEIGHTS.all_nba_1st,
+  },
+  {
+    id: "rings",
+    label: "RING",
+    count: (player) => player.accolades.championship_rings,
+    weight: ACCOLADE_WEIGHTS.championship_rings,
+  },
+  { id: "roy", label: "ROY", count: (player) => (player.accolades.roy_won ? 1 : 0), weight: ACCOLADE_WEIGHTS.roy_won },
+  {
+    id: "all-defense",
+    label: "ALL DEF",
+    count: (player) => player.accolades.all_def_1st + player.accolades.all_def_2nd,
+    sortValue: (player) => weightedAccoladeScore(player, ["all_def_1st", "all_def_2nd"]),
+    weight: ACCOLADE_WEIGHTS.all_def_1st,
+  },
+  { id: "scoring", label: "SCORING", count: (player) => player.accolades.scoring_titles, weight: ACCOLADE_WEIGHTS.scoring_titles },
+  { id: "assists", label: "ASSISTS", count: (player) => player.accolades.assist_titles, weight: ACCOLADE_WEIGHTS.assist_titles },
+  { id: "rebounds", label: "REBOUNDS", count: (player) => player.accolades.rebound_titles, weight: ACCOLADE_WEIGHTS.rebound_titles },
+  { id: "steals", label: "STEALS", count: (player) => player.accolades.steal_titles, weight: ACCOLADE_WEIGHTS.steal_titles },
+  { id: "blocks", label: "BLOCKS", count: (player) => player.accolades.block_titles, weight: ACCOLADE_WEIGHTS.block_titles },
+  {
+    id: "olympic-gold",
+    label: "GOLD",
+    count: (player) => player.accolades.olympic_gold_medals ?? 0,
+    weight: ACCOLADE_WEIGHTS.olympic_gold_medals,
+  },
+  {
+    id: "all-star-mvp",
+    label: "AS MVP",
+    count: (player) => player.accolades.all_star_mvp_count ?? 0,
+    weight: ACCOLADE_WEIGHTS.all_star_mvp_count,
+  },
+  {
+    id: "all-rookie-1st",
+    label: "ROOK1",
+    count: (player) => player.accolades.all_rookie_1st ?? 0,
+    weight: ACCOLADE_WEIGHTS.all_rookie_1st,
+  },
+  {
+    id: "all-star",
+    label: "ALL-STAR",
+    count: (player) => player.accolades.all_star_selections,
+    weight: ACCOLADE_WEIGHTS.all_star_selections,
+  },
+  { id: "sixth-man", label: "6MOY", count: (player) => player.accolades["6moy"] ?? 0, weight: ACCOLADE_WEIGHTS["6moy"] },
+  {
+    id: "most-improved",
+    label: "MIP",
+    count: (player) => player.accolades.most_improved ?? 0,
+    weight: ACCOLADE_WEIGHTS.most_improved,
+  },
+  {
+    id: "all-rookie-2nd",
+    label: "ROOK2",
+    count: (player) => player.accolades.all_rookie_2nd ?? 0,
+    weight: ACCOLADE_WEIGHTS.all_rookie_2nd,
+  },
+  {
+    id: "olympic-silver",
+    label: "SILVER",
+    count: (player) => player.accolades.olympic_silver_medals ?? 0,
+    weight: ACCOLADE_WEIGHTS.olympic_silver_medals,
+  },
+  {
+    id: "olympic-bronze",
+    label: "BRONZE",
+    count: (player) => player.accolades.olympic_bronze_medals ?? 0,
+    weight: ACCOLADE_WEIGHTS.olympic_bronze_medals,
+  },
+  { id: "seasons", label: "SEASONS", count: (player) => player.accolades.seasons_played, weight: ACCOLADE_WEIGHTS.seasons_played },
 ];
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
 const SEASON_TIERS: SeasonTier[] = [
   {
-    minScore: 1500,
+    minScore: 2000,
     minWins: 100,
     maxWins: 100,
     tier: "WTF",
     description: "THIS MIGHT BE THE BEST TEAM EVER YOU JUST BROKE 82-0 AND THE SCORE IS 100-0. The engine is crying. The database is melting.",
   },
   {
-    minScore: 1000,
+    minScore: 1500,
     minWins: 82,
     maxWins: 82,
     tier: "S+ (The Immortal 82-0)",
     description: "The Absolute Pinnacle. You drafted a lineup of literal basketball Gods. This team sweeps the league, goes undefeated, and forces opposing fanbases to switch sports.",
   },
   {
-    minScore: 850,
+    minScore: 1000,
     minWins: 81,
     maxWins: 81,
     tier: "S (You're almost there buddyy...)",
     description: "A historically painful result. You built one of the greatest rosters in the history of the sport, but dropped a random Tuesday night game vs the miami heat in where Bam scored 83 POINTS!",
   },
   {
-    minScore: 690,
+    minScore: 750,
     minWins: 74,
     maxWins: 80,
     tier: "S- (Historic Season)",
@@ -334,6 +468,23 @@ function playerGoatRank(player: Player) {
   return goatScore > 0 ? 101 - goatScore : 0;
 }
 
+function numericAccoladeValue(value: Accolades[keyof Accolades]) {
+  if (typeof value === "boolean") {
+    return value ? 1 : 0;
+  }
+
+  const numeric = Number(value ?? 0);
+
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function weightedAccoladeScore(player: Player, keys: WeightedAccoladeKey[]) {
+  return keys.reduce(
+    (sum, key) => sum + numericAccoladeValue(player.accolades[key]) * ACCOLADE_WEIGHTS[key],
+    0,
+  );
+}
+
 function buildAchievements(player: Player) {
   return ACHIEVEMENT_DISPLAY_ORDER.flatMap((achievement) => {
     const count = achievement.count(player);
@@ -392,7 +543,12 @@ function normalizeName(value: string) {
 
 function eraSortValue(era: string) {
   const decade = Number(era.slice(0, 2));
-  return Number.isNaN(decade) ? 999 : decade;
+
+  if (Number.isNaN(decade)) {
+    return 9999;
+  }
+
+  return decade >= 40 ? 1900 + decade : 2000 + decade;
 }
 
 function fullEraLabel(era: string) {
@@ -405,7 +561,25 @@ function fullEraLabel(era: string) {
   return `${decade >= 40 ? 1900 + decade : 2000 + decade}s`;
 }
 
+function buildDraftSelection(team: string, era: string): DraftSelection {
+  return {
+    team,
+    era,
+    eraLabel: fullEraLabel(era),
+  };
+}
+
+function teamEraExists(team: string, era: string) {
+  const firstEra = TEAM_FIRST_ERAS[team];
+
+  return !firstEra || eraSortValue(era) >= eraSortValue(firstEra);
+}
+
 function playerMatchesTeamEra(player: Player, team: string, era: string) {
+  if (!teamEraExists(team, era)) {
+    return false;
+  }
+
   if (player.team_eras?.length) {
     return player.team_eras.some((teamEra) => teamEra.team === team && teamEra.era === era);
   }
@@ -413,8 +587,41 @@ function playerMatchesTeamEra(player: Player, team: string, era: string) {
   return player.teams.includes(team) && player.eras.includes(era);
 }
 
+function playerErasForTeam(player: Player, team: string) {
+  const filterPossibleEras = (eras: string[]) => eras.filter((era) => teamEraExists(team, era));
+
+  if (player.team_eras?.length) {
+    return filterPossibleEras(player.team_eras.filter((teamEra) => teamEra.team === team).map((teamEra) => teamEra.era));
+  }
+
+  return player.teams.includes(team) ? filterPossibleEras(player.eras) : [];
+}
+
+function eraOptionsForTeam(players: Player[], team: string) {
+  const teamEras = players.flatMap((player) => playerErasForTeam(player, team));
+  const eras = teamEras.length ? teamEras : DEFAULT_ERAS.filter((era) => teamEraExists(team, era));
+
+  return Array.from(new Set(eras)).sort((a, b) => eraSortValue(a) - eraSortValue(b));
+}
+
+function playerMatchesPositionFilter(player: Player, filter: PositionFilter) {
+  if (filter === "All") {
+    return true;
+  }
+
+  if (filter === "G") {
+    return player.positions.some((position) => position === "PG" || position === "SG");
+  }
+
+  if (filter === "F") {
+    return player.positions.some((position) => position === "SF" || position === "PF");
+  }
+
+  return player.positions.includes("C");
+}
+
 function currentPositionForPlayer(lineup: Lineup, playerId: string) {
-  return POSITIONS.find((position) => lineup[position]?.id === playerId) ?? null;
+  return POSITIONS.find((position) => lineup[position]?.player.id === playerId) ?? null;
 }
 
 function placementStatus(lineup: Lineup, player: Player, target: Position): PlacementStatus {
@@ -423,7 +630,7 @@ function placementStatus(lineup: Lineup, player: Player, target: Position): Plac
   }
 
   const source = currentPositionForPlayer(lineup, player.id);
-  const targetPlayer = lineup[target];
+  const targetPlayer = lineup[target]?.player;
 
   if (source === target) {
     return "same";
@@ -451,16 +658,28 @@ function canDropAt(lineup: Lineup, player: Player, position: Position) {
 }
 
 function playerInitials(name: string) {
-  return name
+  const initials = name
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+
+  if (initials.length >= 2) {
+    return initials.slice(0, 2);
+  }
+
+  const fallback = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
+  return fallback.slice(0, 2).padEnd(2, fallback[0] ?? "?");
 }
 
 function randomInteger(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomItem<T>(items: T[]) {
+  return items[Math.floor(Math.random() * items.length)];
 }
 
 function formatLegacyScore(score: number) {
@@ -496,13 +715,14 @@ export default function Home() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedTeam, setSelectedTeam] = useState("LAL");
   const [selectedEra, setSelectedEra] = useState("10's");
-  const [positionPriority, setPositionPriority] = useState<PositionPriority>("None");
+  const [positionFilter, setPositionFilter] = useState<PositionFilter>("All");
   const [accoladePriority, setAccoladePriority] = useState("goat");
+  const [rosterSearch, setRosterSearch] = useState("");
   const [lineup, setLineup] = useState<Lineup>({});
   const [selectedSlot, setSelectedSlot] = useState<Position | null>(null);
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const [draggedFromPosition, setDraggedFromPosition] = useState<Position | null>(null);
-  const [status, setStatus] = useState("Ready");
+  const [, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -546,41 +766,36 @@ export default function Home() {
   const teamOptions = CURRENT_NBA_TEAMS;
 
   const eraOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...DEFAULT_ERAS,
-          ...players.flatMap((player) => [
-            ...player.eras,
-            ...(player.team_eras?.map((teamEra) => teamEra.era) ?? []),
-          ]),
-        ]),
-      ).sort((a, b) => eraSortValue(a) - eraSortValue(b)),
-    [players],
+    () => eraOptionsForTeam(players, selectedTeam),
+    [players, selectedTeam],
   );
+  const activeEra = eraOptions.includes(selectedEra) ? selectedEra : eraOptions[eraOptions.length - 1] ?? selectedEra;
 
   const selectedPlayerIds = useMemo(
     () =>
       new Set(
-        Object.values(lineup).flatMap((player) => (player ? [player.id] : [])),
+        Object.values(lineup).flatMap((slot) => (slot ? [slot.player.id] : [])),
       ),
     [lineup],
   );
+  const normalizedRosterSearch = useMemo(() => normalizeName(rosterSearch), [rosterSearch]);
 
   const filteredPlayers = useMemo(
     () =>
       players
-        .filter((player) => playerMatchesTeamEra(player, selectedTeam, selectedEra))
+        .filter((player) => playerMatchesTeamEra(player, selectedTeam, activeEra))
         .filter((player) => !selectedPlayerIds.has(player.id))
-        .sort((a, b) => {
-          const aPositionPriority = positionPriority !== "None" && a.positions.includes(positionPriority) ? 1 : 0;
-          const bPositionPriority = positionPriority !== "None" && b.positions.includes(positionPriority) ? 1 : 0;
-          const positionDelta = bPositionPriority - aPositionPriority;
-
-          if (positionDelta) {
-            return positionDelta;
+        .filter((player) => playerMatchesPositionFilter(player, positionFilter))
+        .filter((player) => {
+          if (!normalizedRosterSearch) {
+            return true;
           }
 
+          return normalizeName(`${player.name} ${playerInitials(player.name)} ${player.positions.join(" ")}`).includes(
+            normalizedRosterSearch,
+          );
+        })
+        .sort((a, b) => {
           const accoladeDelta =
             achievementPriorityValue(b, accoladePriority) - achievementPriorityValue(a, accoladePriority);
 
@@ -592,7 +807,7 @@ export default function Home() {
 
           return legacyDelta || a.name.localeCompare(b.name);
         }),
-    [accoladePriority, players, positionPriority, selectedEra, selectedPlayerIds, selectedTeam],
+    [accoladePriority, activeEra, normalizedRosterSearch, players, positionFilter, selectedPlayerIds, selectedTeam],
   );
 
   const draggedPlayer = useMemo(
@@ -615,9 +830,9 @@ export default function Home() {
   const lineupEntries = useMemo(
     () =>
       POSITIONS.flatMap((position) => {
-        const player = lineup[position];
+        const slot = lineup[position];
 
-        return player ? [{ position, player }] : [];
+        return slot ? [{ position, player: slot.player, selection: slot.selection }] : [];
       }),
     [lineup],
   );
@@ -626,11 +841,11 @@ export default function Home() {
     [lineupEntries],
   );
   const teamLegacyScore = POSITIONS.reduce(
-    (sum, position) => sum + playerLegacyScore(lineup[position]),
+    (sum, position) => sum + playerLegacyScore(lineup[position]?.player),
     0,
   );
   const lineupHasStephCurry = POSITIONS.some((position) => {
-    const player = lineup[position];
+    const player = lineup[position]?.player;
 
     return player ? playerIsStephCurry(player) : false;
   });
@@ -657,7 +872,8 @@ export default function Home() {
     }
 
     const status = placementStatus(lineup, player, target);
-    const targetPlayer = lineup[target];
+    const targetSlot = lineup[target];
+    const targetPlayer = targetSlot?.player;
 
     if (status === "same") {
       setSelectedSlot(null);
@@ -681,24 +897,26 @@ export default function Home() {
     setLineup((currentLineup) => {
       const next = { ...currentLineup };
       const currentSource = currentPositionForPlayer(currentLineup, player.id);
-      const targetPlayer = next[target];
+      const existingSlot = currentSource ? currentLineup[currentSource] : null;
+      const selection = existingSlot?.selection ?? buildDraftSelection(selectedTeam, activeEra);
+      const targetSlot = next[target];
 
       if (currentSource) {
         delete next[currentSource];
       }
 
-      next[target] = player;
+      next[target] = { player, selection };
 
-      if (status === "swap" && currentSource && targetPlayer) {
-        next[currentSource] = targetPlayer;
+      if (status === "swap" && currentSource && targetSlot) {
+        next[currentSource] = targetSlot;
       }
 
       return next;
     });
     setSelectedSlot(null);
     setStatus(
-      status === "swap" && source && lineup[target]
-        ? `${player.name} swapped to ${target}; ${lineup[target]?.name} moved to ${source}.`
+      status === "swap" && source && targetPlayer
+        ? `${player.name} swapped to ${target}; ${targetPlayer.name} moved to ${source}.`
         : replacedPlayer
           ? `${player.name} replaced ${replacedPlayer.name} at ${target}.`
         : `${player.name} assigned to ${target}.`,
@@ -732,7 +950,7 @@ export default function Home() {
 
   function handleDragEnd(event: DragEvent<HTMLButtonElement>) {
     if (draggedFromPosition && event.dataTransfer.dropEffect === "none" && !dragEndedInsideCourt(event)) {
-      const removedPlayer = lineup[draggedFromPosition];
+      const removedPlayer = lineup[draggedFromPosition]?.player;
 
       setLineup((currentLineup) => {
         const next = { ...currentLineup };
@@ -803,16 +1021,15 @@ export default function Home() {
 
     setLineup((currentLineup) => ({
       ...currentLineup,
-      [draggedFromPosition]: targetPlayer,
+      [draggedFromPosition]: {
+        player: targetPlayer,
+        selection: buildDraftSelection(selectedTeam, activeEra),
+      },
     }));
     setSelectedSlot(null);
     setStatus(`${targetPlayer.name} replaced ${draggedPlayer.name} at ${draggedFromPosition}.`);
     setDraggedPlayerId(null);
     setDraggedFromPosition(null);
-  }
-
-  function handlePositionPick(position: Position) {
-    setSelectedSlot((current) => (current === position ? null : position));
   }
 
   function clearLineup() {
@@ -821,6 +1038,19 @@ export default function Home() {
     setDraggedPlayerId(null);
     setDraggedFromPosition(null);
     setStatus("Lineup cleared.");
+  }
+
+  function spinTeamEra() {
+    const team = randomItem(teamOptions);
+    const eras = eraOptionsForTeam(players, team);
+    const era = randomItem(eras.length ? eras : DEFAULT_ERAS);
+
+    setSelectedTeam(team);
+    setSelectedEra(era);
+    setSelectedSlot(null);
+    setDraggedPlayerId(null);
+    setDraggedFromPosition(null);
+    setStatus(`Spun ${team} ${fullEraLabel(era)}.`);
   }
 
   function simulateSeason() {
@@ -833,14 +1063,15 @@ export default function Home() {
     const payload: AllTimeResultPayload = {
       mode: "all-time",
       selectedTeam,
-      selectedEraLabel: fullEraLabel(selectedEra),
+      selectedEraLabel: fullEraLabel(activeEra),
       simulationResult: result,
-      lineup: lineupEntries.map(({ position, player }) => ({
+      lineup: lineupEntries.map(({ position, player, selection }) => ({
         position,
         player: {
           id: player.id,
           name: player.name,
         },
+        selection,
         achievements: buildAchievements(player),
       })),
       totals: lineupAchievementTotals,
@@ -862,7 +1093,7 @@ export default function Home() {
             </h1>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[160px_160px_auto] sm:items-end">
+          <div className="grid gap-3 sm:grid-cols-[160px_160px_92px_auto] sm:items-end">
             <label className="grid gap-1 text-sm font-semibold text-[#cfd3df]">
               Team
               <select
@@ -882,7 +1113,7 @@ export default function Home() {
               Era
               <select
                 className="h-11 rounded-lg border border-[#b86cff]/45 bg-[#242938] px-3 text-base font-black text-white outline-none transition focus:border-[#d998ff] focus:ring-2 focus:ring-[#b86cff]/25"
-                value={selectedEra}
+                value={activeEra}
                 onChange={(event) => setSelectedEra(event.target.value)}
               >
                 {eraOptions.map((era) => (
@@ -892,6 +1123,15 @@ export default function Home() {
                 ))}
               </select>
             </label>
+
+            <button
+              aria-label="Spin random roster feed"
+              className="h-11 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] px-4 text-sm font-black text-[#89f0cd] transition hover:border-[#31d6a1]/70 hover:bg-[#31d6a1]/[0.22]"
+              type="button"
+              onClick={spinTeamEra}
+            >
+              Spin
+            </button>
 
             <button
               className="h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1]"
@@ -905,58 +1145,68 @@ export default function Home() {
       </header>
 
       <section className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(420px,520px)_1fr] lg:px-8">
-        <aside className="min-h-[calc(100vh-132px)] overflow-hidden rounded-lg border border-white/10 bg-[#202431]">
+        <aside className="flex max-h-[720px] min-h-[560px] flex-col overflow-hidden rounded-lg border border-white/10 bg-[#202431] lg:sticky lg:top-5 lg:h-[calc(100vh-132px)] lg:max-h-[calc(100vh-132px)] lg:min-h-0">
           <div className="border-b border-white/10 px-4 py-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#31d6a1]">Roster Feed</p>
-                <h2 className="mt-1 text-xl font-black text-white">
-                  {selectedTeam} {selectedEra}
-                </h2>
-              </div>
-              <span className="rounded-md bg-[#2e3446] px-3 py-2 text-sm font-black text-[#f4f2ec]">
-                {filteredPlayers.length} Players
-              </span>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#31d6a1]">Roster Feed</p>
+              <h2 className="mt-1 text-xl font-black text-white">
+                {selectedTeam} {activeEra}
+              </h2>
             </div>
 
-            <p className="mt-4 text-xs font-semibold text-[#aeb4c2]">
-              Showing players with an actual {selectedTeam} season during the {fullEraLabel(selectedEra)}.
+            <p className="mt-3 text-xs font-semibold text-[#aeb4c2]">
+              Showing players with an actual {selectedTeam} season during the {fullEraLabel(activeEra)}.
             </p>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-[#aeb4c2]">
-                Position Priority
-                <select
-                  className="h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-black normal-case tracking-normal text-white outline-none transition focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
-                  value={positionPriority}
-                  onChange={(event) => setPositionPriority(event.target.value as PositionPriority)}
-                >
-                  {POSITION_PRIORITY_OPTIONS.map((position) => (
-                    <option key={position} value={position}>
-                      {position}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <div
+                aria-label="Position filter"
+                className="flex h-10 items-center gap-1 rounded-lg bg-[#1a1f2b] p-1"
+                role="group"
+              >
+                {POSITION_FILTER_OPTIONS.map((filter) => (
+                  <button
+                    key={filter}
+                    className={`h-8 rounded-md px-3 text-sm font-black transition ${
+                      positionFilter === filter
+                        ? "bg-[#ff6f13] text-white"
+                        : "text-[#cfd3df] hover:bg-white/[0.06] hover:text-white"
+                    }`}
+                    type="button"
+                    onClick={() => setPositionFilter(filter)}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
 
-              <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-[#aeb4c2]">
-                Accolade Priority
-                <select
-                  className="h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-black normal-case tracking-normal text-white outline-none transition focus:border-[#ff8a2a] focus:ring-2 focus:ring-[#ff8a2a]/20"
-                  value={accoladePriority}
-                  onChange={(event) => setAccoladePriority(event.target.value)}
-                >
-                  {ACHIEVEMENT_DISPLAY_ORDER.map((achievement) => (
-                    <option key={achievement.id} value={achievement.id}>
-                      {achievement.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <input
+                aria-label="Search roster"
+                className="h-10 min-w-[150px] flex-1 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-semibold normal-case tracking-normal text-white outline-none transition placeholder:text-[#aeb4c2] focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
+                placeholder="Search..."
+                type="search"
+                value={rosterSearch}
+                onChange={(event) => setRosterSearch(event.target.value)}
+              />
+
+              <select
+                aria-label="Accolade filter"
+                className="h-10 w-[132px] rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-black normal-case tracking-normal text-white outline-none transition focus:border-[#ff8a2a] focus:ring-2 focus:ring-[#ff8a2a]/20"
+                value={accoladePriority}
+                onChange={(event) => setAccoladePriority(event.target.value)}
+              >
+                {ACHIEVEMENT_DISPLAY_ORDER.map((achievement) => (
+                  <option key={achievement.id} value={achievement.id}>
+                    {achievement.label}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <p className="mt-3 text-sm font-semibold text-[#cfd3df]">{filteredPlayers.length} players available</p>
           </div>
 
-          <div className="max-h-[calc(100vh-250px)] overflow-y-auto px-3 py-3">
+          <div className="roster-list-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
             {loading ? (
               <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-[#cfd3df]">
                 Loading player accolades...
@@ -967,7 +1217,7 @@ export default function Home() {
               </p>
             ) : filteredPlayers.length === 0 ? (
               <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-[#cfd3df]">
-                No players found for this team and era.
+                {rosterSearch.trim() ? "No players match that search." : "No players found for this team and era."}
               </p>
             ) : (
               <div className="grid gap-2">
@@ -978,7 +1228,7 @@ export default function Home() {
                     <button
                       key={player.id}
                       aria-grabbed={draggedPlayerId === player.id}
-                      className={`player-card grid min-h-[86px] grid-cols-[minmax(174px,0.95fr)_minmax(0,1.55fr)] items-center gap-3 rounded-lg border border-white/10 bg-[#282d3b] px-3 py-3 text-left transition hover:border-[#31d6a1]/60 hover:bg-[#303747] focus:outline-none focus:ring-2 focus:ring-[#31d6a1]/35 ${
+                      className={`player-card grid min-h-[82px] grid-cols-1 gap-3 rounded-lg border px-3 py-3 text-left transition focus:outline-none focus:ring-2 sm:grid-cols-[minmax(150px,0.85fr)_minmax(0,1.15fr)] sm:items-center ${
                         draggedPlayerId === player.id ? "player-card-dragging" : ""
                       } ${canRosterSwap ? "player-card-roster-drop" : ""}`}
                       draggable
@@ -988,19 +1238,17 @@ export default function Home() {
                       onDragOver={(event) => handleRosterDragOver(event, player)}
                       onDragStart={(event) => handleDragStart(event, player)}
                       onDrop={(event) => handleRosterDrop(event, player)}
+                      style={teamThemeStyle(selectedTeam)}
                     >
-                      <span className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)] items-center gap-3">
-                        <span className="player-token" aria-hidden="true">
-                          {playerInitials(player.name)}
+                      <span className="min-w-0">
+                        <span className="player-card-name block truncate text-base font-black leading-tight">
+                          {player.name}
                         </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-base font-black text-white">{player.name}</span>
-                          <span className="mt-1 block text-xs font-black text-[#b86cff]">
-                            {player.positions.join(" / ")}
-                          </span>
-                          <span className="block truncate text-xs font-semibold text-[#aeb4c2]">
-                            {selectedTeam} - {fullEraLabel(selectedEra)}
-                          </span>
+                        <span className="player-card-positions mt-1 block text-xs font-black">
+                          {player.positions.join(" / ")}
+                        </span>
+                        <span className="player-card-team block truncate text-xs font-semibold">
+                          {selectedTeam} - {fullEraLabel(activeEra)}
                         </span>
                       </span>
                       <AchievementStrip achievements={buildAchievements(player)} />
@@ -1012,33 +1260,10 @@ export default function Home() {
           </div>
         </aside>
 
-        <section className="grid gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#202431] px-4 py-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#ff8a2a]">Court Blueprint</p>
-              <p className="mt-1 text-sm font-semibold text-[#cfd3df]">{status}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {POSITIONS.map((position) => (
-                <button
-                  key={position}
-                  className={`h-9 min-w-11 rounded-lg border px-3 text-sm font-black transition ${
-                    selectedSlot === position
-                      ? "border-[#31d6a1] bg-[#31d6a1] text-[#15171f]"
-                      : "border-white/12 bg-white/[0.05] text-white hover:border-white/30"
-                  }`}
-                  type="button"
-                  onClick={() => handlePositionPick(position)}
-                >
-                  {position}
-                </button>
-              ))}
-            </div>
-          </div>
-
+        <section className="flex flex-col gap-4 self-start">
           <div
             ref={courtRef}
-            className="court-blueprint relative min-h-[560px] overflow-hidden rounded-lg border border-white/10 shadow-2xl shadow-black/25"
+            className="court-blueprint relative h-[520px] overflow-hidden rounded-lg border border-white/10 shadow-2xl shadow-black/25 sm:h-[560px]"
           >
             <div className="court-key" />
             <div className="court-rim" />
@@ -1124,7 +1349,8 @@ function CourtSlot({
   onDragOver: (event: DragEvent<HTMLButtonElement>) => void;
   onDrop: (event: DragEvent<HTMLButtonElement>) => void;
 }) {
-  const player = lineup[position];
+  const slot = lineup[position];
+  const player = slot?.player;
   const courtAchievements = player ? buildAchievements(player).slice(0, 4) : [];
 
   return (
@@ -1136,7 +1362,11 @@ function CourtSlot({
       }`}
       type="button"
       aria-grabbed={player ? undefined : false}
+      aria-label={player ? `${player.name}, ${position}` : `${position} slot`}
+      data-player-name={player?.name}
       draggable={Boolean(player)}
+      style={slot ? teamThemeStyle(slot.selection.team) : undefined}
+      title={player?.name}
       onClick={onSelect}
       onDragEnd={onPlayerDragEnd}
       onDragOver={onDragOver}
@@ -1146,7 +1376,10 @@ function CourtSlot({
       <span className="court-slot-position">{position}</span>
       {player ? (
         <>
-          <span className="court-slot-name">{player.name}</span>
+          <span className="court-slot-name">{playerInitials(player.name)}</span>
+          <span className="court-slot-team">
+            {slot.selection.team} - {slot.selection.eraLabel}
+          </span>
           {courtAchievements.length ? <CourtAchievementGrid achievements={courtAchievements} /> : null}
         </>
       ) : null}
