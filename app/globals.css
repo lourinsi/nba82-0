@@ -284,7 +284,7 @@ select {
 }
 
 .spin-tile-action:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.7;
 }
 
@@ -449,7 +449,7 @@ select {
   z-index: 1;
 }
 
-.player-card:hover {
+.player-card:hover:not(:disabled) {
   background:
     radial-gradient(circle at 0% 50%, color-mix(in srgb, var(--team-secondary) 30%, transparent), transparent 50%),
     linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 52%, #303747), color-mix(in srgb, var(--team-primary) 22%, #303747) 48%, color-mix(in srgb, var(--team-secondary) 26%, #303747)),
@@ -464,6 +464,16 @@ select {
 
 .player-card:active {
   cursor: grabbing;
+}
+
+.player-card-disabled {
+  cursor: not-allowed;
+  filter: saturate(0.62);
+  opacity: 0.58;
+}
+
+.player-card-disabled:active {
+  cursor: not-allowed;
 }
 
 .player-card-dragging {
@@ -1086,6 +1096,10 @@ select {
   cursor: grab;
 }
 
+.court-slot-locked {
+  cursor: default;
+}
+
 .court-slot-filled::after {
   background: rgba(10, 12, 18, 0.94);
   border: 1px solid color-mix(in srgb, var(--team-accent) 48%, rgba(255, 255, 255, 0.18));
@@ -1121,6 +1135,10 @@ select {
 
 .court-slot-filled:active {
   cursor: grabbing;
+}
+
+.court-slot-locked:active {
+  cursor: default;
 }
 
 .court-slot-can-drop {
