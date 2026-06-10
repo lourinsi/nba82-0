@@ -18,6 +18,10 @@ type DraftSelection = {
   era?: string;
   eraLabel: string;
 };
+type PositionBonus = {
+  multiplier: number;
+  points: number;
+};
 type ResultPlayer = {
   position: Position;
   player: {
@@ -26,6 +30,7 @@ type ResultPlayer = {
   };
   selection?: DraftSelection;
   achievements: Achievement[];
+  positionBonus?: PositionBonus;
 };
 type AllTimeResultPayload = {
   mode: "all-time";
@@ -57,6 +62,10 @@ function playerInitials(name: string) {
 
 function formatLegacyScore(score: number) {
   return Number.isInteger(score) ? String(score) : score.toFixed(1);
+}
+
+function formatBoostPercent(multiplier: number) {
+  return `${Math.round((multiplier - 1) * 100)}%`;
 }
 
 function readStoredResult() {
@@ -180,6 +189,7 @@ export default function AllTimeResultsPage() {
                 fallbackTeam={selectedTeam}
                 player={entry.player}
                 position={entry.position}
+                positionBonus={entry.positionBonus}
                 selection={entry.selection}
               />
             ))}
@@ -204,6 +214,7 @@ function ResultPlayerRow({
   fallbackTeam,
   player,
   position,
+  positionBonus,
   selection,
 }: {
   achievements: Achievement[];
@@ -211,15 +222,30 @@ function ResultPlayerRow({
   fallbackTeam: string;
   player: { id: string; name: string };
   position: Position;
+  positionBonus?: PositionBonus;
   selection?: DraftSelection;
 }) {
   const displaySelection = {
     team: selection?.team ?? fallbackTeam,
     eraLabel: selection?.eraLabel ?? fallbackEraLabel,
   };
+  const positionBoost = positionBonus && positionBonus.points > 0 ? positionBonus : null;
 
   return (
     <div className="result-player-row" style={teamThemeStyle(displaySelection.team)}>
+      {positionBoost ? (
+        <span
+          aria-label="This player plays his primary position."
+          className="result-position-boost"
+          tabIndex={0}
+        >
+          {formatBoostPercent(positionBoost.multiplier)} boost
+          <span className="result-position-boost-tooltip" role="tooltip">
+            This player plays his primary position.
+          </span>
+        </span>
+      ) : null}
+
       <div className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] items-center gap-4">
         <span className="result-player-token" aria-hidden="true">
           <span>{playerInitials(player.name)}</span>
@@ -244,9 +270,9 @@ function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
   }
 
   return (
-    <span className="achievement-strip" aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}>
+    <span className="achievement-strip flex overflow-x-auto whitespace-nowrap pb-1 min-w-0" aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}>
       {achievements.map((achievement) => (
-        <span className="achievement-stat" key={achievement.id}>
+        <span className="achievement-stat flex-shrink-0" key={achievement.id}>
           <span className="achievement-value">{achievement.value}</span>
           <span className="achievement-label">{achievement.label}</span>
         </span>

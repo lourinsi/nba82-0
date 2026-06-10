@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent } from "react";
+import type { CSSProperties, DragEvent } from "react";
 import { teamThemeStyle } from "./teamStyles";
 
 type Position = "PG" | "SG" | "SF" | "PF" | "C";
@@ -42,9 +42,8 @@ type Player = {
   id: string;
   name: string;
   legacy_points?: number;
-  goat_rank?: number;
-  goat_score?: number;
-  final_legacy_points?: number;
+  // goat_rank?: number | null;
+  // goat_score?: number;
   positions: Position[];
   primary_position: Position;
   current_team: string | null;
@@ -94,6 +93,11 @@ type ResultPlayer = {
   };
   selection: DraftSelection;
   achievements: Achievement[];
+  positionBonus?: PositionBonus;
+};
+type PositionBonus = {
+  multiplier: number;
+  points: number;
 };
 type AllTimeResultPayload = {
   mode: "all-time";
@@ -174,44 +178,107 @@ const TEAM_FIRST_ERAS: Record<string, string> = {
   WAS: "60's",
 };
 const DEFAULT_ERAS = ["90's", "00's", "10's", "20's"];
+const SPIN_DURATION_MS = 1320;
+const SPIN_TICK_MS = 72;
+type SpinTileStyle = CSSProperties & {
+  "--spin-primary": string;
+  "--spin-accent": string;
+  "--spin-kicker": string;
+  "--spin-number": string;
+};
+type SpinTarget = "all" | "team" | "era";
+const ERA_TILE_STYLES: Record<string, SpinTileStyle> = {
+  "40's": {
+    "--spin-primary": "#574536",
+    "--spin-accent": "#c89b5f",
+    "--spin-kicker": "#ffdba8",
+    "--spin-number": "#fff7e6",
+  },
+  "50's": {
+    "--spin-primary": "#24504a",
+    "--spin-accent": "#7ad7c8",
+    "--spin-kicker": "#aaf5ea",
+    "--spin-number": "#f0fffc",
+  },
+  "60's": {
+    "--spin-primary": "#254772",
+    "--spin-accent": "#ffcf56",
+    "--spin-kicker": "#ffe6a1",
+    "--spin-number": "#ffffff",
+  },
+  "70's": {
+    "--spin-primary": "#6d371d",
+    "--spin-accent": "#ff8f35",
+    "--spin-kicker": "#ffc08a",
+    "--spin-number": "#fff3df",
+  },
+  "80's": {
+    "--spin-primary": "#25246d",
+    "--spin-accent": "#ff4fc4",
+    "--spin-kicker": "#ffb4e8",
+    "--spin-number": "#ffffff",
+  },
+  "90's": {
+    "--spin-primary": "#1d1d22",
+    "--spin-accent": "#e23d3d",
+    "--spin-kicker": "#ff9292",
+    "--spin-number": "#ffffff",
+  },
+  "00's": {
+    "--spin-primary": "#183b72",
+    "--spin-accent": "#c7d1df",
+    "--spin-kicker": "#e9f1fb",
+    "--spin-number": "#ffffff",
+  },
+  "10's": {
+    "--spin-primary": "#123f46",
+    "--spin-accent": "#31d6a1",
+    "--spin-kicker": "#89f0cd",
+    "--spin-number": "#ffffff",
+  },
+  "20's": {
+    "--spin-primary": "#321a66",
+    "--spin-accent": "#7de0ff",
+    "--spin-kicker": "#b6f0ff",
+    "--spin-number": "#ffffff",
+  },
+};
 const ACCOLADE_WEIGHTS = {
   mvp_count: 10,
-  finals_mvp_count: 5,
-  dpoy_count: 5,
-  championship_rings: 3,
-  roy_won: 3,
-  all_nba_1st: 5,
-  all_nba_2nd: 3,
-  all_nba_3rd: 2,
-  all_def_1st: 3,
-  all_def_2nd: 2,
-  scoring_titles: 3,
-  assist_titles: 3,
-  rebound_titles: 3,
-  steal_titles: 3,
-  block_titles: 3,
-  olympic_gold_medals: 3,
-  olympic_silver_medals: 1,
-  olympic_bronze_medals: 0.5,
-  all_rookie_1st: 2,
-  all_rookie_2nd: 1.5,
-  all_star_selections: 2,
-  all_star_mvp_count: 3,
-  "6moy": 2,
-  most_improved: 2,
-  seasons_played: 0.5,
+  finals_mvp_count: 6,
+  all_nba_1st: 6,
+  all_nba_2nd: 4.5,
+  all_nba_3rd: 3,
+  championship_rings: 2,
+  dpoy_count: 2,
+  all_def_1st: 1,
+  all_def_2nd: 0.75,
+  scoring_titles: 2,
+  assist_titles: 2,
+  rebound_titles: 1.5,
+  steal_titles: 1,
+  block_titles: 1,
+  // no more olympics point value
+  roy_won: 1.5,
+  all_rookie_1st: 0.75,
+  all_rookie_2nd: 0.5,
+  all_star_selections: 1,
+  all_star_mvp_count: 1.5,
+  "6moy": 1,
+  most_improved: 1,
+  seasons_played: 0.25,
 } satisfies Partial<Record<keyof Accolades, number>>;
 type WeightedAccoladeKey = keyof typeof ACCOLADE_WEIGHTS;
 
 const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
-  {
-    id: "goat",
-    label: "GOAT",
-    count: (player) => playerGoatRank(player),
-    value: (player) => ordinalRank(playerGoatRank(player)),
-    sortValue: (player) => player.goat_score ?? (playerGoatRank(player) ? 101 - playerGoatRank(player) : 0),
-    weight: Number.POSITIVE_INFINITY,
-  },
+  // {
+  //   id: "goat",
+  //   label: "GOAT",
+  //   count: (player) => playerGoatRank(player),
+  //   value: (player) => ordinalRank(playerGoatRank(player)),
+  //   sortValue: (player) => player.goat_score ?? (playerGoatRank(player) ? 101 - playerGoatRank(player) : 0),
+  //   weight: Number.POSITIVE_INFINITY,
+  // },
   { id: "mvp", label: "MVP", count: (player) => player.accolades.mvp_count, weight: ACCOLADE_WEIGHTS.mvp_count },
   {
     id: "fmvp",
@@ -248,12 +315,6 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   { id: "steals", label: "STEALS", count: (player) => player.accolades.steal_titles, weight: ACCOLADE_WEIGHTS.steal_titles },
   { id: "blocks", label: "BLOCKS", count: (player) => player.accolades.block_titles, weight: ACCOLADE_WEIGHTS.block_titles },
   {
-    id: "olympic-gold",
-    label: "GOLD",
-    count: (player) => player.accolades.olympic_gold_medals ?? 0,
-    weight: ACCOLADE_WEIGHTS.olympic_gold_medals,
-  },
-  {
     id: "all-star-mvp",
     label: "AS MVP",
     count: (player) => player.accolades.all_star_mvp_count ?? 0,
@@ -284,38 +345,26 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     count: (player) => player.accolades.all_rookie_2nd ?? 0,
     weight: ACCOLADE_WEIGHTS.all_rookie_2nd,
   },
-  {
-    id: "olympic-silver",
-    label: "SILVER",
-    count: (player) => player.accolades.olympic_silver_medals ?? 0,
-    weight: ACCOLADE_WEIGHTS.olympic_silver_medals,
-  },
-  {
-    id: "olympic-bronze",
-    label: "BRONZE",
-    count: (player) => player.accolades.olympic_bronze_medals ?? 0,
-    weight: ACCOLADE_WEIGHTS.olympic_bronze_medals,
-  },
   { id: "seasons", label: "SEASONS", count: (player) => player.accolades.seasons_played, weight: ACCOLADE_WEIGHTS.seasons_played },
 ];
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
 const SEASON_TIERS: SeasonTier[] = [
   {
-    minScore: 2000,
+    minScore: 1000,
     minWins: 100,
     maxWins: 100,
     tier: "WTF",
     description: "THIS MIGHT BE THE BEST TEAM EVER YOU JUST BROKE 82-0 AND THE SCORE IS 100-0. The engine is crying. The database is melting.",
   },
   {
-    minScore: 1500,
+    minScore: 800,
     minWins: 82,
     maxWins: 82,
     tier: "S+ (The Immortal 82-0)",
     description: "The Absolute Pinnacle. You drafted a lineup of literal basketball Gods. This team sweeps the league, goes undefeated, and forces opposing fanbases to switch sports.",
   },
   {
-    minScore: 1000,
+    minScore: 800,
     minWins: 81,
     maxWins: 81,
     tier: "S (You're almost there buddyy...)",
@@ -456,17 +505,17 @@ function ordinalRank(rank: number) {
   return `${rank}${suffix}`;
 }
 
-function playerGoatRank(player: Player) {
-  const explicitRank = Number(player.goat_rank || 0);
+// function playerGoatRank(player: Player) {
+//   const explicitRank = Number(player.goat_rank || 0);
 
-  if (explicitRank) {
-    return explicitRank;
-  }
+//   if (explicitRank) {
+//     return explicitRank;
+//   }
 
-  const goatScore = Number(player.goat_score || 0);
+//   const goatScore = Number(player.goat_score || 0);
 
-  return goatScore > 0 ? 101 - goatScore : 0;
-}
+//   return goatScore > 0 ? 101 - goatScore : 0;
+// }
 
 function numericAccoladeValue(value: Accolades[keyof Accolades]) {
   if (typeof value === "boolean") {
@@ -518,7 +567,42 @@ function buildAchievementTotals(players: Player[]) {
 }
 
 function playerLegacyScore(player: Player | undefined) {
-  return Number(player?.final_legacy_points ?? player?.legacy_points ?? 0);
+  const legacyPoints = Number(player?.legacy_points ?? 0);
+  // const goatScore = Number(player?.goat_score ?? 0);
+
+  // return Number((legacyPoints + goatScore).toFixed(2));
+
+  return Number((legacyPoints).toFixed(2));
+}
+
+function positionScoreMultiplier(player: Player | undefined, assignedPosition: Position) {
+  if (!player || player.primary_position !== assignedPosition) {
+    return 1;
+  }
+
+  const legacyPoints = Number(player.legacy_points ?? 0);
+
+  return legacyPoints < 100 ? 1.15 : 1.1;
+}
+
+function lineupSlotScore(slot: LineupSlot | undefined, assignedPosition: Position) {
+  if (!slot) {
+    return 0;
+  }
+
+  return Number((playerLegacyScore(slot.player) * positionScoreMultiplier(slot.player, assignedPosition)).toFixed(2));
+}
+
+function positionBonusForSlot(slot: LineupSlot | undefined, assignedPosition: Position): PositionBonus | undefined {
+  if (!slot) {
+    return undefined;
+  }
+
+  const baseScore = playerLegacyScore(slot.player);
+  const multiplier = positionScoreMultiplier(slot.player, assignedPosition);
+  const points = Number((baseScore * multiplier - baseScore).toFixed(2));
+
+  return points > 0 ? { multiplier, points } : undefined;
 }
 
 function achievementPriorityValue(player: Player, achievementId: string) {
@@ -682,6 +766,61 @@ function randomItem<T>(items: T[]) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
+function randomDifferentItem<T>(items: T[], current: T) {
+  const options = items.length > 1 ? items.filter((item) => item !== current) : items;
+
+  return randomItem(options);
+}
+
+function randomDraftSelection(players: Player[], teamOptions: string[], currentTeam?: string, currentEra?: string) {
+  const team = currentTeam ? randomDifferentItem(teamOptions, currentTeam) : randomItem(teamOptions);
+  const eras = eraOptionsForTeam(players, team);
+  const eraOptions = eras.length ? eras : DEFAULT_ERAS;
+  const era = currentEra ? randomDifferentItem(eraOptions, currentEra) : randomItem(eraOptions);
+
+  return buildDraftSelection(team, era);
+}
+
+function teamOptionsForEra(players: Player[], teamOptions: string[], era: string) {
+  const validTeams = teamOptions.filter((team) => {
+    const eras = eraOptionsForTeam(players, team);
+
+    return eras.length ? eras.includes(era) : teamEraExists(team, era);
+  });
+
+  return validTeams.length ? validTeams : teamOptions;
+}
+
+function randomTeamSelectionForEra(players: Player[], teamOptions: string[], era: string, currentTeam: string) {
+  const validTeams = teamOptionsForEra(players, teamOptions, era);
+  const team = randomDifferentItem(validTeams, currentTeam);
+
+  return buildDraftSelection(team, era);
+}
+
+function randomEraSelectionForTeam(players: Player[], team: string, currentEra: string) {
+  const eras = eraOptionsForTeam(players, team);
+  const validEras = eras.length ? eras : DEFAULT_ERAS.filter((era) => teamEraExists(team, era));
+  const era = randomDifferentItem(validEras.length ? validEras : DEFAULT_ERAS, currentEra);
+
+  return buildDraftSelection(team, era);
+}
+
+function teamSpinTileStyle(team: string): SpinTileStyle {
+  const theme = teamThemeStyle(team);
+
+  return {
+    "--spin-primary": theme["--team-primary"],
+    "--spin-accent": theme["--team-secondary"],
+    "--spin-kicker": theme["--team-readable-secondary"],
+    "--spin-number": theme["--team-readable-number"],
+  };
+}
+
+function eraSpinTileStyle(era: string): SpinTileStyle {
+  return ERA_TILE_STYLES[era] ?? ERA_TILE_STYLES["20's"];
+}
+
 function formatLegacyScore(score: number) {
   return Number.isInteger(score) ? String(score) : score.toFixed(1);
 }
@@ -712,6 +851,8 @@ function projectSeasonRecord(score: number, hasStephCurry: boolean): SeasonProje
 export default function Home() {
   const router = useRouter();
   const courtRef = useRef<HTMLDivElement | null>(null);
+  const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedTeam, setSelectedTeam] = useState("LAL");
   const [selectedEra, setSelectedEra] = useState("10's");
@@ -725,6 +866,10 @@ export default function Home() {
   const [, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [spinningTarget, setSpinningTarget] = useState<SpinTarget | null>(null);
+  const isSpinning = spinningTarget !== null;
+  const spinStatusLabel =
+    spinningTarget === "team" ? "TEAM SPINNING..." : spinningTarget === "era" ? "ERA SPINNING..." : "SPINNING...";
 
   useEffect(() => {
     const controller = new AbortController();
@@ -762,6 +907,19 @@ export default function Home() {
 
     return () => controller.abort();
   }, []);
+
+  useEffect(
+    () => () => {
+      if (spinIntervalRef.current) {
+        clearInterval(spinIntervalRef.current);
+      }
+
+      if (spinTimeoutRef.current) {
+        clearTimeout(spinTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const teamOptions = CURRENT_NBA_TEAMS;
 
@@ -840,17 +998,26 @@ export default function Home() {
     () => buildAchievementTotals(lineupEntries.map(({ player }) => player)),
     [lineupEntries],
   );
-  const teamLegacyScore = POSITIONS.reduce(
-    (sum, position) => sum + playerLegacyScore(lineup[position]?.player),
-    0,
+  const teamLegacyScore = Number(
+    POSITIONS.reduce(
+      (sum, position) => sum + lineupSlotScore(lineup[position], position),
+      0,
+    ).toFixed(2),
   );
   const lineupHasStephCurry = POSITIONS.some((position) => {
     const player = lineup[position]?.player;
 
     return player ? playerIsStephCurry(player) : false;
   });
+  const teamTileSpinning = spinningTarget === "all" || spinningTarget === "team";
+  const eraTileSpinning = spinningTarget === "all" || spinningTarget === "era";
 
   function assignPlayer(player: Player, preferredPosition?: Position, allowReplace = false) {
+    if (isSpinning) {
+      setStatus("Wait for the spin to finish before assigning a player.");
+      return;
+    }
+
     const source = currentPositionForPlayer(lineup, player.id);
     const target =
       preferredPosition ??
@@ -924,6 +1091,12 @@ export default function Home() {
   }
 
   function handleDragStart(event: DragEvent<HTMLButtonElement>, player: Player, sourcePosition: Position | null = null) {
+    if (isSpinning) {
+      event.preventDefault();
+      setStatus("Wait for the spin to finish before moving players.");
+      return;
+    }
+
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("application/x-player-id", player.id);
     event.dataTransfer.setData("application/x-source-position", sourcePosition ?? "");
@@ -1040,17 +1213,66 @@ export default function Home() {
     setStatus("Lineup cleared.");
   }
 
-  function spinTeamEra() {
-    const team = randomItem(teamOptions);
-    const eras = eraOptionsForTeam(players, team);
-    const era = randomItem(eras.length ? eras : DEFAULT_ERAS);
+  function selectionForSpinTarget(target: SpinTarget) {
+    if (target === "team") {
+      return randomTeamSelectionForEra(players, teamOptions, activeEra, selectedTeam);
+    }
 
-    setSelectedTeam(team);
-    setSelectedEra(era);
+    if (target === "era") {
+      return randomEraSelectionForTeam(players, selectedTeam, activeEra);
+    }
+
+    return randomDraftSelection(players, teamOptions, selectedTeam, activeEra);
+  }
+
+  function applySpinSelection(selection: DraftSelection, target: SpinTarget) {
+    if (target === "team" || target === "all") {
+      setSelectedTeam(selection.team);
+    }
+
+    if (target === "era" || target === "all") {
+      setSelectedEra(selection.era);
+    }
+  }
+
+  function spinTeamEra(target: SpinTarget = "all") {
+    if (isSpinning) {
+      return;
+    }
+
+    const finalSelection = selectionForSpinTarget(target);
+
+    if (spinIntervalRef.current) {
+      clearInterval(spinIntervalRef.current);
+    }
+
+    if (spinTimeoutRef.current) {
+      clearTimeout(spinTimeoutRef.current);
+    }
+
     setSelectedSlot(null);
     setDraggedPlayerId(null);
     setDraggedFromPosition(null);
-    setStatus(`Spun ${team} ${fullEraLabel(era)}.`);
+    setSpinningTarget(target);
+    setStatus("Spinning...");
+
+    spinIntervalRef.current = setInterval(() => {
+      const previewSelection = selectionForSpinTarget(target);
+
+      applySpinSelection(previewSelection, target);
+    }, SPIN_TICK_MS);
+
+    spinTimeoutRef.current = setTimeout(() => {
+      if (spinIntervalRef.current) {
+        clearInterval(spinIntervalRef.current);
+        spinIntervalRef.current = null;
+      }
+
+      spinTimeoutRef.current = null;
+      applySpinSelection(finalSelection, target);
+      setSpinningTarget(null);
+      setStatus(`Spun ${finalSelection.team} ${finalSelection.eraLabel}.`);
+    }, SPIN_DURATION_MS);
   }
 
   function simulateSeason() {
@@ -1073,6 +1295,7 @@ export default function Home() {
         },
         selection,
         achievements: buildAchievements(player),
+        positionBonus: positionBonusForSlot(lineup[position], position),
       })),
       totals: lineupAchievementTotals,
     };
@@ -1097,7 +1320,10 @@ export default function Home() {
             <label className="grid gap-1 text-sm font-semibold text-[#cfd3df]">
               Team
               <select
-                className="h-11 rounded-lg border border-[#ff8a2a]/45 bg-[#242938] px-3 text-base font-black text-white outline-none transition focus:border-[#ffb13d] focus:ring-2 focus:ring-[#ff8a2a]/25"
+                className={`h-11 rounded-lg border border-[#ff8a2a]/45 bg-[#242938] px-3 text-base font-black text-white outline-none transition focus:border-[#ffb13d] focus:ring-2 focus:ring-[#ff8a2a]/25 disabled:cursor-wait disabled:opacity-100 ${
+                  isSpinning ? "animate-pulse shadow-[0_0_22px_rgba(255,138,42,0.22)]" : ""
+                }`}
+                disabled={isSpinning}
                 value={selectedTeam}
                 onChange={(event) => setSelectedTeam(event.target.value)}
               >
@@ -1112,7 +1338,10 @@ export default function Home() {
             <label className="grid gap-1 text-sm font-semibold text-[#cfd3df]">
               Era
               <select
-                className="h-11 rounded-lg border border-[#b86cff]/45 bg-[#242938] px-3 text-base font-black text-white outline-none transition focus:border-[#d998ff] focus:ring-2 focus:ring-[#b86cff]/25"
+                className={`h-11 rounded-lg border border-[#b86cff]/45 bg-[#242938] px-3 text-base font-black text-white outline-none transition focus:border-[#d998ff] focus:ring-2 focus:ring-[#b86cff]/25 disabled:cursor-wait disabled:opacity-100 ${
+                  isSpinning ? "animate-pulse shadow-[0_0_22px_rgba(184,108,255,0.22)]" : ""
+                }`}
+                disabled={isSpinning}
                 value={activeEra}
                 onChange={(event) => setSelectedEra(event.target.value)}
               >
@@ -1126,15 +1355,18 @@ export default function Home() {
 
             <button
               aria-label="Spin random roster feed"
-              className="h-11 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] px-4 text-sm font-black text-[#89f0cd] transition hover:border-[#31d6a1]/70 hover:bg-[#31d6a1]/[0.22]"
+              aria-busy={isSpinning}
+              className="h-11 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] px-4 text-sm font-black text-[#89f0cd] transition hover:border-[#31d6a1]/70 hover:bg-[#31d6a1]/[0.22] disabled:cursor-wait disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#aeb4c2]"
+              disabled={isSpinning}
               type="button"
-              onClick={spinTeamEra}
+              onClick={() => spinTeamEra("all")}
             >
-              Spin
+              {isSpinning ? "SPINNING..." : "Spin"}
             </button>
 
             <button
-              className="h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1]"
+              className="h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1] disabled:cursor-wait disabled:text-[#8f96a7]"
+              disabled={isSpinning}
               type="button"
               onClick={clearLineup}
             >
@@ -1146,118 +1378,181 @@ export default function Home() {
 
       <section className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(420px,520px)_1fr] lg:px-8">
         <aside className="flex max-h-[720px] min-h-[560px] flex-col overflow-hidden rounded-lg border border-white/10 bg-[#202431] lg:sticky lg:top-5 lg:h-[calc(100vh-132px)] lg:max-h-[calc(100vh-132px)] lg:min-h-0">
-          <div className="border-b border-white/10 px-4 py-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#31d6a1]">Roster Feed</p>
-              <h2 className="mt-1 text-xl font-black text-white">
-                {selectedTeam} {activeEra}
-              </h2>
-            </div>
+          {isSpinning ? (
+            <div className="spin-stage flex min-h-0 flex-1 flex-col px-4 py-5">
+              <div className="spin-stage-header">
+                <span className="spin-stage-mark" aria-hidden="true" />
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-[#31d6a1]">Draft Draw</span>
+              </div>
 
-            <p className="mt-3 text-xs font-semibold text-[#aeb4c2]">
-              Showing players with an actual {selectedTeam} season during the {fullEraLabel(activeEra)}.
-            </p>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
               <div
-                aria-label="Position filter"
-                className="flex h-10 items-center gap-1 rounded-lg bg-[#1a1f2b] p-1"
-                role="group"
+                className="mt-5 grid grid-cols-2 gap-3"
+                aria-busy={isSpinning}
+                aria-live={isSpinning ? "off" : "polite"}
               >
-                {POSITION_FILTER_OPTIONS.map((filter) => (
-                  <button
-                    key={filter}
-                    className={`h-8 rounded-md px-3 text-sm font-black transition ${
-                      positionFilter === filter
-                        ? "bg-[#ff6f13] text-white"
-                        : "text-[#cfd3df] hover:bg-white/[0.06] hover:text-white"
-                    }`}
-                    type="button"
-                    onClick={() => setPositionFilter(filter)}
-                  >
-                    {filter}
-                  </button>
-                ))}
+                <SpinTile
+                  label="Team"
+                  onSpin={() => spinTeamEra("team")}
+                  style={teamSpinTileStyle(selectedTeam)}
+                  disabled={isSpinning}
+                  tone="team"
+                  value={selectedTeam}
+                  spinning={teamTileSpinning}
+                />
+                <SpinTile
+                  label="Era"
+                  onSpin={() => spinTeamEra("era")}
+                  style={eraSpinTileStyle(activeEra)}
+                  disabled={isSpinning}
+                  tone="era"
+                  value={activeEra}
+                  spinning={eraTileSpinning}
+                />
               </div>
 
-              <input
-                aria-label="Search roster"
-                className="h-10 min-w-[150px] flex-1 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-semibold normal-case tracking-normal text-white outline-none transition placeholder:text-[#aeb4c2] focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
-                placeholder="Search..."
-                type="search"
-                value={rosterSearch}
-                onChange={(event) => setRosterSearch(event.target.value)}
-              />
+              <div className="spin-stage-meter mt-5" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
 
-              <select
-                aria-label="Accolade filter"
-                className="h-10 w-[132px] rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-black normal-case tracking-normal text-white outline-none transition focus:border-[#ff8a2a] focus:ring-2 focus:ring-[#ff8a2a]/20"
-                value={accoladePriority}
-                onChange={(event) => setAccoladePriority(event.target.value)}
-              >
-                {ACHIEVEMENT_DISPLAY_ORDER.map((achievement) => (
-                  <option key={achievement.id} value={achievement.id}>
-                    {achievement.label}
-                  </option>
-                ))}
-              </select>
+              <p className="mt-5 text-center text-base font-black uppercase text-[#cfd3df]">{spinStatusLabel}</p>
             </div>
+          ) : (
+            <>
+              <div className="border-b border-white/10 px-4 py-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#31d6a1]">Roster Feed</p>
+                  <div className="mt-2 grid grid-cols-2 gap-3" aria-live="polite">
+                    <SpinTile
+                      label="Team"
+                      onSpin={() => spinTeamEra("team")}
+                      style={teamSpinTileStyle(selectedTeam)}
+                      disabled={isSpinning}
+                      tone="team"
+                      value={selectedTeam}
+                      spinning={teamTileSpinning}
+                    />
+                    <SpinTile
+                      label="Era"
+                      onSpin={() => spinTeamEra("era")}
+                      style={eraSpinTileStyle(activeEra)}
+                      disabled={isSpinning}
+                      tone="era"
+                      value={activeEra}
+                      spinning={eraTileSpinning}
+                    />
+                  </div>
+                </div>
 
-            <p className="mt-3 text-sm font-semibold text-[#cfd3df]">{filteredPlayers.length} players available</p>
-          </div>
+                <p className="mt-3 text-xs font-semibold text-[#aeb4c2]">
+                  Showing players with an actual {selectedTeam} season during the {fullEraLabel(activeEra)}.
+                </p>
 
-          <div className="roster-list-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            {loading ? (
-              <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-[#cfd3df]">
-                Loading player accolades...
-              </p>
-            ) : error ? (
-              <p className="rounded-lg border border-[#ff8a2a]/30 bg-[#ff8a2a]/10 p-4 text-sm font-semibold text-[#ffd5b4]">
-                {error}
-              </p>
-            ) : filteredPlayers.length === 0 ? (
-              <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-[#cfd3df]">
-                {rosterSearch.trim() ? "No players match that search." : "No players found for this team and era."}
-              </p>
-            ) : (
-              <div className="grid gap-2">
-                {filteredPlayers.map((player) => {
-                  const canRosterSwap = rosterDropAllowed(player);
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <div
+                    aria-label="Position filter"
+                    className="flex h-10 items-center gap-1 rounded-lg bg-[#1a1f2b] p-1"
+                    role="group"
+                  >
+                    {POSITION_FILTER_OPTIONS.map((filter) => (
+                      <button
+                        key={filter}
+                        className={`h-8 rounded-md px-3 text-sm font-black transition ${
+                          positionFilter === filter
+                            ? "bg-[#ff6f13] text-white"
+                            : "text-[#cfd3df] hover:bg-white/[0.06] hover:text-white"
+                        }`}
+                        type="button"
+                        onClick={() => setPositionFilter(filter)}
+                      >
+                        {filter}
+                      </button>
+                    ))}
+                  </div>
 
-                  return (
-                    <button
-                      key={player.id}
-                      aria-grabbed={draggedPlayerId === player.id}
-                      className={`player-card grid min-h-[82px] grid-cols-1 gap-3 rounded-lg border px-3 py-3 text-left transition focus:outline-none focus:ring-2 sm:grid-cols-[minmax(150px,0.85fr)_minmax(0,1.15fr)] sm:items-center ${
-                        draggedPlayerId === player.id ? "player-card-dragging" : ""
-                      } ${canRosterSwap ? "player-card-roster-drop" : ""}`}
-                      draggable
-                      type="button"
-                      onClick={() => assignPlayer(player, selectedSlot ?? undefined)}
-                      onDragEnd={handleDragEnd}
-                      onDragOver={(event) => handleRosterDragOver(event, player)}
-                      onDragStart={(event) => handleDragStart(event, player)}
-                      onDrop={(event) => handleRosterDrop(event, player)}
-                      style={teamThemeStyle(selectedTeam)}
-                    >
-                      <span className="min-w-0">
-                        <span className="player-card-name block truncate text-base font-black leading-tight">
-                          {player.name}
-                        </span>
-                        <span className="player-card-positions mt-1 block text-xs font-black">
-                          {player.positions.join(" / ")}
-                        </span>
-                        <span className="player-card-team block truncate text-xs font-semibold">
-                          {selectedTeam} - {fullEraLabel(activeEra)}
-                        </span>
-                      </span>
-                      <AchievementStrip achievements={buildAchievements(player)} />
-                    </button>
-                  );
-                })}
+                  <input
+                    aria-label="Search roster"
+                    className="h-10 min-w-[150px] flex-1 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-semibold normal-case tracking-normal text-white outline-none transition placeholder:text-[#aeb4c2] focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
+                    placeholder="Search..."
+                    type="search"
+                    value={rosterSearch}
+                    onChange={(event) => setRosterSearch(event.target.value)}
+                  />
+
+                  <select
+                    aria-label="Accolade filter"
+                    className="h-10 w-[132px] rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-black normal-case tracking-normal text-white outline-none transition focus:border-[#ff8a2a] focus:ring-2 focus:ring-[#ff8a2a]/20"
+                    value={accoladePriority}
+                    onChange={(event) => setAccoladePriority(event.target.value)}
+                  >
+                    {ACHIEVEMENT_DISPLAY_ORDER.map((achievement) => (
+                      <option key={achievement.id} value={achievement.id}>
+                        {achievement.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <p className="mt-3 text-sm font-semibold text-[#cfd3df]">{filteredPlayers.length} players available</p>
               </div>
-            )}
-          </div>
+
+              <div className="roster-list-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                {loading ? (
+                  <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-[#cfd3df]">
+                    Loading player accolades...
+                  </p>
+                ) : error ? (
+                  <p className="rounded-lg border border-[#ff8a2a]/30 bg-[#ff8a2a]/10 p-4 text-sm font-semibold text-[#ffd5b4]">
+                    {error}
+                  </p>
+                ) : filteredPlayers.length === 0 ? (
+                  <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-[#cfd3df]">
+                    {rosterSearch.trim() ? "No players match that search." : "No players found for this team and era."}
+                  </p>
+                ) : (
+                  <div className="grid gap-2">
+                    {filteredPlayers.map((player) => {
+                      const canRosterSwap = rosterDropAllowed(player);
+
+                      return (
+                        <button
+                          key={player.id}
+                          aria-grabbed={draggedPlayerId === player.id}
+                          className={`player-card grid min-h-[82px] grid-cols-1 gap-3 rounded-lg border px-3 py-3 text-left transition focus:outline-none focus:ring-2 sm:grid-cols-[minmax(150px,0.85fr)_minmax(0,1.15fr)] sm:items-center ${
+                            draggedPlayerId === player.id ? "player-card-dragging" : ""
+                          } ${canRosterSwap ? "player-card-roster-drop" : ""}`}
+                          draggable
+                          type="button"
+                          onClick={() => assignPlayer(player, selectedSlot ?? undefined)}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={(event) => handleRosterDragOver(event, player)}
+                          onDragStart={(event) => handleDragStart(event, player)}
+                          onDrop={(event) => handleRosterDrop(event, player)}
+                          style={teamThemeStyle(selectedTeam)}
+                        >
+                          <span className="min-w-0">
+                            <span className="player-card-name block truncate text-base font-black leading-tight">
+                              {player.name}
+                            </span>
+                            <span className="player-card-positions mt-1 block text-xs font-black">
+                              {player.positions.join(" / ")}
+                            </span>
+                            <span className="player-card-team block truncate text-xs font-semibold">
+                              {selectedTeam} - {fullEraLabel(activeEra)}
+                            </span>
+                          </span>
+                          <AchievementStrip achievements={buildAchievements(player)} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </aside>
 
         <section className="flex flex-col gap-4 self-start">
@@ -1294,7 +1589,7 @@ export default function Home() {
             </div>
             <button
               className="h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#8f96a7]"
-              disabled={!lineupComplete}
+              disabled={!lineupComplete || isSpinning}
               type="button"
               onClick={simulateSeason}
             >
@@ -1307,15 +1602,62 @@ export default function Home() {
   );
 }
 
+function SpinTile({
+  disabled,
+  label,
+  onSpin,
+  style,
+  tone,
+  value,
+  spinning,
+}: {
+  disabled: boolean;
+  label: string;
+  onSpin: () => void;
+  style: SpinTileStyle;
+  tone: "team" | "era";
+  value: string;
+  spinning: boolean;
+}) {
+  return (
+    <div
+      className={`spin-tile spin-tile-${tone} grid h-24 place-items-center px-3 text-center ${
+        spinning ? "spin-tile-spinning" : ""
+      }`}
+      style={style}
+    >
+      <button
+        aria-label={`Spin ${label.toLowerCase()}`}
+        className={`spin-tile-action ${spinning ? "spin-tile-action-spinning" : ""}`}
+        disabled={disabled}
+        type="button"
+        onClick={onSpin}
+      >
+        <span aria-hidden="true" />
+      </button>
+      <span className="grid min-w-0 gap-1">
+        <span className="spin-tile-label text-sm font-black uppercase">{label}</span>
+        <span key={`${label}-${value}`} className="spin-tile-value truncate text-4xl font-black leading-none">
+          {value}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
   if (achievements.length === 0) {
     return <span className="achievement-strip achievement-strip-empty" aria-hidden="true" />;
   }
 
   return (
-    <span className="achievement-strip" aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}>
+    <span // AchievementStrip component
+      className="achievement-strip flex overflow-x-auto whitespace-nowrap pb-1 min-w-0"
+      aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}
+      onClick={(e) => e.stopPropagation()}
+    >
       {achievements.map((achievement) => (
-        <span className="achievement-stat" key={achievement.id}>
+        <span className="achievement-stat flex-shrink-0" key={achievement.id}>
           <span className="achievement-value">{achievement.value}</span>
           <span className="achievement-label">{achievement.label}</span>
         </span>
