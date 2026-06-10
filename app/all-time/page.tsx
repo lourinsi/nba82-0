@@ -1122,12 +1122,22 @@ export default function Home() {
   const dropStatuses = useMemo(
     () =>
       Object.fromEntries(
-        POSITIONS.map((position) => [
-          position,
-          isAdmin && draggedPlayer ? placementStatus(lineup, draggedPlayer, position) : "blocked",
-        ]),
+        POSITIONS.map((position) => {
+          if (!draggedPlayer || (isSpinning && !isAdmin)) return [position, "blocked"];
+          const status = placementStatus(lineup, draggedPlayer, position);
+
+          if (isAdmin) return [position, status];
+
+          // Public mode: 
+          // 1. Swapping/Moving on the court (draggedFromPosition is not null) is allowed.
+          // 2. Roster to court (draggedFromPosition is null) is allowed only if target slot is empty.
+          if (draggedFromPosition !== null) {
+            return [position, status === "move" || status === "swap" || status === "same" ? status : "blocked"];
+          }
+          return [position, (status === "move" && !lineup[position]) || status === "same" ? status : "blocked"];
+        }),
       ) as Record<Position, PlacementStatus>,
-    [draggedPlayer, isAdmin, lineup],
+    [draggedPlayer, isAdmin, lineup, draggedFromPosition, isSpinning],
   );
 
   const lineupComplete = POSITIONS.every((position) => Boolean(lineup[position]));
@@ -1257,25 +1267,30 @@ export default function Home() {
     const source = currentPositionForPlayer(lineup, player.id);
 
     if (!isAdmin) {
-      if (rosterSelectionDisabled) {
-        setStatus("Spin before choosing the next player.");
+      // Swapping within the court is always allowed in public mode.
+      // Picking from the roster (source is null) is only allowed when awaiting a pick.
+      if (!source) { // Player is from roster
+        if (rosterSelectionDisabled) {
+          setStatus(publicGameComplete ? "Draft complete." : "Spin before choosing the next player.");
+          return false;
+        }
+        // If not rosterSelectionDisabled, then awaitingPublicPick is true.
+      const status = placementStatus(lineup, player, preferredPosition || "PG"); 
+      if (status === "blocked" || (preferredPosition && lineup[preferredPosition])) {
+        setStatus("Public slots are locked once filled. Use admin mode to replace players.");
         return false;
       }
-
-      if (source) {
-        setStatus("Public players cannot be moved once selected.");
-        return false;
-      }
-
       allowReplace = false;
+      }
     }
 
     const target =
       preferredPosition ??
-      player.positions.find((position) => {
-        const status = placementStatus(lineup, player, position);
-        return (status === "move" && (allowReplace || !lineup[position])) || status === "same";
-      });
+      [player.primary_position, ...player.positions.filter((p) => p !== player.primary_position)]
+        .find((position) => {
+          const status = placementStatus(lineup, player, position);
+          return (status === "move" && (allowReplace || !lineup[position])) || status === "same";
+        });
 
     if (!target) {
       setStatus(`${player.name} has no open eligible slot.`);
@@ -1339,23 +1354,15 @@ export default function Home() {
           ? `${player.name} replaced ${replacedPlayer.name} at ${target}.`
         : `${player.name} assigned to ${target}.`,
     );
-    if (!isAdmin) {
+    if (!isAdmin && !source) {
       setAwaitingPublicPick(false);
     }
     return true;
   }
 
   function handleDragStart(event: DragEvent<HTMLButtonElement>, player: Player, sourcePosition: Position | null = null) {
-    if (!isAdmin) {
-      event.preventDefault();
-      setStatus("Public mode uses locked picks only.");
-      return;
-    }
-
-    if (isSpinning) {
-      event.preventDefault();
+    if (isSpinning && !isAdmin) {
       setStatus("Wait for the spin to finish before moving players.");
-      return;
     }
 
     event.dataTransfer.effectAllowed = "move";
@@ -1383,8 +1390,11 @@ export default function Home() {
   }
 
   function handleDragEnd(event: DragEvent<HTMLButtonElement>) {
-    if (!isAdmin) {
-      setDraggedPlayerId(null);
+    // In public mode, dragging a player off the court should not remove them.
+    // The drag operation itself is allowed to start, but the drop effect will be 'none'
+    // if not dropped on a valid target. We only allow removal in admin mode.
+    if (!isAdmin && draggedFromPosition !== null) { // If dragging from court in public mode
+      setDraggedPlayerId(null); // Reset dragged state without removing the player
       setDraggedFromPosition(null);
       return;
     }
@@ -1406,11 +1416,7 @@ export default function Home() {
   }
 
   function handleSlotDragOver(event: DragEvent<HTMLButtonElement>, position: Position) {
-    if (!isAdmin) {
-      return;
-    }
-
-    if (!draggedPlayer || !canDropAt(lineup, draggedPlayer, position)) {
+    if (!draggedPlayer || dropStatuses[position] === "blocked") {
       return;
     }
 
@@ -1421,22 +1427,9 @@ export default function Home() {
   function handleSlotDrop(event: DragEvent<HTMLButtonElement>, position: Position) {
     event.preventDefault();
 
-    if (!isAdmin) {
-      setDraggedPlayerId(null);
-      setDraggedFromPosition(null);
-      return;
-    }
+    if (!draggedPlayer) return;
 
-    const playerId = event.dataTransfer.getData("application/x-player-id") || draggedPlayerId;
-    const player = players.find((candidate) => candidate.id === playerId);
-
-    if (!player) {
-      setStatus("Dropped player could not be found.");
-      setDraggedPlayerId(null);
-      return;
-    }
-
-    assignPlayer(player, position, true);
+    assignPlayer(draggedPlayer, position, true);
     setDraggedPlayerId(null);
     setDraggedFromPosition(null);
   }
@@ -1457,11 +1450,8 @@ export default function Home() {
   function handleRosterDrop(event: DragEvent<HTMLButtonElement>, targetPlayer: Player) {
     event.preventDefault();
 
-    if (!isAdmin) {
-      setDraggedPlayerId(null);
-      setDraggedFromPosition(null);
-      return;
-    }
+    // In public mode, dropping onto the roster is never allowed.
+    if (!isAdmin) return;
 
     if (!draggedPlayer || !draggedFromPosition) {
       setDraggedPlayerId(null);
@@ -1960,9 +1950,10 @@ export default function Home() {
                             canSelectPlayer ? "" : "player-card-disabled"
                           }`}
                           disabled={!canSelectPlayer}
-                          draggable={isAdmin}
+                          draggable={true}
                           type="button"
                           onClick={() => assignPlayer(player, selectedSlot ?? undefined)}
+                          onDoubleClick={() => assignPlayer(player)}
                           onDragEnd={handleDragEnd}
                           onDragOver={(event) => handleRosterDragOver(event, player)}
                           onDragStart={(event) => handleDragStart(event, player)}
@@ -2005,11 +1996,11 @@ export default function Home() {
                 key={position}
                 lineup={lineup}
                 position={position}
-                selected={selectedSlot === position}
-                canDragPlayer={isAdmin}
-                canDrop={isAdmin && draggedPlayer ? dropStatuses[position] !== "blocked" : false}
-                blocked={Boolean(isAdmin && draggedPlayer && dropStatuses[position] === "blocked")}
-                swapTarget={isAdmin && dropStatuses[position] === "swap"}
+                selected={selectedSlot === position} // This is for visual feedback, not drag logic
+                canDragPlayer={true} // Allow drag to start, drop targets will restrict
+                canDrop={draggedPlayer ? dropStatuses[position] !== "blocked" : false}
+                blocked={Boolean(draggedPlayer && dropStatuses[position] === "blocked")}
+                swapTarget={dropStatuses[position] === "swap"}
                 onSelect={() => handleCourtSlotSelect(position)}
                 onPlayerDragEnd={handleDragEnd}
                 onPlayerDragStart={(event, player) => handleDragStart(event, player, position)}
