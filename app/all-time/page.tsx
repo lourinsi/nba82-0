@@ -41,9 +41,9 @@ type Accolades = {
 type Player = {
   id: string;
   name: string;
-  legacy_points?: number;
-  // goat_rank?: number | null;
-  // goat_score?: number;
+  legacy_points?: number; // This is the base score from accolades
+  goat_rank?: number | null; // Bleacher Report GOAT ranking (1-100)
+  goat_score?: number; // Bleacher Report GOAT score (101-rank)
   positions: Position[];
   primary_position: Position;
   current_team: string | null;
@@ -580,11 +580,13 @@ function positionScoreMultiplier(player: Player | undefined, assignedPosition: P
     return 1;
   }
 
-  const legacyPoints = Number(player.legacy_points ?? 0);
+  // The bonus only applies to players ranked in the top 100 GOAT list.
+  // The goat_rank is 1-100, or null/0 if not ranked.
+  // The goat_score is 101-rank, or 0 if not ranked.
+  const isTop100Goat = (player.goat_rank && player.goat_rank >= 1 && player.goat_rank <= 100) || (player.goat_score && player.goat_score > 0);
 
-  return legacyPoints < 100 ? 1.15 : 1.1;
+  return isTop100Goat ? 1.15 : 1;
 }
-
 function lineupSlotScore(slot: LineupSlot | undefined, assignedPosition: Position) {
   if (!slot) {
     return 0;
