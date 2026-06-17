@@ -215,37 +215,39 @@ select {
   --spin-kicker: #ffb13d;
   --spin-number: #ffffff;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--spin-accent) 28%, transparent), transparent 26%),
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--spin-accent) 18%, transparent), transparent 42%),
-    linear-gradient(145deg, color-mix(in srgb, var(--spin-primary) 82%, #202637) 0%, color-mix(in srgb, var(--spin-primary) 52%, #252b3b) 54%, #171b26 100%);
-  border: 1px solid color-mix(in srgb, var(--spin-accent) 68%, rgba(255, 255, 255, 0.12));
+    linear-gradient(90deg, color-mix(in srgb, var(--spin-accent) 18%, transparent), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 36%),
+    linear-gradient(145deg, color-mix(in srgb, var(--spin-primary) 84%, #202637) 0%, color-mix(in srgb, var(--spin-primary) 48%, #252b3b) 56%, #171b26 100%);
+  border: 1px solid color-mix(in srgb, var(--spin-accent) 62%, rgba(255, 255, 255, 0.12));
   border-radius: 8px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.11),
-    inset 0 -9px 0 rgba(0, 0, 0, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
     0 0 0 3px color-mix(in srgb, var(--spin-accent) 22%, transparent),
-    0 18px 26px rgba(0, 0, 0, 0.18);
+    0 14px 24px rgba(0, 0, 0, 0.18);
+  display: grid;
   isolation: isolate;
+  min-height: 116px;
   overflow: hidden;
   position: relative;
 }
 
 .spin-tile::before {
-  background: var(--spin-accent);
-  bottom: 12px;
-  box-shadow: 0 0 18px color-mix(in srgb, var(--spin-accent) 62%, transparent);
+  background: linear-gradient(180deg, var(--spin-accent), color-mix(in srgb, var(--spin-accent) 58%, #ffffff));
+  bottom: 16px;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--spin-accent) 52%, transparent);
   content: "";
   left: 0;
   position: absolute;
-  top: 12px;
+  top: 16px;
   width: 5px;
   z-index: 0;
 }
 
 .spin-tile::after {
   background:
-    linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.2), transparent 42%),
-    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 8px);
+    linear-gradient(105deg, transparent 14%, rgba(255, 255, 255, 0.18), transparent 42%),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 9px);
   content: "";
   inset: 0;
   opacity: 0;
@@ -255,77 +257,174 @@ select {
 }
 
 .spin-tile-action {
-  align-items: center;
-  background: color-mix(in srgb, var(--spin-primary) 78%, rgba(0, 0, 0, 0.42));
-  border: 1px solid color-mix(in srgb, var(--spin-accent) 76%, rgba(255, 255, 255, 0.18));
-  border-radius: 999px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 0 18px color-mix(in srgb, var(--spin-accent) 34%, transparent);
-  color: var(--spin-kicker);
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  color: transparent;
   cursor: pointer;
-  display: flex;
-  height: 34px;
-  justify-content: center;
   position: absolute;
-  right: 10px;
-  top: 9px;
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    transform 160ms ease;
-  width: 34px;
-  z-index: 3;
+  inset: 0;
+  z-index: 4;
 }
 
-.spin-tile-action:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--spin-accent) 26%, rgba(0, 0, 0, 0.5));
-  transform: translateY(-1px);
+.spin-tile-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--spin-accent) 70%, #ffffff);
+  outline-offset: -4px;
 }
 
 .spin-tile-action:disabled {
   cursor: not-allowed;
-  opacity: 0.7;
 }
 
-.spin-tile-action span {
-  border: 2px solid currentColor;
-  border-left-color: transparent;
-  border-radius: 999px;
-  height: 16px;
+.spin-tile-action:hover:not(:disabled) ~ .spin-tile-inner .spin-tile-reel {
+  border-color: color-mix(in srgb, var(--spin-accent) 64%, rgba(255, 255, 255, 0.16));
+  transform: translateY(-1px);
+}
+
+.spin-tile-action:hover:not(:disabled) ~ .spin-tile-inner .spin-tile-wheel {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 18px color-mix(in srgb, var(--spin-accent) 48%, transparent);
+  transform: rotate(22deg);
+}
+
+.spin-tile-inner {
+  display: grid;
+  gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  padding: 14px 14px 14px 18px;
+  pointer-events: none;
   position: relative;
-  width: 16px;
+  width: 100%;
+  z-index: 2;
 }
 
-.spin-tile-action span::after {
-  border-bottom: 4px solid transparent;
-  border-left: 6px solid currentColor;
-  border-top: 4px solid transparent;
-  content: "";
-  position: absolute;
-  right: -4px;
-  top: -2px;
-  transform: rotate(-26deg);
-}
-
-.spin-tile-action-spinning span {
-  animation: spin-action-rotate 520ms linear infinite;
-}
-
-.spin-tile > * {
-  position: relative;
-  z-index: 1;
+.spin-tile-topline {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
 }
 
 .spin-tile-label {
   color: var(--spin-kicker);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.spin-tile-wheel {
+  aspect-ratio: 1;
+  background:
+    conic-gradient(from 40deg, transparent 0 58deg, var(--spin-accent) 58deg 230deg, transparent 230deg 360deg),
+    color-mix(in srgb, var(--spin-primary) 72%, #101521);
+  border: 1px solid color-mix(in srgb, var(--spin-accent) 48%, rgba(255, 255, 255, 0.16));
+  border-radius: 999px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 14px color-mix(in srgb, var(--spin-accent) 34%, transparent);
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  position: relative;
+  transition:
+    box-shadow 160ms ease,
+    transform 160ms ease;
+  width: 34px;
+}
+
+.spin-tile-wheel::before {
+  background: color-mix(in srgb, var(--spin-primary) 74%, #131824);
+  border-radius: inherit;
+  content: "";
+  inset: 7px;
+  position: absolute;
+}
+
+.spin-tile-wheel::after {
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid var(--spin-kicker);
+  border-top: 5px solid transparent;
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 6px;
+  transform: rotate(-24deg);
+}
+
+.spin-tile-wheel span {
+  background: var(--spin-kicker);
+  border-radius: 999px;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--spin-accent) 54%, transparent);
+  height: 5px;
+  position: relative;
+  width: 5px;
+  z-index: 1;
+}
+
+.spin-tile-reel {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 28%, rgba(0, 0, 0, 0.16) 100%),
+    linear-gradient(90deg, color-mix(in srgb, var(--spin-primary) 70%, #161b27), color-mix(in srgb, var(--spin-primary) 50%, #202637));
+  border: 1px solid color-mix(in srgb, var(--spin-accent) 34%, rgba(255, 255, 255, 0.12));
+  border-radius: 7px;
+  box-shadow:
+    inset 0 12px 16px rgba(255, 255, 255, 0.05),
+    inset 0 -14px 18px rgba(0, 0, 0, 0.16);
+  display: grid;
+  isolation: isolate;
+  min-height: 56px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 9px;
+  position: relative;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.spin-tile-reel::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 22%, transparent 74%, rgba(0, 0, 0, 0.24)),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.09), transparent 16%, transparent 84%, rgba(0, 0, 0, 0.2));
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 3;
+}
+
+.spin-tile-reel::after {
+  background: repeating-linear-gradient(180deg, transparent 0 9px, rgba(255, 255, 255, 0.11) 9px 10px);
+  content: "";
+  inset: -18px 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateY(-18px);
+  z-index: 2;
 }
 
 .spin-tile-value {
   color: var(--spin-number);
+  display: block;
+  font-size: 2.34rem;
+  font-weight: 950;
+  line-height: 0.92;
+  max-width: 100%;
+  overflow: hidden;
+  position: relative;
+  text-overflow: ellipsis;
   text-shadow:
-    2px 2px 0 color-mix(in srgb, var(--spin-accent) 58%, transparent),
-    -1px 0 0 rgba(49, 214, 161, 0.44);
+    2px 2px 0 color-mix(in srgb, var(--spin-accent) 52%, transparent),
+    -1px 0 0 rgba(49, 214, 161, 0.34);
+  white-space: nowrap;
+  z-index: 2;
 }
 
 .spin-tile-spinning {
@@ -334,6 +433,15 @@ select {
 
 .spin-tile-spinning::after {
   animation: spin-tile-scan 520ms ease-in-out infinite;
+  opacity: 1;
+}
+
+.spin-tile-spinning .spin-tile-wheel {
+  animation: spin-action-rotate 520ms linear infinite;
+}
+
+.spin-tile-spinning .spin-tile-reel::after {
+  animation: spin-reel-lines 180ms linear infinite;
   opacity: 1;
 }
 
@@ -366,15 +474,15 @@ select {
   from {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.11),
-      inset 0 -9px 0 rgba(0, 0, 0, 0.18),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.35),
       0 0 0 3px color-mix(in srgb, var(--spin-accent) 22%, transparent),
-      0 18px 26px rgba(0, 0, 0, 0.18);
+      0 14px 24px rgba(0, 0, 0, 0.18);
   }
 
   to {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.16),
-      inset 0 -9px 0 rgba(0, 0, 0, 0.18),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.35),
       0 0 0 5px color-mix(in srgb, var(--spin-accent) 34%, transparent),
       0 0 32px color-mix(in srgb, var(--spin-accent) 56%, transparent);
   }
@@ -383,6 +491,12 @@ select {
 @keyframes spin-tile-scan {
   to {
     transform: translateX(115%);
+  }
+}
+
+@keyframes spin-reel-lines {
+  to {
+    transform: translateY(18px);
   }
 }
 
@@ -407,8 +521,9 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .spin-tile-spinning,
   .spin-tile-spinning::after,
+  .spin-tile-spinning .spin-tile-reel::after,
   .spin-tile-spinning .spin-tile-value,
-  .spin-tile-action-spinning span,
+  .spin-tile-spinning .spin-tile-wheel,
   .spin-stage-meter span::before {
     animation: none;
   }

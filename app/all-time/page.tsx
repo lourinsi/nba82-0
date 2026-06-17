@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, FormEvent } from "react";
 import { teamThemeStyle } from "./teamStyles";
 
@@ -255,28 +255,28 @@ const ERA_TILE_STYLES: Record<string, SpinTileStyle> = { // '40s and '50s now us
   },
 };
 const ACCOLADE_WEIGHTS = {
-  mvp_count: 10,
-  finals_mvp_count: 6,
-  all_nba_1st: 6,
-  all_nba_2nd: 4.5,
-  all_nba_3rd: 3,
-  championship_rings: 2,
-  dpoy_count: 2,
-  all_def_1st: 1,
-  all_def_2nd: 0.75,
-  scoring_titles: 2,
-  assist_titles: 2,
-  rebound_titles: 1.5,
-  steal_titles: 1,
-  block_titles: 1,
+  mvp_count: 8,
+  finals_mvp_count: 7,
+  all_nba_1st: 7,
+  all_nba_2nd: 5.5,
+  all_nba_3rd: 4,
+  championship_rings: 2.5,
+  dpoy_count: 2.5,
+  all_def_1st: 2,
+  all_def_2nd: 1.5,
+  scoring_titles: 3,
+  assist_titles: 3,
+  rebound_titles: 2,
+  steal_titles: 1.5,
+  block_titles: 1.5,
   // no more olympics point value
-  all_star_mvp_count: 1.5,
+  all_star_mvp_count: 1,
   all_star_selections: 1,
   "6moy": 1,
   most_improved: 1,
-  roy_won: 1.5,
-  all_rookie_1st: 0.75,
-  all_rookie_2nd: 0.5,
+  roy_won: 1,
+  all_rookie_1st: 1,
+  all_rookie_2nd: 0.75,
   seasons_played: 0.25,
 } satisfies Partial<Record<keyof Accolades, number>>;
 type WeightedAccoladeKey = keyof typeof ACCOLADE_WEIGHTS;
@@ -368,28 +368,28 @@ const SEASON_TIERS: SeasonTier[] = [
     description: "THIS MIGHT BE THE BEST TEAM EVER YOU JUST BROKE 82-0 AND THE SCORE IS 100-0. The engine is crying. The database is melting.",
   },
   {
-    minScore: 880,
+    minScore: 870,
     minWins: 82,
     maxWins: 82,
     tier: "S+ (The Immortal 82-0)",
     description: "The Absolute Pinnacle. You drafted a lineup of literal basketball Gods. This team sweeps the league, goes undefeated, and forces opposing fanbases to switch sports.",
   },
   {
-    minScore: 820,
+    minScore: 800,
     minWins: 81,
     maxWins: 81,
     tier: "S (You're almost there buddyy...)",
     description: "A historically painful result. You built one of the greatest rosters in the history of the sport, but dropped a random Tuesday night game vs the miami heat in where Bam scored 83 POINTS!",
   },
   {
-    minScore: 720,
+    minScore: 690,
     minWins: 74,
     maxWins: 80,
     tier: "S- (Historic Season)",
     description: "Congrats, your team just broke the regular season wins record. This squad systematically dismantles the league.",
   },
   {
-    minScore: 580,
+    minScore: 570,
     minWins: 67,
     maxWins: 73,
     tier: "A+ (Dynasty)",
@@ -480,7 +480,7 @@ const SEASON_TIERS: SeasonTier[] = [
     description: "Opposing teams are resting their starters against you and still winning by 30. Your mascot has more trade value than half the roster.",
   },
   {
-    minScore: 5,
+    minScore: 4,
     minWins: 1,
     maxWins: 4,
     tier: "F (The Basement Dwellers)",
@@ -497,21 +497,6 @@ const SEASON_TIERS: SeasonTier[] = [
 
 function countValue(count: number) {
   return `${count}x`;
-}
-
-function ordinalRank(rank: number) {
-  if (!rank) {
-    return "";
-  }
-
-  const teenRemainder = rank % 100;
-
-  if (teenRemainder >= 11 && teenRemainder <= 13) {
-    return `${rank}th`;
-  }
-
-  const suffix = rank % 10 === 1 ? "st" : rank % 10 === 2 ? "nd" : rank % 10 === 3 ? "rd" : "th";
-  return `${rank}${suffix}`;
 }
 
 // function playerGoatRank(player: Player) {
@@ -678,34 +663,27 @@ function teamEraExists(team: string, era: string) {
   return !firstEra || eraSortValue(getCanonicalEra(era)) >= eraSortValue(firstEra);
 }
 
-function playerMatchesTeamEra(player: Player, team: string, era: string) {
-  if (!teamEraExists(team, era)) {
-    return false;
-  }
-  const canonicalSelectedEra = getCanonicalEra(era);
+function playerHasRecordedTeamEra(player: Player, team: string, canonicalEra: string) {
   if (player.team_eras?.length) {
     return player.team_eras.some(
-      (teamEra) => teamEra.team === team && getCanonicalEra(teamEra.era) === canonicalSelectedEra,
+      (teamEra) => teamEra.team === team && getCanonicalEra(teamEra.era) === canonicalEra,
     );
   }
 
   return (
     player.teams.includes(team) &&
-    player.eras.some((playerEra) => getCanonicalEra(playerEra) === canonicalSelectedEra)
+    player.eras.some((playerEra) => getCanonicalEra(playerEra) === canonicalEra)
   );
 }
 
-function playerErasForTeam(player: Player, team: string) {
-  const filterPossibleEras = (eras: string[]) =>
-    Array.from(new Set(eras.map(getCanonicalEra))).filter((era) => teamEraExists(team, era));
+function playerMatchesTeamEra(player: Player, team: string, era: string) {
+  const canonicalSelectedEra = getCanonicalEra(era);
 
   if (player.team_eras?.length) {
-    return filterPossibleEras(
-      player.team_eras.filter((teamEra) => teamEra.team === team).map((teamEra) => teamEra.era),
-    );
+    return playerHasRecordedTeamEra(player, team, canonicalSelectedEra);
   }
 
-  return player.teams.includes(team) ? filterPossibleEras(player.eras) : [];
+  return teamEraExists(team, era) && playerHasRecordedTeamEra(player, team, canonicalSelectedEra);
 }
 
 function eraOptionsForTeam(players: Player[], team: string) {
@@ -717,13 +695,13 @@ function eraOptionsForTeam(players: Player[], team: string) {
 
   const uniqueCanonicalPlayerEras = Array.from(new Set(allPlayerErasForTeam.map(getCanonicalEra)));
 
-  const uniqueCanonicalDefaultEras = Array.from(new Set(DEFAULT_ERAS.map(getCanonicalEra))).filter((era) =>
-    teamEraExists(team, era),
-  );
+  if (uniqueCanonicalPlayerEras.length || players.length) {
+    return uniqueCanonicalPlayerEras.sort((a, b) => eraSortValue(a) - eraSortValue(b));
+  }
 
-  const combinedEras = Array.from(new Set([...uniqueCanonicalPlayerEras, ...uniqueCanonicalDefaultEras]));
+  const fallbackEras = Array.from(new Set(DEFAULT_ERAS.map(getCanonicalEra))).filter((era) => teamEraExists(team, era));
 
-  return combinedEras.sort((a, b) => eraSortValue(a) - eraSortValue(b));
+  return fallbackEras.sort((a, b) => eraSortValue(a) - eraSortValue(b));
 }
 
 function playerMatchesPositionFilter(player: Player, filter: PositionFilter) {
@@ -773,12 +751,6 @@ function placementStatus(lineup: Lineup, player: Player, target: Position): Plac
   return "blocked";
 }
 
-function canDropAt(lineup: Lineup, player: Player, position: Position) {
-  const status = placementStatus(lineup, player, position);
-
-  return status === "move" || status === "same" || status === "swap";
-}
-
 function playerInitials(name: string) {
   const initials = name
     .split(/\s+/)
@@ -811,26 +783,35 @@ function randomDifferentItem<T>(items: T[], current: T) {
 }
 
 function randomDraftSelection(players: Player[], teamOptions: string[], currentTeam?: string, currentEra?: string) {
-  const team = currentTeam ? randomDifferentItem(teamOptions, currentTeam) : randomItem(teamOptions);
+  const teamsWithEraData = teamOptions.filter((team) => eraOptionsForTeam(players, team).length > 0);
+  const validTeamOptions = teamsWithEraData.length ? teamsWithEraData : teamOptions;
+  const team = currentTeam ? randomDifferentItem(validTeamOptions, currentTeam) : randomItem(validTeamOptions);
   const eras = eraOptionsForTeam(players, team);
-  const eraOptions = eras.length ? eras : DEFAULT_ERAS;
+  const fallbackEras = DEFAULT_ERAS.filter((era) => teamEraExists(team, era));
+  const eraOptions = eras.length ? eras : fallbackEras.length ? fallbackEras : DEFAULT_ERAS;
   const era = currentEra ? randomDifferentItem(eraOptions, currentEra) : randomItem(eraOptions);
 
   return buildDraftSelection(team, era);
 }
 
 function teamOptionsForEra(players: Player[], teamOptions: string[], era: string) {
+  const canonicalEra = getCanonicalEra(era);
   const validTeams = teamOptions.filter((team) => {
     const eras = eraOptionsForTeam(players, team);
 
-    return eras.length ? eras.includes(era) : teamEraExists(team, era);
+    return eras.includes(canonicalEra);
   });
 
-  return validTeams.length ? validTeams : teamOptions;
+  return validTeams;
 }
 
 function randomTeamSelectionForEra(players: Player[], teamOptions: string[], era: string, currentTeam: string) {
   const validTeams = teamOptionsForEra(players, teamOptions, era);
+
+  if (!validTeams.length) {
+    return randomDraftSelection(players, teamOptions, currentTeam, era);
+  }
+
   const team = randomDifferentItem(validTeams, currentTeam);
 
   return buildDraftSelection(team, era);
@@ -878,7 +859,7 @@ function playerIsStephCurry(player: Player) {
 function projectSeasonRecord(score: number, hasStephCurry: boolean): SeasonProjection {
   const tier = SEASON_TIERS.find((candidate) => score >= candidate.minScore) ?? SEASON_TIERS[SEASON_TIERS.length - 1];
   const wins = tier.minWins === tier.maxWins ? tier.minWins : randomInteger(tier.minWins, tier.maxWins);
-  const losses = tier.fixedLosses ?? 82 - wins;
+  const losses = Math.max(0, tier.fixedLosses ?? 82 - wins);
   const isHistoricStephRun = tier.tier === "S- (Historic Season)" && hasStephCurry;
   const description =
     isHistoricStephRun || (wins === 73 && losses === 9)
@@ -1065,6 +1046,7 @@ export default function Home() {
     publicRoundsSpent + (!awaitingPublicPick && publicRoundsSpent < PUBLIC_ROUND_COUNT ? 1 : 0),
     PUBLIC_ROUND_COUNT,
   );
+  const showPublicRosterSpinCta = publicSpinAllowed && publicRoundsSpent > 0;
 
   const selectedPlayerIds = useMemo(
     () =>
@@ -1168,6 +1150,59 @@ export default function Home() {
   const teamTileSpinning = spinningTarget === "all" || spinningTarget === "team";
   const eraTileSpinning = spinningTarget === "all" || spinningTarget === "era";
 
+  const simulateSeason = useCallback(() => {
+    if (!lineupComplete) {
+      setStatus("Fill all five court slots before simulating.");
+      return;
+    }
+
+    const result = projectSeasonRecord(teamLegacyScore, lineupHasStephCurry);
+    const payload: AllTimeResultPayload = {
+      mode: "all-time",
+      selectedTeam,
+      selectedEraLabel: fullEraLabel(activeEra),
+      simulationResult: result,
+      lineup: lineupEntries.map(({ position, player, selection }) => ({
+        position,
+        player: {
+          id: player.id,
+          name: player.name,
+        },
+        selection,
+        achievements: buildAchievements(player),
+        positionBonus: positionBonusForSlot(lineup[position], position),
+      })),
+      totals: lineupAchievementTotals,
+    };
+
+    sessionStorage.setItem(ALL_TIME_RESULT_STORAGE_KEY, JSON.stringify(payload));
+    setStatus(`${result.tier}: ${result.wins}-${result.losses}`);
+    router.push("/all-time/results");
+  }, [
+    activeEra,
+    lineup,
+    lineupAchievementTotals,
+    lineupComplete,
+    lineupEntries,
+    lineupHasStephCurry,
+    router,
+    selectedTeam,
+    teamLegacyScore,
+  ]);
+
+  const hasAutoSimulated = useRef(false);
+
+  useEffect(() => {
+    if (lineupComplete && !isAdmin && !isSpinning) {
+      if (!hasAutoSimulated.current) {
+        hasAutoSimulated.current = true;
+        simulateSeason();
+      }
+    } else {
+      hasAutoSimulated.current = false;
+    }
+  }, [lineupComplete, isAdmin, isSpinning, simulateSeason]);
+
   function enterAdminMode() {
     setIsAdmin(true);
     setAuthPanelOpen(false);
@@ -1192,6 +1227,13 @@ export default function Home() {
     setAwaitingPublicPick(false);
     setPublicTeamSwapUsed(false);
     setPublicEraSwapUsed(false);
+  }
+
+  function handlePublicReset() {
+    resetPublicGame();
+    setAuthPanelOpen(false);
+    setLoginError(null);
+    setStatus("Public draft reset.");
   }
 
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
@@ -1274,13 +1316,15 @@ export default function Home() {
           setStatus(publicGameComplete ? "Draft complete." : "Spin before choosing the next player.");
           return false;
         }
-        // If not rosterSelectionDisabled, then awaitingPublicPick is true.
-      const status = placementStatus(lineup, player, preferredPosition || "PG"); 
-      if (status === "blocked" || (preferredPosition && lineup[preferredPosition])) {
-        setStatus("Public slots are locked once filled. Use admin mode to replace players.");
-        return false;
-      }
-      allowReplace = false;
+        if (preferredPosition) {
+          const status = placementStatus(lineup, player, preferredPosition);
+
+          if (status === "blocked" || lineup[preferredPosition]) {
+            setStatus("Public slots are locked once filled. Use admin mode to replace players.");
+            return false;
+          }
+        }
+        allowReplace = false;
       }
     }
 
@@ -1609,36 +1653,6 @@ export default function Home() {
     }, SPIN_DURATION_MS);
   }
 
-  function simulateSeason() {
-    if (!lineupComplete) {
-      setStatus("Fill all five court slots before simulating.");
-      return;
-    }
-
-    const result = projectSeasonRecord(teamLegacyScore, lineupHasStephCurry);
-    const payload: AllTimeResultPayload = {
-      mode: "all-time",
-      selectedTeam,
-      selectedEraLabel: fullEraLabel(activeEra),
-      simulationResult: result,
-      lineup: lineupEntries.map(({ position, player, selection }) => ({
-        position,
-        player: {
-          id: player.id,
-          name: player.name,
-        },
-        selection,
-        achievements: buildAchievements(player),
-        positionBonus: positionBonusForSlot(lineup[position], position),
-      })),
-      totals: lineupAchievementTotals,
-    };
-
-    sessionStorage.setItem(ALL_TIME_RESULT_STORAGE_KEY, JSON.stringify(payload));
-    setStatus(`${result.tier}: ${result.wins}-${result.losses}`);
-    router.push("/all-time/results");
-  }
-
   return (
     <main className="min-h-screen bg-[#15171f] text-[#f4f2ec]">
       <header className="border-b border-white/10 bg-[#1c1f29]/95 px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.04)] sm:px-6 lg:px-8">
@@ -1726,6 +1740,16 @@ export default function Home() {
                   {publicDisplayRound}/{PUBLIC_ROUND_COUNT}
                 </span>
               </div>
+
+              <button
+                aria-label="Reset public draft"
+                className="h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-[#ff8a2a]/45 hover:bg-[#ff8a2a]/10 hover:text-[#ffbf86] disabled:cursor-not-allowed disabled:text-[#8f96a7]"
+                disabled={!authChecked || isSpinning}
+                type="button"
+                onClick={handlePublicReset}
+              >
+                Reset
+              </button>
 
               <button
                 aria-label="Spin random roster feed"
@@ -1915,6 +1939,27 @@ export default function Home() {
                 </div>
 
                 <p className="mt-3 text-sm font-semibold text-[#cfd3df]">{filteredPlayers.length} players available</p>
+
+                {showPublicRosterSpinCta ? (
+                  <div className="mt-3 flex flex-col gap-3 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="grid gap-1">
+                      <span className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[#89f0cd]">
+                        Next Draw
+                      </span>
+                      <span className="text-lg font-black leading-none text-white">
+                        Round {publicDisplayRound}/{PUBLIC_ROUND_COUNT}
+                      </span>
+                    </span>
+                    <button
+                      aria-label={`Spin round ${publicDisplayRound}`}
+                      className="h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf]"
+                      type="button"
+                      onClick={() => spinTeamEra("all")}
+                    >
+                      Spin
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <div className="roster-list-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
@@ -2049,9 +2094,7 @@ function SpinTile({
 }) {
   return (
     <div
-      className={`spin-tile spin-tile-${tone} grid h-24 place-items-center px-3 text-center ${
-        spinning ? "spin-tile-spinning" : ""
-      }`}
+      className={`spin-tile spin-tile-${tone} text-center ${spinning ? "spin-tile-spinning" : ""}`}
       style={style}
     >
       <button
@@ -2061,12 +2104,19 @@ function SpinTile({
         type="button"
         onClick={onSpin}
       >
-        <span aria-hidden="true" />
+        <span className="sr-only">Spin {label.toLowerCase()}</span>
       </button>
-      <span className="grid min-w-0 gap-1">
-        <span className="spin-tile-label text-sm font-black uppercase">{label}</span>
-        <span key={`${label}-${value}`} className="spin-tile-value truncate text-4xl font-black leading-none">
-          {value}
+      <span className="spin-tile-inner" aria-hidden="true">
+        <span className="spin-tile-topline">
+          <span className="spin-tile-label">{label}</span>
+          <span className="spin-tile-wheel">
+            <span />
+          </span>
+        </span>
+        <span className="spin-tile-reel">
+          <span key={`${label}-${value}`} className="spin-tile-value">
+            {value}
+          </span>
         </span>
       </span>
     </div>
@@ -2082,7 +2132,6 @@ function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
     <span // AchievementStrip component
       className="achievement-strip flex overflow-x-auto whitespace-nowrap pb-1 min-w-0"
       aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}
-      onClick={(e) => e.stopPropagation()}
     >
       {achievements.map((achievement) => (
         <span className="achievement-stat flex-shrink-0" key={achievement.id}>
