@@ -299,7 +299,7 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   },
   {
     id: "all-nba",
-    label: "ALL NBA",
+    label: "NBA",
     count: (player) => player.accolades.all_nba_1st + player.accolades.all_nba_2nd + player.accolades.all_nba_3rd,
     sortValue: (player) =>
       weightedAccoladeScore(player, ["all_nba_1st", "all_nba_2nd", "all_nba_3rd"]),
@@ -314,25 +314,25 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   { id: "dpoy", label: "DPOY", count: (player) => player.accolades.dpoy_count, weight: ACCOLADE_WEIGHTS.dpoy_count },
   {
     id: "all-defense",
-    label: "ALL DEF",
+    label: "DEF",
     count: (player) => player.accolades.all_def_1st + player.accolades.all_def_2nd,
     sortValue: (player) => weightedAccoladeScore(player, ["all_def_1st", "all_def_2nd"]),
     weight: ACCOLADE_WEIGHTS.all_def_1st,
   },
-  { id: "scoring", label: "SCORING", count: (player) => player.accolades.scoring_titles, weight: ACCOLADE_WEIGHTS.scoring_titles },
-  { id: "assists", label: "ASSISTS", count: (player) => player.accolades.assist_titles, weight: ACCOLADE_WEIGHTS.assist_titles },
-  { id: "rebounds", label: "REBOUNDS", count: (player) => player.accolades.rebound_titles, weight: ACCOLADE_WEIGHTS.rebound_titles },
-  { id: "steals", label: "STEALS", count: (player) => player.accolades.steal_titles, weight: ACCOLADE_WEIGHTS.steal_titles },
-  { id: "blocks", label: "BLOCKS", count: (player) => player.accolades.block_titles, weight: ACCOLADE_WEIGHTS.block_titles },
+  { id: "scoring", label: "SCO", count: (player) => player.accolades.scoring_titles, weight: ACCOLADE_WEIGHTS.scoring_titles },
+  { id: "assists", label: "AST", count: (player) => player.accolades.assist_titles, weight: ACCOLADE_WEIGHTS.assist_titles },
+  { id: "rebounds", label: "REB", count: (player) => player.accolades.rebound_titles, weight: ACCOLADE_WEIGHTS.rebound_titles },
+  { id: "steals", label: "STL", count: (player) => player.accolades.steal_titles, weight: ACCOLADE_WEIGHTS.steal_titles },
+  { id: "blocks", label: "BLK", count: (player) => player.accolades.block_titles, weight: ACCOLADE_WEIGHTS.block_titles },
   {
     id: "all-star-mvp",
-    label: "AS MVP",
+    label: "ASM",
     count: (player) => player.accolades.all_star_mvp_count ?? 0,
     weight: ACCOLADE_WEIGHTS.all_star_mvp_count,
   },
   {
     id: "all-star",
-    label: "ALL-STAR",
+    label: "AS",
     count: (player) => player.accolades.all_star_selections,
     weight: ACCOLADE_WEIGHTS.all_star_selections,
   },
@@ -346,17 +346,17 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   { id: "roy", label: "ROY", count: (player) => (player.accolades.roy_won ? 1 : 0), weight: ACCOLADE_WEIGHTS.roy_won },
   {
     id: "all-rookie-1st",
-    label: "ROOK1",
+    label: "R1",
     count: (player) => player.accolades.all_rookie_1st ?? 0,
     weight: ACCOLADE_WEIGHTS.all_rookie_1st,
   },
   {
     id: "all-rookie-2nd",
-    label: "ROOK2",
+    label: "R2",
     count: (player) => player.accolades.all_rookie_2nd ?? 0,
     weight: ACCOLADE_WEIGHTS.all_rookie_2nd,
   },
-  { id: "seasons", label: "SEASONS", count: (player) => player.accolades.seasons_played, weight: ACCOLADE_WEIGHTS.seasons_played },
+  { id: "seasons", label: "YRS", count: (player) => player.accolades.seasons_played, weight: ACCOLADE_WEIGHTS.seasons_played },
 ];
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
 const SEASON_TIERS: SeasonTier[] = [
@@ -891,10 +891,12 @@ export default function Home() {
   const [selectedTeam, setSelectedTeam] = useState(PUBLIC_TEAM_PLACEHOLDER);
   const [selectedEra, setSelectedEra] = useState(PUBLIC_ERA_PLACEHOLDER);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("All");
-  const [accoladePriority, setAccoladePriority] = useState("goat");
+  const [accoladePriority, setAccoladePriority] = useState("mvp");
   const [rosterSearch, setRosterSearch] = useState("");
   const [lineup, setLineup] = useState<Lineup>({});
   const [selectedSlot, setSelectedSlot] = useState<Position | null>(null);
+  const [mobileMoveSource, setMobileMoveSource] = useState<Position | null>(null);
+  const [positionPickerPlayer, setPositionPickerPlayer] = useState<Player | null>(null);
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const [draggedFromPosition, setDraggedFromPosition] = useState<Position | null>(null);
   const [publicRoundsSpent, setPublicRoundsSpent] = useState(0);
@@ -1046,7 +1048,7 @@ export default function Home() {
     publicRoundsSpent + (!awaitingPublicPick && publicRoundsSpent < PUBLIC_ROUND_COUNT ? 1 : 0),
     PUBLIC_ROUND_COUNT,
   );
-  const showPublicRosterSpinCta = publicSpinAllowed && publicRoundsSpent > 0;
+  const showPublicRosterSpinCta = publicSpinAllowed;
 
   const selectedPlayerIds = useMemo(
     () =>
@@ -1210,6 +1212,8 @@ export default function Home() {
     setLoginPassword("");
     setSelectedTeam((currentTeam) => (currentTeam === PUBLIC_TEAM_PLACEHOLDER ? ADMIN_DEFAULT_TEAM : currentTeam));
     setSelectedEra((currentEra) => (currentEra === PUBLIC_ERA_PLACEHOLDER ? ADMIN_DEFAULT_ERA : currentEra));
+    setMobileMoveSource(null);
+    setPositionPickerPlayer(null);
     setAwaitingPublicPick(false);
     setPublicRoundsSpent(0);
     setPublicTeamSwapUsed(false);
@@ -1221,6 +1225,8 @@ export default function Home() {
     setSelectedEra(PUBLIC_ERA_PLACEHOLDER);
     setLineup({});
     setSelectedSlot(null);
+    setMobileMoveSource(null);
+    setPositionPickerPlayer(null);
     setDraggedPlayerId(null);
     setDraggedFromPosition(null);
     setPublicRoundsSpent(0);
@@ -1276,12 +1282,51 @@ export default function Home() {
   }
 
   function handleCourtSlotSelect(position: Position) {
+    setMobileMoveSource(null);
+    setPositionPickerPlayer(null);
+
     if (!isAdmin && lineup[position]) {
       setStatus("Public lineup slots lock once filled.");
       return;
     }
 
     setSelectedSlot((current) => (current === position ? null : position));
+  }
+
+  function handleMobileLineupSlotSelect(position: Position) {
+    setPositionPickerPlayer(null);
+
+    if (mobileMoveSource) {
+      if (mobileMoveSource === position) {
+        setMobileMoveSource(null);
+        return;
+      }
+
+      const sourceSlot = lineup[mobileMoveSource];
+
+      if (!sourceSlot) {
+        setMobileMoveSource(null);
+        handleCourtSlotSelect(position);
+        return;
+      }
+
+      if (!assignPlayer(sourceSlot.player, position, true)) {
+        setMobileMoveSource(null);
+      }
+
+      return;
+    }
+
+    const slot = lineup[position];
+
+    if (slot) {
+      setSelectedSlot(null);
+      setMobileMoveSource(position);
+      setStatus(`Choose a new position for ${slot.player.name}.`);
+      return;
+    }
+
+    handleCourtSlotSelect(position);
   }
 
   function rosterPlayerSelectable(player: Player) {
@@ -1298,6 +1343,63 @@ export default function Home() {
     }
 
     return player.positions.some((position) => !lineup[position]);
+  }
+
+  function rosterAssignablePositions(player: Player) {
+    if (isSpinning) {
+      return [];
+    }
+
+    if (!isAdmin && rosterSelectionDisabled) {
+      return [];
+    }
+
+    if (selectedSlot) {
+      const status = placementStatus(lineup, player, selectedSlot);
+
+      return !lineup[selectedSlot] && player.positions.includes(selectedSlot) && status !== "blocked"
+        ? [selectedSlot]
+        : [];
+    }
+
+    return POSITIONS.filter((position) => {
+      if (!player.positions.includes(position)) {
+        return false;
+      }
+
+      const status = placementStatus(lineup, player, position);
+
+      if (status === "same") {
+        return true;
+      }
+
+      return status === "move" && !lineup[position];
+    });
+  }
+
+  function handleRosterPlayerClick(player: Player) {
+    if (!rosterPlayerSelectable(player)) {
+      return;
+    }
+
+    const assignablePositions = rosterAssignablePositions(player);
+
+    if (selectedSlot || assignablePositions.length <= 1) {
+      assignPlayer(player, selectedSlot ?? assignablePositions[0]);
+      return;
+    }
+
+    setPositionPickerPlayer(player);
+  }
+
+  function choosePositionForPicker(position: Position) {
+    if (!positionPickerPlayer) {
+      return;
+    }
+
+    if (assignPlayer(positionPickerPlayer, position)) {
+      setPositionPickerPlayer(null);
+    }
   }
 
   function assignPlayer(player: Player, preferredPosition?: Position, allowReplace = false) {
@@ -1391,6 +1493,8 @@ export default function Home() {
       return next;
     });
     setSelectedSlot(null);
+    setMobileMoveSource(null);
+    setPositionPickerPlayer(null);
     setStatus(
       status === "swap" && source && targetPlayer
         ? `${player.name} swapped to ${target}; ${targetPlayer.name} moved to ${source}.`
@@ -1416,6 +1520,8 @@ export default function Home() {
     setDraggedPlayerId(player.id);
     setDraggedFromPosition(sourcePosition);
     setSelectedSlot(null);
+    setMobileMoveSource(null);
+    setPositionPickerPlayer(null);
   }
 
   function dragEndedInsideCourt(event: DragEvent<HTMLButtonElement>) {
@@ -1530,6 +1636,8 @@ export default function Home() {
 
     setLineup({});
     setSelectedSlot(null);
+    setMobileMoveSource(null);
+    setPositionPickerPlayer(null);
     setDraggedPlayerId(null);
     setDraggedFromPosition(null);
     setStatus("Lineup cleared.");
@@ -1590,6 +1698,8 @@ export default function Home() {
       return;
     }
 
+    setPositionPickerPlayer(null);
+
     if (!isAdmin) {
       if (target === "all" && !publicSpinAllowed) {
         setStatus(publicGameComplete ? "All public rounds are complete." : "Choose a player before spinning again.");
@@ -1618,6 +1728,7 @@ export default function Home() {
     }
 
     setSelectedSlot(null);
+    setMobileMoveSource(null);
     setDraggedPlayerId(null);
     setDraggedFromPosition(null);
     setSpinningTarget(target);
@@ -1653,21 +1764,29 @@ export default function Home() {
     }, SPIN_DURATION_MS);
   }
 
+  const positionPickerAssignablePositions = positionPickerPlayer ? rosterAssignablePositions(positionPickerPlayer) : [];
+
   return (
-    <main className="min-h-screen bg-[#15171f] text-[#f4f2ec]">
-      <header className="border-b border-white/10 bg-[#1c1f29]/95 px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.04)] sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+    <main className="game-page min-h-screen bg-[#15171f] text-[#f4f2ec]">
+      <header className="game-header border-b border-white/10 bg-[#1c1f29]/95 px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.04)] sm:px-6 lg:px-8">
+        <div className="game-header-inner mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="game-brand">
+            <div className="game-logo-mark" aria-hidden="true">
+              <span>82-0</span>
+              <small>ALL TIME</small>
+            </div>
+            <div className="game-brand-copy">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#ff8a2a]">
               {isAdmin ? "Admin Mode" : "Public Mode"}
             </p>
             <h1 className="mt-1 text-2xl font-black tracking-normal text-white sm:text-3xl">
-              82-0 Accolade Workspace
+              {isAdmin ? "Admin Workspace" : `Round ${publicDisplayRound}/${PUBLIC_ROUND_COUNT}`}
             </h1>
+            </div>
           </div>
 
           {isAdmin ? (
-            <div className="grid gap-3 sm:grid-cols-[160px_160px_92px_auto_auto] sm:items-end">
+            <div className="game-admin-controls grid gap-3 sm:grid-cols-[160px_160px_92px_auto_auto] sm:items-end">
               <label className="grid gap-1 text-sm font-semibold text-[#cfd3df]">
                 Team
                 <select
@@ -1707,7 +1826,7 @@ export default function Home() {
               <button
                 aria-label="Spin random roster feed"
                 aria-busy={isSpinning}
-                className="h-11 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] px-4 text-sm font-black text-[#89f0cd] transition hover:border-[#31d6a1]/70 hover:bg-[#31d6a1]/[0.22] disabled:cursor-wait disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#aeb4c2]"
+                className="game-control-button game-spin-button h-11 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] px-4 text-sm font-black text-[#89f0cd] transition hover:border-[#31d6a1]/70 hover:bg-[#31d6a1]/[0.22] disabled:cursor-wait disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#aeb4c2]"
                 disabled={isSpinning}
                 type="button"
                 onClick={() => spinTeamEra("all")}
@@ -1716,7 +1835,7 @@ export default function Home() {
               </button>
 
               <button
-                className="h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1] disabled:cursor-wait disabled:text-[#8f96a7]"
+                className="game-control-button game-clear-button h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1] disabled:cursor-wait disabled:text-[#8f96a7]"
                 disabled={isSpinning}
                 type="button"
                 onClick={clearLineup}
@@ -1725,7 +1844,7 @@ export default function Home() {
               </button>
 
               <button
-                className="h-11 rounded-lg border border-[#ff8a2a]/35 bg-[#ff8a2a]/10 px-4 text-sm font-black text-[#ffbf86] transition hover:border-[#ff8a2a]/60 hover:bg-[#ff8a2a]/20"
+                className="game-control-button game-logout-button h-11 rounded-lg border border-[#ff8a2a]/35 bg-[#ff8a2a]/10 px-4 text-sm font-black text-[#ffbf86] transition hover:border-[#ff8a2a]/60 hover:bg-[#ff8a2a]/20"
                 type="button"
                 onClick={handleAdminLogout}
               >
@@ -1733,8 +1852,8 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <div className="relative flex flex-wrap items-end gap-3 lg:justify-end">
-              <div className="grid h-11 content-center rounded-lg border border-white/12 bg-white/[0.05] px-4">
+            <div className="game-public-controls relative flex flex-wrap items-end gap-3 lg:justify-end">
+              <div className="game-round-pill grid h-11 content-center rounded-lg border border-white/12 bg-white/[0.05] px-4">
                 <span className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[#aeb4c2]">Round</span>
                 <span className="text-sm font-black text-white">
                   {publicDisplayRound}/{PUBLIC_ROUND_COUNT}
@@ -1743,7 +1862,7 @@ export default function Home() {
 
               <button
                 aria-label="Reset public draft"
-                className="h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-[#ff8a2a]/45 hover:bg-[#ff8a2a]/10 hover:text-[#ffbf86] disabled:cursor-not-allowed disabled:text-[#8f96a7]"
+                className="game-control-button game-reset-button h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-[#ff8a2a]/45 hover:bg-[#ff8a2a]/10 hover:text-[#ffbf86] disabled:cursor-not-allowed disabled:text-[#8f96a7]"
                 disabled={!authChecked || isSpinning}
                 type="button"
                 onClick={handlePublicReset}
@@ -1754,7 +1873,7 @@ export default function Home() {
               <button
                 aria-label="Spin random roster feed"
                 aria-busy={isSpinning}
-                className="h-11 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] px-6 text-sm font-black text-[#89f0cd] transition hover:border-[#31d6a1]/70 hover:bg-[#31d6a1]/[0.22] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#aeb4c2]"
+                className="game-control-button game-spin-button h-11 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] px-6 text-sm font-black text-[#89f0cd] transition hover:border-[#31d6a1]/70 hover:bg-[#31d6a1]/[0.22] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#aeb4c2]"
                 disabled={!publicSpinAllowed}
                 type="button"
                 onClick={() => spinTeamEra("all")}
@@ -1763,7 +1882,7 @@ export default function Home() {
               </button>
 
               <button
-                className="h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1] disabled:cursor-wait disabled:text-[#8f96a7]"
+                className="game-control-button game-admin-button h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1] disabled:cursor-wait disabled:text-[#8f96a7]"
                 disabled={!authChecked}
                 type="button"
                 onClick={() => {
@@ -1776,7 +1895,7 @@ export default function Home() {
 
               {authPanelOpen ? (
                 <form
-                  className="absolute right-0 top-[calc(100%+0.75rem)] z-20 grid w-[280px] max-w-[calc(100vw-2rem)] gap-3 rounded-lg border border-white/12 bg-[#202431] p-4 shadow-2xl shadow-black/35"
+                  className="game-auth-panel absolute right-0 top-[calc(100%+0.75rem)] z-20 grid w-[280px] max-w-[calc(100vw-2rem)] gap-3 rounded-lg border border-white/12 bg-[#202431] p-4 shadow-2xl shadow-black/35"
                   onSubmit={handleAdminLogin}
                 >
                   <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-[#cfd3df]">
@@ -1816,17 +1935,17 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(420px,520px)_1fr] lg:px-8">
-        <aside className="flex max-h-[720px] min-h-[560px] flex-col overflow-hidden rounded-lg border border-white/10 bg-[#202431] lg:sticky lg:top-5 lg:h-[calc(100vh-132px)] lg:max-h-[calc(100vh-132px)] lg:min-h-0">
+      <section className="game-shell mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(420px,520px)_1fr] lg:px-8">
+        <aside className="game-roster-panel flex max-h-[720px] min-h-[560px] flex-col overflow-hidden rounded-lg border border-white/10 bg-[#202431] lg:sticky lg:top-5 lg:h-[calc(100vh-132px)] lg:max-h-[calc(100vh-132px)] lg:min-h-0">
           {isSpinning ? (
-            <div className="spin-stage flex min-h-0 flex-1 flex-col px-4 py-5">
+            <div className="spin-stage game-spin-stage flex min-h-0 flex-1 flex-col px-4 py-5">
               <div className="spin-stage-header">
                 <span className="spin-stage-mark" aria-hidden="true" />
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-[#31d6a1]">Draft Draw</span>
               </div>
 
               <div
-                className="mt-5 grid grid-cols-2 gap-3"
+                className="game-spin-grid mt-5 grid grid-cols-2 gap-3"
                 aria-busy={isSpinning}
                 aria-live={isSpinning ? "off" : "polite"}
               >
@@ -1865,7 +1984,7 @@ export default function Home() {
               <div className="border-b border-white/10 px-4 py-4">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#31d6a1]">Roster Feed</p>
-                  <div className="mt-2 grid grid-cols-2 gap-3" aria-live="polite">
+                  <div className="game-spin-grid mt-2 grid grid-cols-2 gap-3" aria-live="polite">
                     <SpinTile
                       label="Team"
                       onSpin={() => spinTeamEra("team")}
@@ -1893,10 +2012,10 @@ export default function Home() {
                     : "No roster drawn yet."}
                 </p>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2">
+                <div className="roster-filter-row mt-4 flex flex-wrap items-center gap-2">
                   <div
                     aria-label="Position filter"
-                    className="flex h-10 items-center gap-1 rounded-lg bg-[#1a1f2b] p-1"
+                    className="position-filter-group flex h-10 items-center gap-1 rounded-lg bg-[#1a1f2b] p-1"
                     role="group"
                   >
                     {POSITION_FILTER_OPTIONS.map((filter) => (
@@ -1941,7 +2060,7 @@ export default function Home() {
                 <p className="mt-3 text-sm font-semibold text-[#cfd3df]">{filteredPlayers.length} players available</p>
 
                 {showPublicRosterSpinCta ? (
-                  <div className="mt-3 flex flex-col gap-3 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="next-draw-card mt-3 flex flex-col gap-3 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] p-3 sm:flex-row sm:items-center sm:justify-between">
                     <span className="grid gap-1">
                       <span className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[#89f0cd]">
                         Next Draw
@@ -1952,7 +2071,7 @@ export default function Home() {
                     </span>
                     <button
                       aria-label={`Spin round ${publicDisplayRound}`}
-                      className="h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf]"
+                      className="big-spin-button h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf]"
                       type="button"
                       onClick={() => spinTeamEra("all")}
                     >
@@ -1989,7 +2108,7 @@ export default function Home() {
                         <button
                           key={player.id}
                           aria-grabbed={draggedPlayerId === player.id}
-                          className={`player-card grid min-h-[82px] grid-cols-1 gap-3 rounded-lg border px-3 py-3 text-left transition focus:outline-none focus:ring-2 sm:grid-cols-[minmax(150px,0.85fr)_minmax(0,1.15fr)] sm:items-center ${
+                          className={`roster-player-card player-card grid min-h-[82px] grid-cols-1 gap-3 rounded-lg border px-3 py-3 text-left transition focus:outline-none focus:ring-2 sm:grid-cols-[minmax(150px,0.85fr)_minmax(0,1.15fr)] sm:items-center ${
                             draggedPlayerId === player.id ? "player-card-dragging" : ""
                           } ${canRosterSwap ? "player-card-roster-drop" : ""} ${
                             canSelectPlayer ? "" : "player-card-disabled"
@@ -1997,8 +2116,11 @@ export default function Home() {
                           disabled={!canSelectPlayer}
                           draggable={true}
                           type="button"
-                          onClick={() => assignPlayer(player, selectedSlot ?? undefined)}
-                          onDoubleClick={() => assignPlayer(player)}
+                          onClick={() => handleRosterPlayerClick(player)}
+                          onDoubleClick={() => {
+                            setPositionPickerPlayer(null);
+                            assignPlayer(player);
+                          }}
                           onDragEnd={handleDragEnd}
                           onDragOver={(event) => handleRosterDragOver(event, player)}
                           onDragStart={(event) => handleDragStart(event, player)}
@@ -2027,10 +2149,10 @@ export default function Home() {
           )}
         </aside>
 
-        <section className="flex flex-col gap-4 self-start">
+        <section className="game-court-section flex flex-col gap-4 self-start">
           <div
             ref={courtRef}
-            className="court-blueprint relative h-[520px] overflow-hidden rounded-lg border border-white/10 shadow-2xl shadow-black/25 sm:h-[560px]"
+            className="game-court court-blueprint relative h-[520px] overflow-hidden rounded-lg border border-white/10 shadow-2xl shadow-black/25 sm:h-[560px]"
           >
             <div className="court-key" />
             <div className="court-rim" />
@@ -2055,13 +2177,13 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="flex flex-col gap-3 rounded-lg border border-[#ff8a2a]/25 bg-[#202431] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="game-score-panel flex flex-col gap-3 rounded-lg border border-[#ff8a2a]/25 bg-[#202431] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#ff8a2a]">Grand Legacy Score</p>
               <p className="mt-1 text-3xl font-black text-white">{formatLegacyScore(teamLegacyScore)}</p>
             </div>
             <button
-              className="h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#8f96a7]"
+              className="simulate-button h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#8f96a7]"
               disabled={!lineupComplete || isSpinning}
               type="button"
               onClick={simulateSeason}
@@ -2071,6 +2193,85 @@ export default function Home() {
           </div>
         </section>
       </section>
+
+      {positionPickerPlayer ? (
+        <div
+          aria-labelledby="position-picker-title"
+          aria-modal="true"
+          className="position-picker"
+          role="dialog"
+        >
+          <button
+            aria-label="Close position picker"
+            className="position-picker-backdrop"
+            type="button"
+            onClick={() => setPositionPickerPlayer(null)}
+          />
+          <div className="position-picker-panel">
+            <div className="position-picker-heading">
+              <h2 id="position-picker-title">{positionPickerPlayer.name} - Choose Position</h2>
+              <button
+                aria-label="Close position picker"
+                className="position-picker-close"
+                type="button"
+                onClick={() => setPositionPickerPlayer(null)}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="position-picker-options">
+              {POSITIONS.map((position) => {
+                const assignable = positionPickerAssignablePositions.includes(position);
+                const naturalPosition = positionPickerPlayer.positions.includes(position);
+
+                return (
+                  <button
+                    key={position}
+                    className={`position-picker-option ${assignable ? "position-picker-option-active" : ""}`}
+                    disabled={!assignable}
+                    type="button"
+                    onClick={() => choosePositionForPicker(position)}
+                  >
+                    <span className="position-picker-position">{position}</span>
+                    <span className="position-picker-status">{assignable ? "Pick" : naturalPosition ? "Filled" : "N/A"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <nav className="mobile-lineup-rail" aria-label="Lineup positions">
+        {POSITIONS.map((position) => {
+          const slot = lineup[position];
+          const mobileSourceSlot = mobileMoveSource ? lineup[mobileMoveSource] : undefined;
+          const canReceiveMobileMove = Boolean(
+            mobileSourceSlot &&
+              mobileMoveSource !== position &&
+              placementStatus(lineup, mobileSourceSlot.player, position) !== "blocked",
+          );
+
+          return (
+            <button
+              key={position}
+              aria-label={slot ? `${slot.player.name}, ${position}` : `${position} slot`}
+              className={`mobile-lineup-slot ${
+                selectedSlot === position || mobileMoveSource === position ? "mobile-lineup-slot-selected" : ""
+              } ${canReceiveMobileMove ? "mobile-lineup-slot-can-move" : ""} ${
+                slot ? "mobile-lineup-slot-filled" : ""
+              }`}
+              style={slot ? teamThemeStyle(slot.selection.team) : undefined}
+              type="button"
+              onClick={() => handleMobileLineupSlotSelect(position)}
+            >
+              <span className="mobile-lineup-token">{slot ? playerInitials(slot.player.name) : position}</span>
+              <span className="mobile-lineup-label">{position}</span>
+            </button>
+          );
+        })}
+      </nav>
     </main>
   );
 }

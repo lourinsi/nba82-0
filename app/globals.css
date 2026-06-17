@@ -1430,3 +1430,725 @@ select {
     left: 4%;
   }
 }
+
+.game-page {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(255, 111, 19, 0.12), transparent 30rem),
+    radial-gradient(circle at 92% 22%, rgba(184, 112, 255, 0.12), transparent 24rem),
+    linear-gradient(180deg, #1d222e 0%, #171b25 55%, #12161f 100%);
+}
+
+.game-header {
+  backdrop-filter: blur(18px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.game-brand {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.game-brand-copy {
+  min-width: 0;
+}
+
+.game-logo-mark {
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 6px, #ff8a2a 0 9px, transparent 10px),
+    linear-gradient(180deg, #2b3143, #151923);
+  border: 2px solid rgba(255, 111, 19, 0.9);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 8px 20px rgba(0, 0, 0, 0.24);
+  color: #ffffff;
+  display: grid;
+  flex: 0 0 auto;
+  height: 48px;
+  justify-items: center;
+  line-height: 1;
+  overflow: hidden;
+  padding-top: 13px;
+  position: relative;
+  text-shadow: 1px 1px 0 #10131c;
+  width: 52px;
+}
+
+.game-logo-mark::before,
+.game-logo-mark::after {
+  background: rgba(244, 242, 236, 0.46);
+  content: "";
+  height: 1px;
+  left: 8px;
+  position: absolute;
+  right: 8px;
+  top: 16px;
+}
+
+.game-logo-mark::after {
+  background: #ff6f13;
+  bottom: 7px;
+  height: 5px;
+  left: 6px;
+  right: 6px;
+  top: auto;
+}
+
+.game-logo-mark span {
+  font-size: 0.98rem;
+  font-weight: 950;
+  position: relative;
+  z-index: 1;
+}
+
+.game-logo-mark small {
+  color: #ffffff;
+  font-size: 0.46rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.game-control-button {
+  align-items: center;
+  display: inline-grid;
+  justify-items: center;
+}
+
+.mobile-lineup-rail {
+  display: none;
+}
+
+.position-picker {
+  align-items: end;
+  display: grid;
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 90;
+}
+
+.position-picker-backdrop {
+  background: rgba(8, 10, 16, 0.56);
+  border: 0;
+  cursor: pointer;
+  inset: 0;
+  pointer-events: auto;
+  position: absolute;
+}
+
+.position-picker-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 46%),
+    #1b202c;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -20px 42px rgba(0, 0, 0, 0.34);
+  display: grid;
+  gap: 24px;
+  margin: 0 auto;
+  max-width: 560px;
+  padding: 26px 28px 34px;
+  pointer-events: auto;
+  position: relative;
+  width: min(100%, 560px);
+}
+
+.position-picker-heading {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.position-picker-heading h2 {
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.12;
+}
+
+.position-picker-close {
+  align-items: center;
+  aspect-ratio: 1;
+  background: transparent;
+  border: 0;
+  color: #d8dbe4;
+  display: inline-grid;
+  flex: 0 0 auto;
+  font-size: 1.5rem;
+  font-weight: 500;
+  justify-items: center;
+  line-height: 1;
+  width: 36px;
+}
+
+.position-picker-options {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.position-picker-option {
+  align-items: center;
+  aspect-ratio: 0.92;
+  background: rgba(36, 41, 56, 0.86);
+  border: 2px solid rgba(90, 96, 116, 0.38);
+  border-radius: 8px;
+  color: #6f7688;
+  display: grid;
+  justify-items: center;
+  min-height: 78px;
+  padding: 10px 6px;
+}
+
+.position-picker-option:disabled {
+  cursor: not-allowed;
+}
+
+.position-picker-option-active {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 42%),
+    #0795a8;
+  border-color: #10bfd4;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.24);
+  color: #ffffff;
+}
+
+.position-picker-position {
+  font-size: 1.45rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.position-picker-status {
+  font-size: 0.66rem;
+  font-weight: 950;
+  line-height: 1;
+  opacity: 0.72;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .game-page {
+    min-height: 100svh;
+    overflow-x: hidden;
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
+  }
+
+  .game-header {
+    padding: 9px 10px;
+  }
+
+  .game-header-inner {
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    justify-content: space-between;
+    margin: 0 auto;
+    max-width: 430px;
+  }
+
+  .game-brand {
+    gap: 10px;
+  }
+
+  .game-logo-mark {
+    height: 44px;
+    width: 48px;
+  }
+
+  .game-brand-copy p,
+  .game-round-pill {
+    display: none;
+  }
+
+  .game-brand-copy h1 {
+    font-size: 1.02rem;
+    line-height: 1;
+    margin-top: 0;
+    white-space: nowrap;
+  }
+
+  .game-public-controls {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .game-admin-controls {
+    align-items: end;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) repeat(3, 46px);
+    width: 100%;
+  }
+
+  .game-admin-controls label {
+    font-size: 0.72rem;
+  }
+
+  .game-control-button {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    font-size: 0;
+    height: 46px;
+    padding: 0;
+    width: 46px;
+  }
+
+  .game-control-button::before,
+  .game-control-button::after {
+    content: "";
+    display: block;
+  }
+
+  .game-spin-button::before {
+    border-bottom: 7px solid transparent;
+    border-left: 11px solid currentColor;
+    border-top: 7px solid transparent;
+    height: 0;
+    margin-left: 3px;
+    width: 0;
+  }
+
+  .game-reset-button::before {
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    height: 18px;
+    transform: rotate(-38deg);
+    width: 18px;
+  }
+
+  .game-admin-button::before {
+    border: 2px solid currentColor;
+    border-radius: 999px;
+    height: 12px;
+    margin-top: -4px;
+    width: 12px;
+  }
+
+  .game-admin-button::after {
+    border: 2px solid currentColor;
+    border-bottom: 0;
+    border-radius: 999px 999px 0 0;
+    height: 9px;
+    margin-top: -3px;
+    width: 20px;
+  }
+
+  .game-clear-button::before,
+  .game-logout-button::before {
+    background:
+      linear-gradient(45deg, transparent 43%, currentColor 45% 55%, transparent 57%),
+      linear-gradient(-45deg, transparent 43%, currentColor 45% 55%, transparent 57%);
+    height: 22px;
+    width: 22px;
+  }
+
+  .game-logout-button::before {
+    background:
+      linear-gradient(currentColor, currentColor) 4px 10px / 16px 2px no-repeat,
+      linear-gradient(45deg, transparent 48%, currentColor 49% 58%, transparent 59%) 12px 5px / 10px 10px no-repeat,
+      linear-gradient(-45deg, transparent 48%, currentColor 49% 58%, transparent 59%) 12px 7px / 10px 10px no-repeat;
+  }
+
+  .game-auth-panel {
+    position: fixed;
+    right: 10px;
+    top: 68px;
+    width: min(280px, calc(100vw - 20px));
+  }
+
+  .game-shell {
+    gap: 12px;
+    max-width: 430px;
+    padding: 0 10px 12px;
+  }
+
+  .game-roster-panel {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 34%),
+      #202431;
+    border-color: rgba(255, 255, 255, 0.11);
+    border-radius: 8px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+    height: calc(100svh - 190px);
+    max-height: none;
+    min-height: 430px;
+  }
+
+  .game-roster-panel > .border-b {
+    padding: 14px 14px 12px;
+  }
+
+  .game-spin-stage {
+    justify-content: center;
+    padding: 24px 18px;
+  }
+
+  .spin-stage-header {
+    justify-content: center;
+  }
+
+  .game-spin-grid {
+    gap: 14px;
+  }
+
+  .spin-tile {
+    border-radius: 8px;
+    min-height: 110px;
+  }
+
+  .spin-tile-team {
+    --spin-accent: #ff9d00 !important;
+    --spin-kicker: #ff6f13 !important;
+  }
+
+  .spin-tile-era {
+    --spin-accent: #b94cff !important;
+    --spin-kicker: #ff6f13 !important;
+  }
+
+  .spin-tile::before {
+    display: none;
+  }
+
+  .spin-tile-inner {
+    gap: 7px;
+    padding: 11px;
+  }
+
+  .spin-tile-topline {
+    justify-content: center;
+  }
+
+  .spin-tile-label {
+    color: #ff6f13;
+    font-size: 0.8rem;
+    letter-spacing: 0;
+  }
+
+  .spin-tile-wheel {
+    display: none;
+  }
+
+  .spin-tile-reel {
+    justify-items: center;
+    min-height: 62px;
+    padding: 0 8px;
+  }
+
+  .spin-tile-value {
+    font-size: clamp(2.05rem, 12vw, 2.85rem);
+    text-align: center;
+  }
+
+  .roster-filter-row {
+    display: grid;
+    gap: 6px;
+    grid-template-columns: minmax(118px, auto) minmax(0, 1fr) minmax(78px, 0.34fr);
+    width: 100%;
+  }
+
+  .position-filter-group {
+    border-radius: 8px;
+  }
+
+  .position-filter-group button {
+    font-size: 0.9rem;
+    min-width: 28px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .roster-filter-row input {
+    min-width: 0;
+  }
+
+  .roster-filter-row select {
+    padding-left: 10px;
+    padding-right: 8px;
+    width: 100%;
+  }
+
+  .next-draw-card {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    padding: 2px 0 0;
+  }
+
+  .next-draw-card > span {
+    display: none;
+  }
+
+  .big-spin-button {
+    background: #ff6f13;
+    border-color: #ff8a2a;
+    color: #ffffff;
+    font-size: 1.02rem;
+    height: 48px;
+    min-width: 154px;
+    text-transform: uppercase;
+  }
+
+  .roster-list-scroll {
+    padding: 8px 12px 14px;
+  }
+
+  .roster-player-card {
+    align-items: center;
+    gap: 8px;
+    grid-template-columns: minmax(108px, 0.85fr) minmax(0, 1.15fr);
+    min-height: 80px;
+    padding: 10px 12px 10px 16px;
+  }
+
+  .roster-player-card .achievement-strip {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    justify-content: stretch;
+    overflow: hidden;
+    padding: 0;
+    scrollbar-width: none;
+    white-space: normal;
+  }
+
+  .roster-player-card .achievement-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .roster-player-card .achievement-stat {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .roster-player-card .achievement-stat:nth-child(n + 6) {
+    display: none;
+  }
+
+  .roster-player-card .achievement-value {
+    font-size: 0.96rem;
+    line-height: 0.95;
+  }
+
+  .roster-player-card .achievement-label {
+    font-size: 0.52rem;
+    line-height: 0.92;
+    max-width: none;
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+
+  .game-court-section {
+    gap: 10px;
+  }
+
+  .game-court {
+    display: none;
+  }
+
+  .game-score-panel {
+    border-color: rgba(255, 111, 19, 0.34);
+    padding: 12px;
+  }
+
+  .game-score-panel p:last-child {
+    font-size: 1.7rem;
+  }
+
+  .simulate-button {
+    height: 46px;
+  }
+
+  .mobile-lineup-rail {
+    align-items: start;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 55%),
+      #1a1f2b;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    bottom: 0;
+    box-shadow: 0 -18px 30px rgba(0, 0, 0, 0.26);
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    left: 50%;
+    max-width: 430px;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    position: fixed;
+    transform: translateX(-50%);
+    width: 100%;
+    z-index: 60;
+  }
+
+  .mobile-lineup-slot {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: #aeb4c2;
+    display: grid;
+    gap: 4px;
+    justify-items: center;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .mobile-lineup-token {
+    align-items: center;
+    aspect-ratio: 1;
+    background: rgba(36, 41, 56, 0.82);
+    border: 3px dashed rgba(174, 180, 194, 0.34);
+    border-radius: 999px;
+    color: #aeb4c2;
+    display: grid;
+    font-size: 0.86rem;
+    font-weight: 950;
+    justify-items: center;
+    line-height: 1;
+    max-width: 58px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .mobile-lineup-label {
+    color: #aeb4c2;
+    font-size: 0.72rem;
+    font-weight: 950;
+    line-height: 1;
+  }
+
+  .mobile-lineup-slot-selected .mobile-lineup-token {
+    border-color: #ff6f13;
+    border-style: solid;
+    box-shadow: 0 0 0 3px rgba(255, 111, 19, 0.18);
+    color: #ffffff;
+  }
+
+  .mobile-lineup-slot-can-move .mobile-lineup-token {
+    border-color: #31d6a1;
+    border-style: solid;
+    box-shadow:
+      0 0 0 3px rgba(49, 214, 161, 0.14),
+      0 0 18px rgba(49, 214, 161, 0.2);
+    color: #ffffff;
+  }
+
+  .mobile-lineup-slot-filled .mobile-lineup-token {
+    background:
+      linear-gradient(145deg, color-mix(in srgb, var(--team-primary) 88%, #0f121b), color-mix(in srgb, var(--team-secondary) 40%, #10131c)),
+      var(--team-primary);
+    border-color: color-mix(in srgb, var(--team-accent) 82%, #ffffff);
+    border-style: solid;
+    color: var(--team-number);
+    font-size: 0.78rem;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.38);
+  }
+
+  .mobile-lineup-slot-filled .mobile-lineup-label {
+    color: color-mix(in srgb, var(--team-accent) 84%, #ffffff);
+  }
+
+  .mobile-lineup-slot-selected .mobile-lineup-token,
+  .mobile-lineup-slot-filled.mobile-lineup-slot-selected .mobile-lineup-token {
+    border-color: #ff9fbd;
+    box-shadow:
+      0 0 0 3px rgba(255, 159, 189, 0.2),
+      0 0 18px rgba(255, 159, 189, 0.2);
+    color: #ffffff;
+  }
+
+  .mobile-lineup-slot-can-move .mobile-lineup-token,
+  .mobile-lineup-slot-filled.mobile-lineup-slot-can-move .mobile-lineup-token {
+    border-color: #31d6a1;
+    box-shadow:
+      0 0 0 3px rgba(49, 214, 161, 0.14),
+      0 0 18px rgba(49, 214, 161, 0.2);
+    color: #ffffff;
+  }
+
+  .position-picker-panel {
+    border-left: 0;
+    border-radius: 0;
+    border-right: 0;
+    gap: 30px;
+    max-width: 430px;
+    min-height: 250px;
+    padding: 28px 22px 34px;
+    width: 100%;
+  }
+
+  .position-picker-heading h2 {
+    font-size: 1.24rem;
+  }
+
+  .position-picker-options {
+    gap: 14px;
+  }
+
+  .position-picker-option {
+    aspect-ratio: auto;
+    min-height: 96px;
+  }
+}
+
+@media (max-width: 390px) {
+  .game-control-button {
+    height: 42px;
+    width: 42px;
+  }
+
+  .game-brand-copy h1 {
+    font-size: 0.96rem;
+  }
+
+  .game-shell {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .game-roster-panel {
+    height: calc(100svh - 184px);
+  }
+
+  .roster-player-card {
+    grid-template-columns: minmax(98px, 0.82fr) minmax(0, 1.18fr);
+    padding-left: 14px;
+  }
+
+  .roster-player-card .achievement-stat {
+    min-width: 0;
+  }
+
+  .roster-player-card .achievement-value {
+    font-size: 0.86rem;
+  }
+
+  .roster-player-card .achievement-label {
+    font-size: 0.46rem;
+  }
+
+  .mobile-lineup-rail {
+    gap: 7px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .position-picker-options {
+    gap: 8px;
+  }
+
+  .position-picker-option {
+    min-height: 88px;
+  }
+}
