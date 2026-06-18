@@ -2507,7 +2507,7 @@ select {
   .roster-filter-row {
     display: grid;
     gap: 6px;
-    grid-template-columns: minmax(118px, auto) minmax(0, 1fr) minmax(78px, 0.34fr);
+    grid-template-columns: minmax(118px, 0.68fr) minmax(0, 1fr);
     width: 100%;
   }
 

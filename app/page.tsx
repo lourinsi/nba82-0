@@ -17,9 +17,10 @@ const GAME_MODES = [
   },
   {
     title: "Classic",
-    status: "Coming Soon",
+    status: "Playable",
+    href: "/classic",
     description: "The streamlined 82-0 draft format.",
-    enabled: false,
+    enabled: true,
   },
   {
     title: "You Know Ball",
