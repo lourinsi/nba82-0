@@ -9,6 +9,13 @@ const GAME_MODES = [
     enabled: true,
   },
   {
+    title: "Legacy Engine",
+    status: "Simulator",
+    href: "/legacy-engine",
+    description: "Tune accolade weights and the Pro-Peak curve in real time.",
+    enabled: true,
+  },
+  {
     title: "Classic",
     status: "Coming Soon",
     description: "The streamlined 82-0 draft format.",

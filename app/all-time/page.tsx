@@ -359,6 +359,12 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     weight: ACCOLADE_WEIGHTS.all_rookie_2nd,
   },
   { id: "seasons", label: "YRS", count: (player) => player.accolades.seasons_played, weight: ACCOLADE_WEIGHTS.seasons_played },
+  {
+    id: "games-started",
+    label: "Starts",
+    count: (player) => player.accolades.games_started ?? 0,
+    weight: ACCOLADE_WEIGHTS.games_started,
+  },
 ];
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
 const SEASON_TIERS: SeasonTier[] = [
@@ -545,7 +551,12 @@ function buildAchievements(player: Player) {
       ? [
           {
             id: achievement.id,
-            value: achievement.value ? achievement.value(player) : achievement.id === "seasons" ? String(count) : countValue(count),
+            value: achievement.value
+              ? achievement.value(player)
+              : achievement.id === "seasons" ||
+                  achievement.id === "games-started"
+                ? String(count)
+                : countValue(count),
             label: achievement.label,
           },
         ]
@@ -561,7 +572,10 @@ function buildAchievementTotals(players: Player[]) {
       ? [
           {
             id: achievement.id,
-            value: achievement.id === "seasons" ? String(total) : countValue(total),
+            value:
+              achievement.id === "seasons" || achievement.id === "games-started"
+                ? String(total)
+                : countValue(total),
             label: achievement.label,
           },
         ]
@@ -681,11 +695,11 @@ function playerHasRecordedTeamEra(player: Player, team: string, canonicalEra: st
 function playerMatchesTeamEra(player: Player, team: string, era: string) {
   const canonicalSelectedEra = getCanonicalEra(era);
 
-  if (player.team_eras?.length) {
-    return playerHasRecordedTeamEra(player, team, canonicalSelectedEra);
+  if (!teamEraExists(team, canonicalSelectedEra)) {
+    return false;
   }
 
-  return teamEraExists(team, era) && playerHasRecordedTeamEra(player, team, canonicalSelectedEra);
+  return playerHasRecordedTeamEra(player, team, canonicalSelectedEra);
 }
 
 function eraOptionsForTeam(players: Player[], team: string) {
@@ -695,7 +709,9 @@ function eraOptionsForTeam(players: Player[], team: string) {
       (player.teams.includes(team) ? player.eras : []),
   );
 
-  const uniqueCanonicalPlayerEras = Array.from(new Set(allPlayerErasForTeam.map(getCanonicalEra)));
+  const uniqueCanonicalPlayerEras = Array.from(new Set(allPlayerErasForTeam.map(getCanonicalEra))).filter((era) =>
+    teamEraExists(team, era),
+  );
 
   if (uniqueCanonicalPlayerEras.length || players.length) {
     return uniqueCanonicalPlayerEras.sort((a, b) => eraSortValue(a) - eraSortValue(b));
@@ -2179,20 +2195,22 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="game-score-panel flex flex-col gap-3 rounded-lg border border-[#ff8a2a]/25 bg-[#202431] p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#ff8a2a]">Grand Legacy Score</p>
-              <p className="mt-1 text-3xl font-black text-white">{formatLegacyScore(teamLegacyScore)}</p>
+          {isAdmin ? (
+            <div className="game-score-panel flex flex-col gap-3 rounded-lg border border-[#ff8a2a]/25 bg-[#202431] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#ff8a2a]">Grand Legacy Score</p>
+                <p className="mt-1 text-3xl font-black text-white">{formatLegacyScore(teamLegacyScore)}</p>
+              </div>
+              <button
+                className="simulate-button h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#8f96a7]"
+                disabled={!lineupComplete || isSpinning}
+                type="button"
+                onClick={simulateSeason}
+              >
+                Simulate Season
+              </button>
             </div>
-            <button
-              className="simulate-button h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#8f96a7]"
-              disabled={!lineupComplete || isSpinning}
-              type="button"
-              onClick={simulateSeason}
-            >
-              Simulate Season
-            </button>
-          </div>
+          ) : null}
         </section>
       </section>
 
