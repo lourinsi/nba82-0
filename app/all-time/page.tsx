@@ -36,12 +36,13 @@ type Accolades = {
   rebound_titles: number;
   steal_titles: number;
   block_titles: number;
+  games_started?: number;
 };
 
 type Player = {
   id: string;
   name: string;
-  legacy_points?: number; // This is the base score from accolades
+  legacy_points?: number; // Final score from weighted accolades and modifier
   goat_rank?: number | null; // Bleacher Report GOAT ranking (1-100)
   goat_score?: number; // Bleacher Report GOAT score (101-rank)
   positions: Position[];
@@ -278,6 +279,7 @@ const ACCOLADE_WEIGHTS = {
   all_rookie_1st: 1,
   all_rookie_2nd: 0.75,
   seasons_played: 0.25,
+  games_started: 0.01,
 } satisfies Partial<Record<keyof Accolades, number>>;
 type WeightedAccoladeKey = keyof typeof ACCOLADE_WEIGHTS;
 
@@ -586,7 +588,7 @@ function positionScoreMultiplier(player: Player | undefined, assignedPosition: P
   // The goat_score is 101-rank, or 0 if not ranked.
   const isTop100Goat = (player.goat_rank && player.goat_rank >= 1 && player.goat_rank <= 100) || (player.goat_score && player.goat_score > 0);
 
-  return isTop100Goat ? 1.15 : 1;
+  return isTop100Goat ? 1.10 : 1;
 }
 function lineupSlotScore(slot: LineupSlot | undefined, assignedPosition: Position) {
   if (!slot) {
