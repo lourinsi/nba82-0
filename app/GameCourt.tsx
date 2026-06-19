@@ -40,14 +40,27 @@ export type Accolades = {
 };
 export type ScoringAccolades = Omit<Accolades, "roy_won"> & { roy_won: boolean | number };
 
-export type ClassicStatKey = "ppg" | "rpg" | "apg" | "spg" | "bpg";
+export type ClassicStatKey = "ppg" | "rpg" | "apg" | "spg" | "bpg" | "ts_pct" | "ws_48";
 export type ClassicStatLine = Partial<Record<ClassicStatKey, number | null>>;
+export type CareerSeason = Partial<TeamEra> & {
+  season?: string | number | null;
+  games_played?: number | string | null;
+  ppg?: number | string | null;
+  rpg?: number | string | null;
+  apg?: number | string | null;
+  spg?: number | string | null;
+  bpg?: number | string | null;
+  ts_pct?: number | string | null;
+  ws_48?: number | string | null;
+  ws_per_48?: number | string | null;
+};
 
 export type Player = {
   id: string;
   name: string;
   legacy_points?: number; // Career all-time score.
   classic_points_by_team_era?: ClassicPointBlock[];
+  career_seasons?: CareerSeason[];
   goat_rank?: number | null; // Bleacher Report GOAT ranking (1-100)
   goat_score?: number; // Bleacher Report GOAT score (101-rank)
   positions: Position[];
@@ -135,6 +148,16 @@ export type RosterControlDefinition = {
     label: string;
   }[];
 };
+export type LeagueAverage = Record<string, number | string | null | undefined>;
+export type LeagueAverages = Record<string, LeagueAverage>;
+export type StatsEngineConfig = {
+  allTimeTsBaseline: number;
+  leagueAverages: LeagueAverages;
+  tsBlendWeights: {
+    absolute: number;
+    era: number;
+  };
+};
 export type LineupEntry = {
   position: Position;
   player: Player;
@@ -149,6 +172,7 @@ export type GameCourtConfig = {
   seasonTiers: SeasonTier[];
   rosterControls: readonly RosterControlDefinition[];
   defaultRosterControlValues: RosterControlValues;
+  usesStatsEngineConfig?: boolean;
   courtAchievementLimit: number;
   buildAchievementTotals: (slots: LineupSlot[]) => Achievement[];
   buildPlayerAchievements: (player: Player, selection: DraftSelection) => Achievement[];
@@ -156,6 +180,7 @@ export type GameCourtConfig = {
     player: Player,
     selection: DraftSelection,
     rosterControls: RosterControlValues,
+    statsEngineConfig: StatsEngineConfig,
   ) => Achievement[];
   compareRosterPlayers: (
     a: Player,
@@ -171,6 +196,15 @@ export type GameCourtConfig = {
 };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+const FALLBACK_ALL_TIME_TS_BASELINE = 0.54;
+const DEFAULT_STATS_ENGINE_CONFIG: StatsEngineConfig = {
+  allTimeTsBaseline: FALLBACK_ALL_TIME_TS_BASELINE,
+  leagueAverages: {},
+  tsBlendWeights: {
+    absolute: 0.5,
+    era: 0.5,
+  },
+};
 const ADMIN_DEFAULT_TEAM = "LAL";
 const ADMIN_DEFAULT_ERA = "10's";
 const PUBLIC_TEAM_PLACEHOLDER = "?";
@@ -327,6 +361,12 @@ export function numericAccoladeValue(value: unknown) {
   const numeric = Number(value ?? 0);
 
   return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function positiveNumberValue(value: unknown, fallback: number) {
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
 }
 
 export function getCanonicalEra(era: string) {
@@ -586,6 +626,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     seasonTiers,
     rosterControls,
     defaultRosterControlValues,
+    usesStatsEngineConfig = false,
     courtAchievementLimit,
     buildAchievementTotals,
     buildPlayerAchievements,
@@ -615,6 +656,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const [rosterControlValues, setRosterControlValues] = useState<RosterControlValues>(() => ({
     ...defaultRosterControlValues,
   }));
+  const [statsEngineConfig, setStatsEngineConfig] = useState<StatsEngineConfig>(DEFAULT_STATS_ENGINE_CONFIG);
   const [rosterSearch, setRosterSearch] = useState("");
   const [lineup, setLineup] = useState<Lineup>({});
   const [selectedSlot, setSelectedSlot] = useState<Position | null>(null);
@@ -670,6 +712,54 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (!usesStatsEngineConfig) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadStatsEngineConfig() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/stats-engine-config`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const config = (await response.json()) as Partial<StatsEngineConfig>;
+        const tsBlendWeights = config.tsBlendWeights ?? DEFAULT_STATS_ENGINE_CONFIG.tsBlendWeights;
+
+        setStatsEngineConfig({
+          allTimeTsBaseline: positiveNumberValue(
+            config.allTimeTsBaseline,
+            DEFAULT_STATS_ENGINE_CONFIG.allTimeTsBaseline,
+          ),
+          leagueAverages:
+            config.leagueAverages && typeof config.leagueAverages === "object" ? config.leagueAverages : {},
+          tsBlendWeights: {
+            absolute: positiveNumberValue(
+              tsBlendWeights.absolute,
+              DEFAULT_STATS_ENGINE_CONFIG.tsBlendWeights.absolute,
+            ),
+            era: positiveNumberValue(tsBlendWeights.era, DEFAULT_STATS_ENGINE_CONFIG.tsBlendWeights.era),
+          },
+        });
+      } catch (fetchError) {
+        if (fetchError instanceof DOMException && fetchError.name === "AbortError") {
+          return;
+        }
+      }
+    }
+
+    loadStatsEngineConfig();
+
+    return () => controller.abort();
+  }, [usesStatsEngineConfig]);
 
   useEffect(() => {
     let active = true;
@@ -1894,7 +1984,12 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                             </span>
                           </span>
                           <AchievementStrip
-                            achievements={buildRosterFeedAchievements(player, playerSelection, rosterControlValues)}
+                            achievements={buildRosterFeedAchievements(
+                              player,
+                              playerSelection,
+                              rosterControlValues,
+                              statsEngineConfig,
+                            )}
                           />
                         </button>
                       );
@@ -2096,7 +2191,7 @@ function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
       aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}
     >
       {achievements.map((achievement) => (
-        <span className="achievement-stat flex-shrink-0" key={achievement.id}>
+        <span className={`achievement-stat achievement-stat-${achievement.id} flex-shrink-0`} key={achievement.id}>
           <span className="achievement-value">{achievement.value}</span>
           <span className="achievement-label">{achievement.label}</span>
         </span>

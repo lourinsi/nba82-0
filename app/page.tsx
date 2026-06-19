@@ -16,6 +16,13 @@ const GAME_MODES = [
     enabled: true,
   },
   {
+    title: "Stats Engine",
+    status: "Simulator",
+    href: "/stats-engine",
+    description: "Tune era-relative stats, TS blend, and WS/48 multipliers.",
+    enabled: true,
+  },
+  {
     title: "Classic",
     status: "Playable",
     href: "/classic",

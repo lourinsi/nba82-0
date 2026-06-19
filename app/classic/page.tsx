@@ -9,6 +9,8 @@ import GameCourt, {
   type ClassicStatKey,
   type ClassicStatLine,
   type GameCourtConfig,
+  type LeagueAverage,
+  type LeagueAverages,
   type LineupSlot,
   type Player,
   type Position,
@@ -16,6 +18,7 @@ import GameCourt, {
   type ScoringAccolades,
   type SeasonTier,
   type StatDisplay,
+  type StatsEngineConfig,
   type TeamEra,
 } from "../GameCourt";
 
@@ -102,12 +105,17 @@ const MERGED_CLASSIC_ACCOLADE_KEYS = [
 ] as const satisfies readonly (keyof Accolades)[];
 const EARLY_CLASSIC_ERA_ACCOLADE_MULTIPLIER = 0.5;
 
-const CLASSIC_STAT_DISPLAY_ORDER: StatDisplay[] = [
+const CLASSIC_BOX_SCORE_DISPLAY_ORDER: StatDisplay[] = [
   { id: "ppg", label: "PTS" },
   { id: "rpg", label: "REB" },
   { id: "apg", label: "AST" },
   { id: "spg", label: "STL" },
   { id: "bpg", label: "BLK" },
+];
+const CLASSIC_STORED_STAT_DISPLAY_ORDER: StatDisplay[] = [
+  ...CLASSIC_BOX_SCORE_DISPLAY_ORDER,
+  { id: "ts_pct", label: "TS%" },
+  { id: "ws_48", label: "WS/48" },
 ];
 const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   // {
@@ -343,6 +351,28 @@ function statValue(value: number) {
   return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1);
 }
 
+function wholeStatValue(value: unknown) {
+  const numeric = numericValue(value);
+
+  return String(Math.round(numeric ?? 0));
+}
+
+function ws48Value(value: unknown) {
+  const numeric = numericValue(value);
+
+  return numeric === null ? "0.00" : numeric.toFixed(2);
+}
+
+function tsPercentValue(value: unknown) {
+  const numeric = numericValue(value);
+
+  return numeric === null ? "0%" : `${Math.round(numeric * 100)}%`;
+}
+
+function compactPraValue(block: ClassicPointBlock) {
+  return `${wholeStatValue(block.stats?.ppg)}/${wholeStatValue(block.stats?.rpg)}/${wholeStatValue(block.stats?.apg)}`;
+}
+
 // function playerGoatRank(player: Player) {
 //   const explicitRank = Number(player.goat_rank || 0);
 
@@ -385,6 +415,177 @@ function positiveNumber(value: unknown) {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
 }
 
+function numericValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function firstNumericValue(source: Record<string, unknown> | undefined | null, keys: string[]) {
+  if (!source) {
+    return null;
+  }
+
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      const numeric = numericValue(source[key]);
+
+      if (numeric !== null) {
+        return numeric;
+      }
+    }
+  }
+
+  return null;
+}
+
+function firstPositiveNumericValue(source: Record<string, unknown> | undefined | null, keys: string[]) {
+  const numeric = firstNumericValue(source, keys);
+
+  return numeric !== null && numeric > 0 ? numeric : null;
+}
+
+function seasonEndYear(season: unknown) {
+  const value = String(season || "").trim();
+  const fullYearRange = value.match(/^(\d{4})\D+(\d{4})/);
+
+  if (fullYearRange) {
+    return Number(fullYearRange[2]);
+  }
+
+  const shortYearRange = value.match(/^(\d{4})\D+(\d{2})/);
+
+  if (shortYearRange) {
+    const startYear = Number(shortYearRange[1]);
+    const endYearSuffix = Number(shortYearRange[2]);
+    const startCentury = Math.floor(startYear / 100) * 100;
+    const endYear = startCentury + endYearSuffix;
+
+    return endYear > startYear ? endYear : endYear + 100;
+  }
+
+  const singleYear = value.match(/\d{4}/);
+
+  return singleYear ? Number(singleYear[0]) : null;
+}
+
+function seasonKeyCandidates(season: unknown) {
+  const rawSeason = String(season || "").trim();
+
+  if (!rawSeason) {
+    return [];
+  }
+
+  const candidates = [rawSeason];
+  const endYear = seasonEndYear(rawSeason);
+  const startYear = Number(rawSeason.match(/^(\d{4})/)?.[1]);
+
+  if (startYear && endYear) {
+    candidates.push(`${startYear}-${String(endYear).slice(-2)}`);
+    candidates.push(`${startYear}-${endYear}`);
+  }
+
+  return Array.from(new Set(candidates));
+}
+
+function leagueAverageForSeason(leagueAverages: LeagueAverages, season: unknown): LeagueAverage | null {
+  for (const key of seasonKeyCandidates(season)) {
+    if (leagueAverages[key]) {
+      return leagueAverages[key];
+    }
+  }
+
+  return null;
+}
+
+function careerSeasonsForSelection(player: Player, selection: TeamEra) {
+  const selectedEra = getCanonicalEra(selection.era);
+
+  return (
+    player.career_seasons?.filter(
+      (season) => season.team === selection.team && getCanonicalEra(String(season.era || "")) === selectedEra,
+    ) ?? []
+  );
+}
+
+function leagueTsValue(leagueAverage: LeagueAverage | null) {
+  return firstPositiveNumericValue(leagueAverage, ["TS_PCT", "ts_pct", "TS%"]);
+}
+
+function adjustedTsPercentForSeason(
+  playerTs: number,
+  leagueTs: number,
+  statsEngineConfig: StatsEngineConfig,
+) {
+  const baseline = positiveNumber(statsEngineConfig.allTimeTsBaseline);
+
+  if (!baseline) {
+    return null;
+  }
+
+  const totalBlendWeight =
+    positiveNumber(statsEngineConfig.tsBlendWeights.era) +
+    positiveNumber(statsEngineConfig.tsBlendWeights.absolute);
+  const eraWeight =
+    totalBlendWeight > 0 ? positiveNumber(statsEngineConfig.tsBlendWeights.era) / totalBlendWeight : 0.5;
+  const absoluteWeight =
+    totalBlendWeight > 0 ? positiveNumber(statsEngineConfig.tsBlendWeights.absolute) / totalBlendWeight : 0.5;
+  const blendedTsRatio = (playerTs / leagueTs) * eraWeight + (playerTs / baseline) * absoluteWeight;
+
+  return Number.isFinite(blendedTsRatio) ? blendedTsRatio * baseline * 100 : null;
+}
+
+function adjustedTsPercentValue(
+  player: Player,
+  selection: TeamEra,
+  block: ClassicPointBlock,
+  statsEngineConfig: StatsEngineConfig,
+) {
+  let weightedTotal = 0;
+  let weightTotal = 0;
+  let sampleTotal = 0;
+  let sampleCount = 0;
+
+  for (const season of careerSeasonsForSelection(player, selection)) {
+    const playerTs = firstPositiveNumericValue(season as Record<string, unknown>, ["ts_pct", "TS_PCT"]);
+    const leagueTs = leagueTsValue(leagueAverageForSeason(statsEngineConfig.leagueAverages, season.season));
+
+    if (!playerTs || !leagueTs) {
+      continue;
+    }
+
+    const adjustedTsPercent = adjustedTsPercentForSeason(playerTs, leagueTs, statsEngineConfig);
+
+    if (adjustedTsPercent === null) {
+      continue;
+    }
+
+    const gamesPlayed = positiveNumber(season.games_played);
+
+    if (gamesPlayed) {
+      weightedTotal += adjustedTsPercent * gamesPlayed;
+      weightTotal += gamesPlayed;
+    } else {
+      sampleTotal += adjustedTsPercent;
+      sampleCount += 1;
+    }
+  }
+
+  if (weightTotal > 0) {
+    return `${Math.round(weightedTotal / weightTotal)}%`;
+  }
+
+  if (sampleCount > 0) {
+    return `${Math.round(sampleTotal / sampleCount)}%`;
+  }
+
+  return tsPercentValue(block.stats?.ts_pct);
+}
+
 function classicBlocksForSelection(player: Player | undefined, selection: TeamEra | undefined) {
   if (!player || !selection) {
     return [];
@@ -405,10 +606,14 @@ function classicAccoladeMultiplier(block: ClassicPointBlock) {
   return block.era === "40's" || block.era === "50's" ? EARLY_CLASSIC_ERA_ACCOLADE_MULTIPLIER : 1;
 }
 
+function classicStatPrecision(stat: ClassicStatKey) {
+  return stat === "ts_pct" || stat === "ws_48" ? 3 : 1;
+}
+
 function mergeClassicStats(blocks: ClassicPointBlock[]) {
   const stats = {} as ClassicStatLine;
 
-  for (const stat of CLASSIC_STAT_DISPLAY_ORDER) {
+  for (const stat of CLASSIC_STORED_STAT_DISPLAY_ORDER) {
     let weightedTotal = 0;
     let weightTotal = 0;
 
@@ -424,7 +629,7 @@ function mergeClassicStats(blocks: ClassicPointBlock[]) {
       weightTotal += weight;
     }
 
-    stats[stat.id] = weightTotal > 0 ? Number((weightedTotal / weightTotal).toFixed(1)) : null;
+    stats[stat.id] = weightTotal > 0 ? Number((weightedTotal / weightTotal).toFixed(classicStatPrecision(stat.id))) : null;
   }
 
   return stats;
@@ -520,7 +725,7 @@ function buildStatAchievements(block: ClassicPointBlock | undefined) {
     return [];
   }
 
-  return CLASSIC_STAT_DISPLAY_ORDER.map((stat) => {
+  return CLASSIC_BOX_SCORE_DISPLAY_ORDER.map((stat) => {
     const value = Number(block?.stats?.[stat.id] ?? 0);
 
     return {
@@ -531,23 +736,20 @@ function buildStatAchievements(block: ClassicPointBlock | undefined) {
   });
 }
 
-function buildMixedStatAchievements(block: ClassicPointBlock | undefined) {
+function buildMixedStatAchievements(
+  player: Player,
+  selection: TeamEra,
+  block: ClassicPointBlock | undefined,
+  statsEngineConfig: StatsEngineConfig,
+) {
   if (!block) {
     return [];
   }
 
-  const points = Number(block?.stats?.ppg ?? 0);
-  const rebounds = Number(block?.stats?.rpg ?? 0);
-  const assists = Number(block?.stats?.apg ?? 0);
-  const steals = Number(block?.stats?.spg ?? 0);
-  const blocks = Number(block?.stats?.bpg ?? 0);
-  const stocks = Number((steals + blocks).toFixed(1));
-
   return [
-    { id: "ppg", value: statValue(points), label: "PTS" },
-    { id: "rpg", value: statValue(rebounds), label: "REB" },
-    { id: "apg", value: statValue(assists), label: "AST" },
-    { id: "stocks", value: statValue(stocks), label: "STCK" },
+    { id: "pra", value: compactPraValue(block), label: "P/R/A" },
+    { id: "ts-plus", value: adjustedTsPercentValue(player, selection, block, statsEngineConfig), label: "TS+" },
+    { id: "ws-48", value: ws48Value(block.stats?.ws_48), label: "WS/48" },
   ];
 }
 
@@ -605,7 +807,12 @@ function buildAchievements(player: Player, selection?: TeamEra) {
   return [...buildStatAchievements(block), ...buildAccoladeAchievements(player, selection)];
 }
 
-function buildRosterFeedAchievements(player: Player, selection: TeamEra, rosterFeedView: RosterFeedView) {
+function buildRosterFeedAchievements(
+  player: Player,
+  selection: TeamEra,
+  rosterFeedView: RosterFeedView,
+  statsEngineConfig: StatsEngineConfig,
+) {
   const block = classicBlockForSelection(player, selection);
   const accoladeAchievements = buildAccoladeAchievements(player, selection);
 
@@ -617,11 +824,11 @@ function buildRosterFeedAchievements(player: Player, selection: TeamEra, rosterF
     return accoladeAchievements;
   }
 
-  return [...buildMixedStatAchievements(block), ...accoladeAchievements.slice(0, 3)];
+  return [...buildMixedStatAchievements(player, selection, block, statsEngineConfig), ...accoladeAchievements.slice(0, 3)];
 }
 
 function buildAchievementTotals(slots: LineupSlot[]) {
-  const statTotals = CLASSIC_STAT_DISPLAY_ORDER.flatMap((stat) => {
+  const statTotals = CLASSIC_BOX_SCORE_DISPLAY_ORDER.flatMap((stat) => {
     const total = slots.reduce((sum, slot) => {
       const value = Number(classicBlockForSelection(slot.player, slot.selection)?.stats?.[stat.id] ?? 0);
 
@@ -688,7 +895,7 @@ function positionScoreMultiplier(player: Player | undefined, assignedPosition: P
   // The goat_score is 101-rank, or 0 if not ranked.
   const isTop100Goat = (player.goat_rank && player.goat_rank >= 1 && player.goat_rank <= 100) || (player.goat_score && player.goat_score > 0);
 
-  return isTop100Goat ? 1.10 : 1;
+  return isTop100Goat ? 1.10 : 1.10;
 }
 function lineupSlotScore(slot: LineupSlot | undefined, assignedPosition: Position) {
   if (!slot) {
@@ -802,11 +1009,17 @@ const classicCourtConfig = {
     rosterFeedView: "mixed",
     rosterSort: "pra",
   },
+  usesStatsEngineConfig: true,
   courtAchievementLimit: 5,
   buildAchievementTotals,
   buildPlayerAchievements: buildAchievements,
-  buildRosterFeedAchievements: (player, selection, rosterControls) =>
-    buildRosterFeedAchievements(player, selection, (rosterControls.rosterFeedView ?? "mixed") as RosterFeedView),
+  buildRosterFeedAchievements: (player, selection, rosterControls, statsEngineConfig) =>
+    buildRosterFeedAchievements(
+      player,
+      selection,
+      (rosterControls.rosterFeedView ?? "mixed") as RosterFeedView,
+      statsEngineConfig,
+    ),
   compareRosterPlayers: (a, b, selection, rosterControls) =>
     rosterSortDelta(a, b, (rosterControls.rosterSort ?? "pra") as RosterSort, selection),
   eraOptionsForTeam,
