@@ -308,6 +308,7 @@ const ACCOLADE_WEIGHTS = {
   seasons_played: 0.25,
   games_started: 0.01,
 } satisfies Partial<Record<keyof Accolades, number>>;
+const CLASSIC_ACCOLADE_SCORE_MULTIPLIER = 0.5;
 const LEGACY_ENGINE_FACTORS = {
   descentExponent: 0.2,
   descentNumerator: 3.2,
@@ -793,7 +794,7 @@ function buildMixedStatAchievements(block: ClassicPointBlock | undefined) {
     { id: "ppg", value: statValue(points), label: "PTS" },
     { id: "rpg", value: statValue(rebounds), label: "REB" },
     { id: "apg", value: statValue(assists), label: "AST" },
-    { id: "stocks", value: statValue(stocks), label: "STOCKS" },
+    { id: "stocks", value: statValue(stocks), label: "STCK" },
   ];
 }
 
@@ -805,10 +806,11 @@ function classicAccoladeScore(
     return 0;
   }
 
-  const basePoints = (Object.keys(ACCOLADE_WEIGHTS) as WeightedAccoladeKey[]).reduce(
+  const rawBasePoints = (Object.keys(ACCOLADE_WEIGHTS) as WeightedAccoladeKey[]).reduce(
     (sum, key) => sum + numericAccoladeValue(accolades[key]) * ACCOLADE_WEIGHTS[key],
     0,
   );
+  const basePoints = rawBasePoints * CLASSIC_ACCOLADE_SCORE_MULTIPLIER;
   const seasons = Math.max(
     numericAccoladeValue(engineSeasonsPlayed ?? accolades.seasons_played),
     1,
