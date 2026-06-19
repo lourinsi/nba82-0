@@ -1969,6 +1969,10 @@ select {
   border-radius: 999px;
 }
 
+.roster-sort-control {
+  max-width: 100%;
+}
+
 .player-card .achievement-strip {
   gap: 10px;
   justify-content: flex-start;
@@ -2095,8 +2099,14 @@ select {
   height: 74px;
   justify-content: center;
   line-height: 1;
+  text-decoration: none;
   text-shadow: 2px 2px 0 #243044;
   width: 116px;
+}
+
+.season-result-logo:focus-visible {
+  outline: 3px solid rgba(49, 214, 161, 0.78);
+  outline-offset: 4px;
 }
 
 .season-result-header h1 {
@@ -2222,6 +2232,41 @@ select {
   position: absolute;
   top: 14px;
   width: 4px;
+}
+
+.result-player-score {
+  align-items: baseline;
+  color: #ffffff;
+  display: inline-flex;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+  font-family: "Segoe Print", "Bradley Hand ITC", "Comic Sans MS", cursive;
+  gap: 3px;
+  left: 50px;
+  line-height: 1;
+  padding: 0;
+  pointer-events: none;
+  position: absolute;
+  text-transform: uppercase;
+  top: 5px;
+  transform: rotate(-8deg);
+  transform-origin: center;
+  white-space: nowrap;
+  z-index: 4;
+}
+
+.result-player-score span:first-child {
+  color: #ffffff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.result-player-score span:last-child {
+  color: #ffffff;
+  font-size: 0.42rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1;
 }
 
 .result-player-row > .achievement-strip,
@@ -2723,6 +2768,12 @@ select {
     padding: 16px;
   }
 
+  .result-player-score {
+    left: 34px;
+    top: 4px;
+    transform: rotate(-7deg);
+  }
+
   .court-blueprint {
     min-height: 520px;
   }
@@ -2793,8 +2844,14 @@ select {
   overflow: hidden;
   padding-top: 13px;
   position: relative;
+  text-decoration: none;
   text-shadow: 1px 1px 0 #10131c;
   width: 52px;
+}
+
+.game-logo-mark:focus-visible {
+  outline: 3px solid rgba(49, 214, 161, 0.78);
+  outline-offset: 4px;
 }
 
 .game-logo-mark::before,
@@ -3173,7 +3230,7 @@ select {
   .roster-filter-row {
     display: grid;
     gap: 6px;
-    grid-template-columns: minmax(118px, 0.68fr) minmax(0, 1fr);
+    grid-template-columns: minmax(106px, 0.58fr) minmax(0, 1fr);
     width: 100%;
   }
 
@@ -3195,6 +3252,11 @@ select {
   .roster-filter-row select {
     padding-left: 10px;
     padding-right: 8px;
+    width: 100%;
+  }
+
+  .roster-sort-control {
+    min-width: 0;
     width: 100%;
   }
 
@@ -3255,7 +3317,7 @@ select {
     grid-column: span 2;
   }
 
-  .roster-player-card .achievement-stat:nth-child(n + 7) {
+  .roster-player-card .achievement-stat:nth-child(n + 9) {
     display: none;
   }
 

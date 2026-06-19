@@ -23,20 +23,6 @@ import GameCourt, {
 } from "../GameCourt";
 
 const DEFAULT_ERAS = ["60's", "90's", "00's", "10's", "20's"];
-const ROSTER_CONTROL_BASE_CLASS =
-  "h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-black normal-case tracking-normal text-white outline-none transition";
-const ROSTER_FEED_VIEW_OPTIONS = [
-  { id: "mixed", label: "Mixed" },
-  { id: "stats", label: "Stats" },
-  { id: "awards", label: "Awards" },
-] as const;
-type RosterFeedView = (typeof ROSTER_FEED_VIEW_OPTIONS)[number]["id"];
-const ROSTER_SORT_OPTIONS = [
-  { id: "pra", label: "PRA" },
-  { id: "stocks", label: "Stocks" },
-  { id: "awards", label: "Awards" },
-] as const;
-type RosterSort = (typeof ROSTER_SORT_OPTIONS)[number]["id"];
 
 const ACCOLADE_WEIGHTS = {
   mvp_count: 8,
@@ -62,9 +48,11 @@ const ACCOLADE_WEIGHTS = {
   all_rookie_1st: 1,
   all_rookie_2nd: 0.75,
   seasons_played: 0.25,
-  games_started: 0.01,
+  // games_started: 0.01,
 } satisfies Partial<Record<keyof Accolades, number>>;
 const CLASSIC_ACCOLADE_SCORE_MULTIPLIER = 0.5;
+const STORED_CLASSIC_STINT_SCALING_FACTOR = 250;
+const CLASSIC_STINT_SCALING_FACTOR = 250;
 const LEGACY_ENGINE_FACTORS = {
   descentExponent: 0.2,
   descentNumerator: 3.2,
@@ -135,7 +123,7 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   },
   {
     id: "all-nba",
-    label: "NBA",
+    label: "ALL NBA",
     count: (player) => player.accolades.all_nba_1st + player.accolades.all_nba_2nd + player.accolades.all_nba_3rd,
     sortValue: (player) =>
       weightedAccoladeScore(player, ["all_nba_1st", "all_nba_2nd", "all_nba_3rd"]),
@@ -193,12 +181,12 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     weight: ACCOLADE_WEIGHTS.all_rookie_2nd,
   },
   { id: "seasons", label: "YRS", count: (player) => player.accolades.seasons_played, weight: ACCOLADE_WEIGHTS.seasons_played },
-  {
-    id: "games-started",
-    label: "Starts",
-    count: (player) => player.accolades.games_started ?? 0,
-    weight: ACCOLADE_WEIGHTS.games_started,
-  },
+  // {
+  //   id: "games-started",
+  //   label: "Starts",
+  //   count: (player) => player.accolades.games_started ?? 0,
+  //   weight: ACCOLADE_WEIGHTS.games_started,
+  // },
 ];
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
 const SEASON_TIERS: SeasonTier[] = [
@@ -373,6 +361,14 @@ function compactPraValue(block: ClassicPointBlock) {
   return `${wholeStatValue(block.stats?.ppg)}/${wholeStatValue(block.stats?.rpg)}/${wholeStatValue(block.stats?.apg)}`;
 }
 
+function stocksValue(block: ClassicPointBlock) {
+  const steals = Number(block.stats?.spg ?? 0);
+  const blocks = Number(block.stats?.bpg ?? 0);
+  const total = (Number.isFinite(steals) ? steals : 0) + (Number.isFinite(blocks) ? blocks : 0);
+
+  return statValue(Number(total.toFixed(1)));
+}
+
 // function playerGoatRank(player: Player) {
 //   const explicitRank = Number(player.goat_rank || 0);
 
@@ -413,6 +409,19 @@ function positiveNumber(value: unknown) {
   const numeric = Number(value ?? 0);
 
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+}
+
+function scaledClassicStintPoints(points: unknown) {
+  const numeric = Number(points ?? 0);
+
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+
+  const storedScale = positiveNumber(STORED_CLASSIC_STINT_SCALING_FACTOR) || 1;
+  const activeScale = positiveNumber(CLASSIC_STINT_SCALING_FACTOR) || storedScale;
+
+  return numeric * (activeScale / storedScale);
 }
 
 function numericValue(value: unknown) {
@@ -700,6 +709,7 @@ function classicBlockForSelection(player: Player | undefined, selection: TeamEra
   if (blocks.length === 1) {
     return {
       ...blocks[0],
+      points: scaledClassicStintPoints(blocks[0].points),
       scoringAccolades: scoringAccoladesForBlock(blocks[0]),
     };
   }
@@ -707,7 +717,7 @@ function classicBlockForSelection(player: Player | undefined, selection: TeamEra
   return {
     team: selection.team,
     era: getCanonicalEra(selection.era),
-    points: weightedBlockAverage(blocks, (block) => Number(block.points ?? 0)),
+    points: weightedBlockAverage(blocks, (block) => scaledClassicStintPoints(block.points)),
     stats: mergeClassicStats(blocks),
     accolades: mergeClassicAccolades(blocks) as Accolades | undefined,
     scoringAccolades: mergeClassicAccolades(blocks, true) as ScoringAccolades | undefined,
@@ -720,7 +730,7 @@ function playerWithClassicAccolades(player: Player, selection: TeamEra | undefin
   return block?.accolades ? { ...player, accolades: block.accolades } : player;
 }
 
-function buildStatAchievements(block: ClassicPointBlock | undefined) {
+function buildBoxScoreAchievements(block: ClassicPointBlock | undefined) {
   if (!block) {
     return [];
   }
@@ -736,6 +746,10 @@ function buildStatAchievements(block: ClassicPointBlock | undefined) {
   });
 }
 
+function buildStocksAchievement(block: ClassicPointBlock) {
+  return { id: "stocks", value: stocksValue(block), label: "STOCKS" };
+}
+
 function buildMixedStatAchievements(
   player: Player,
   selection: TeamEra,
@@ -748,6 +762,7 @@ function buildMixedStatAchievements(
 
   return [
     { id: "pra", value: compactPraValue(block), label: "P/R/A" },
+    buildStocksAchievement(block),
     { id: "ts-plus", value: adjustedTsPercentValue(player, selection, block, statsEngineConfig), label: "TS+" },
     { id: "ws-48", value: ws48Value(block.stats?.ws_48), label: "WS/48" },
   ];
@@ -804,27 +819,49 @@ function buildAccoladeAchievements(player: Player, selection?: TeamEra) {
 function buildAchievements(player: Player, selection?: TeamEra) {
   const block = classicBlockForSelection(player, selection);
 
-  return [...buildStatAchievements(block), ...buildAccoladeAchievements(player, selection)];
+  return [...buildBoxScoreAchievements(block), ...buildAccoladeAchievements(player, selection)];
+}
+
+function buildResultAchievements(
+  player: Player,
+  selection: TeamEra,
+  statsEngineConfig: StatsEngineConfig,
+) {
+  const block = classicBlockForSelection(player, selection);
+
+  return [
+    ...buildMixedStatAchievements(player, selection, block, statsEngineConfig),
+    ...buildAccoladeAchievements(player, selection),
+  ];
 }
 
 function buildRosterFeedAchievements(
   player: Player,
   selection: TeamEra,
-  rosterFeedView: RosterFeedView,
   statsEngineConfig: StatsEngineConfig,
 ) {
   const block = classicBlockForSelection(player, selection);
   const accoladeAchievements = buildAccoladeAchievements(player, selection);
 
-  if (rosterFeedView === "stats") {
-    return buildStatAchievements(block);
+  return [...buildMixedStatAchievements(player, selection, block, statsEngineConfig), ...accoladeAchievements.slice(0, 2)];
+}
+
+function averageClassicStat(slots: LineupSlot[], stat: ClassicStatKey) {
+  let total = 0;
+  let count = 0;
+
+  for (const slot of slots) {
+    const value = numericValue(classicBlockForSelection(slot.player, slot.selection)?.stats?.[stat]);
+
+    if (value === null || value <= 0) {
+      continue;
+    }
+
+    total += value;
+    count += 1;
   }
 
-  if (rosterFeedView === "awards") {
-    return accoladeAchievements;
-  }
-
-  return [...buildMixedStatAchievements(player, selection, block, statsEngineConfig), ...accoladeAchievements.slice(0, 3)];
+  return count > 0 ? total / count : null;
 }
 
 function buildAchievementTotals(slots: LineupSlot[]) {
@@ -845,6 +882,28 @@ function buildAchievementTotals(slots: LineupSlot[]) {
         ]
       : [];
   });
+  const avgTsPct = averageClassicStat(slots, "ts_pct");
+  const avgWs48 = averageClassicStat(slots, "ws_48");
+  const efficiencyTotals = [
+    ...(avgTsPct !== null
+      ? [
+          {
+            id: "avg-ts-pct",
+            value: tsPercentValue(avgTsPct),
+            label: "AVG TS%",
+          },
+        ]
+      : []),
+    ...(avgWs48 !== null
+      ? [
+          {
+            id: "avg-ws-48",
+            value: ws48Value(avgWs48),
+            label: "AVG WS/48",
+          },
+        ]
+      : []),
+  ];
   const accoladeTotals = TOTAL_ACHIEVEMENT_DISPLAY_ORDER.flatMap((achievement) => {
     const total = slots.reduce(
       (sum, slot) => sum + achievement.count(playerWithClassicAccolades(slot.player, slot.selection)),
@@ -865,7 +924,7 @@ function buildAchievementTotals(slots: LineupSlot[]) {
       : [];
   });
 
-  return [...statTotals, ...accoladeTotals];
+  return [...statTotals, ...efficiencyTotals, ...accoladeTotals];
 }
 
 function playerLegacyScore(player: Player | undefined, selection: TeamEra | undefined) {
@@ -883,6 +942,25 @@ function playerLegacyScore(player: Player | undefined, selection: TeamEra | unde
     ) + (Number.isFinite(statPoints) ? statPoints : 0);
 
   return Number(classicScore.toFixed(2));
+}
+
+function playerClassicStatsScore(player: Player, selection: TeamEra | undefined) {
+  const statPoints = Number(classicBlockForSelection(player, selection)?.points ?? 0);
+
+  return Number.isFinite(statPoints) ? statPoints : 0;
+}
+
+function playerClassicAwardsScore(player: Player, selection: TeamEra | undefined) {
+  const block = classicBlockForSelection(player, selection);
+
+  if (!block) {
+    return 0;
+  }
+
+  return classicAccoladeScore(
+    block.scoringAccolades ?? block.accolades,
+    positiveNumber(block.accolades?.seasons_played),
+  );
 }
 
 function positionScoreMultiplier(player: Player | undefined, assignedPosition: Position) {
@@ -915,44 +993,6 @@ function positionBonusForSlot(slot: LineupSlot | undefined, assignedPosition: Po
   const points = Number((baseScore * multiplier - baseScore).toFixed(2));
 
   return points > 0 ? { multiplier, points } : undefined;
-}
-
-function classicStatTotal(player: Player, selection: TeamEra | undefined, stats: ClassicStatKey[]) {
-  return stats.reduce((sum, stat) => {
-    const value = Number(classicBlockForSelection(player, selection)?.stats?.[stat] ?? 0);
-
-    return sum + (Number.isFinite(value) ? value : 0);
-  }, 0);
-}
-
-function accoladeSortValue(player: Player, achievement: AchievementDisplay, selection: TeamEra | undefined) {
-  const displayPlayer = playerWithClassicAccolades(player, selection);
-
-  return achievement.sortValue ? achievement.sortValue(displayPlayer) : achievement.count(displayPlayer);
-}
-
-function awardHierarchySortDelta(a: Player, b: Player, selection: TeamEra | undefined) {
-  for (const achievement of ACHIEVEMENT_DISPLAY_ORDER) {
-    const delta = accoladeSortValue(b, achievement, selection) - accoladeSortValue(a, achievement, selection);
-
-    if (delta) {
-      return delta;
-    }
-  }
-
-  return 0;
-}
-
-function rosterSortDelta(a: Player, b: Player, rosterSort: RosterSort, selection: TeamEra | undefined) {
-  if (rosterSort === "pra") {
-    return classicStatTotal(b, selection, ["ppg", "rpg", "apg"]) - classicStatTotal(a, selection, ["ppg", "rpg", "apg"]);
-  }
-
-  if (rosterSort === "stocks") {
-    return classicStatTotal(b, selection, ["spg", "bpg"]) - classicStatTotal(a, selection, ["spg", "bpg"]);
-  }
-
-  return awardHierarchySortDelta(a, b, selection);
 }
 
 function playerHasRecordedTeamEra(player: Player, team: string, canonicalEra: string) {
@@ -991,37 +1031,17 @@ const classicCourtConfig = {
   resultStorageKey: "nba82_classic_result",
   resultsPath: "/classic/results",
   seasonTiers: SEASON_TIERS,
-  rosterControls: [
-    {
-      id: "rosterFeedView",
-      ariaLabel: "Roster feed view",
-      className: `${ROSTER_CONTROL_BASE_CLASS} w-[116px] focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20`,
-      options: ROSTER_FEED_VIEW_OPTIONS,
-    },
-    {
-      id: "rosterSort",
-      ariaLabel: "Roster sort filter",
-      className: `${ROSTER_CONTROL_BASE_CLASS} w-[132px] focus:border-[#ff8a2a] focus:ring-2 focus:ring-[#ff8a2a]/20`,
-      options: ROSTER_SORT_OPTIONS,
-    },
-  ],
-  defaultRosterControlValues: {
-    rosterFeedView: "mixed",
-    rosterSort: "pra",
-  },
   usesStatsEngineConfig: true,
   courtAchievementLimit: 5,
   buildAchievementTotals,
   buildPlayerAchievements: buildAchievements,
-  buildRosterFeedAchievements: (player, selection, rosterControls, statsEngineConfig) =>
-    buildRosterFeedAchievements(
-      player,
-      selection,
-      (rosterControls.rosterFeedView ?? "mixed") as RosterFeedView,
-      statsEngineConfig,
-    ),
-  compareRosterPlayers: (a, b, selection, rosterControls) =>
-    rosterSortDelta(a, b, (rosterControls.rosterSort ?? "pra") as RosterSort, selection),
+  buildResultAchievements,
+  buildRosterFeedAchievements,
+  rosterSortScores: {
+    mixed: playerLegacyScore,
+    stats: playerClassicStatsScore,
+    awards: playerClassicAwardsScore,
+  },
   eraOptionsForTeam,
   lineupSlotScore,
   playerScore: playerLegacyScore,

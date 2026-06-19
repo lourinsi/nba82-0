@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { teamThemeStyle } from "../teamStyles";
@@ -29,6 +30,7 @@ type ResultPlayer = {
     name: string;
   };
   selection?: DraftSelection;
+  scoreContribution?: number;
   achievements: Achievement[];
   positionBonus?: PositionBonus;
 };
@@ -116,9 +118,9 @@ export default function AllTimeResultsPage() {
       <main className="season-result-page">
         <div className="season-result-shell">
           <header className="season-result-header">
-            <div className="season-result-logo" aria-hidden="true">
+            <Link className="season-result-logo" href="/" aria-label="Go to home">
               82-0
-            </div>
+            </Link>
             <h1>All Time Results</h1>
           </header>
 
@@ -139,9 +141,9 @@ export default function AllTimeResultsPage() {
     <main className="season-result-page">
       <div className="season-result-shell">
         <header className="season-result-header">
-          <div className="season-result-logo" aria-hidden="true">
+          <Link className="season-result-logo" href="/" aria-label="Go to home">
             82-0
-          </div>
+          </Link>
           <h1>Can you go 82-0?</h1>
         </header>
 
@@ -190,6 +192,7 @@ export default function AllTimeResultsPage() {
                 player={entry.player}
                 position={entry.position}
                 positionBonus={entry.positionBonus}
+                scoreContribution={entry.scoreContribution}
                 selection={entry.selection}
               />
             ))}
@@ -215,6 +218,7 @@ function ResultPlayerRow({
   player,
   position,
   positionBonus,
+  scoreContribution,
   selection,
 }: {
   achievements: Achievement[];
@@ -223,6 +227,7 @@ function ResultPlayerRow({
   player: { id: string; name: string };
   position: Position;
   positionBonus?: PositionBonus;
+  scoreContribution?: number;
   selection?: DraftSelection;
 }) {
   const displaySelection = {
@@ -230,6 +235,8 @@ function ResultPlayerRow({
     eraLabel: selection?.eraLabel ?? fallbackEraLabel,
   };
   const positionBoost = positionBonus && positionBonus.points > 0 ? positionBonus : null;
+  const contribution =
+    typeof scoreContribution === "number" && Number.isFinite(scoreContribution) ? scoreContribution : null;
 
   return (
     <div className="result-player-row" style={teamThemeStyle(displaySelection.team)}>
@@ -256,6 +263,12 @@ function ResultPlayerRow({
           <span className="result-player-meta mt-1 block truncate text-sm font-semibold">
             {displaySelection.team} - {displaySelection.eraLabel}
           </span>
+          {contribution !== null ? (
+            <span className="result-player-score">
+              <span>{formatLegacyScore(contribution)}</span>
+              <span>pts</span>
+            </span>
+          ) : null}
         </span>
       </div>
 

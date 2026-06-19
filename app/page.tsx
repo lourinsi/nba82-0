@@ -42,9 +42,9 @@ export default function LandingPage() {
     <main className="landing-page">
       <section className="landing-shell">
         <header className="landing-header">
-          <div className="season-result-logo" aria-hidden="true">
+          <Link className="season-result-logo" href="/" aria-label="Go to home">
             82-0
-          </div>
+          </Link>
           <h1>Can you go 82-0?</h1>
         </header>
 

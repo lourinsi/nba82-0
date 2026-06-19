@@ -10,12 +10,12 @@ import GameCourt, {
   type Player,
   type Position,
   type PositionBonus,
+  type RosterSortOption,
+  type RosterSortScores,
   type SeasonTier,
 } from "../GameCourt";
 
 const DEFAULT_ERAS = ["60's", "90's", "00's", "10's", "20's"];
-const ROSTER_CONTROL_BASE_CLASS =
-  "h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-black normal-case tracking-normal text-white outline-none transition";
 
 const ACCOLADE_WEIGHTS = {
   mvp_count: 8,
@@ -41,11 +41,15 @@ const ACCOLADE_WEIGHTS = {
   all_rookie_1st: 1,
   all_rookie_2nd: 0.75,
   seasons_played: 0.25,
-  games_started: 0.01,
+  // games_started: 0.01,
 } satisfies Partial<Record<keyof Accolades, number>>;
 type WeightedAccoladeKey = keyof typeof ACCOLADE_WEIGHTS;
 
-const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
+function sortAchievementsByWeight(achievements: AchievementDisplay[]) {
+  return [...achievements].sort((a, b) => b.weight - a.weight);
+}
+
+const ACHIEVEMENT_DISPLAY_ORDER = sortAchievementsByWeight([
   // {
   //   id: "goat",
   //   label: "GOAT",
@@ -121,14 +125,40 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     weight: ACCOLADE_WEIGHTS.all_rookie_2nd,
   },
   { id: "seasons", label: "YRS", count: (player) => player.accolades.seasons_played, weight: ACCOLADE_WEIGHTS.seasons_played },
-  {
-    id: "games-started",
-    label: "Starts",
-    count: (player) => player.accolades.games_started ?? 0,
-    weight: ACCOLADE_WEIGHTS.games_started,
-  },
-];
+  // {
+  //   id: "games-started",
+  //   label: "Starts",
+  //   count: (player) => player.accolades.games_started ?? 0,
+  //   weight: ACCOLADE_WEIGHTS.games_started,
+  // },
+]);
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
+const ROSTER_ACCOLADE_SORT_LABELS: Partial<Record<string, string>> = {
+  mvp: "MVPs",
+  fmvp: "FMVPs",
+  "all-nba": "All NBA",
+  scoring: "Scoring Titles",
+  assists: "Assist Titles",
+  rebounds: "Rebound Titles",
+  rings: "Rings",
+  dpoy: "DPOYs",
+  "all-defense": "All Defense",
+  steals: "Steal Titles",
+  blocks: "Block Titles",
+  "all-star-mvp": "All-Star MVPs",
+  "all-star": "All-Stars",
+  "sixth-man": "6MOYs",
+  "most-improved": "MIPs",
+  roy: "ROYs",
+  "all-rookie-1st": "All-Rookie 1st",
+  "all-rookie-2nd": "All-Rookie 2nd",
+  seasons: "Seasons",
+  "games-started": "Starts",
+};
+const ALL_TIME_ROSTER_SORT_OPTIONS: readonly RosterSortOption[] = ACHIEVEMENT_DISPLAY_ORDER.map((achievement) => ({
+  id: achievement.id,
+  label: ROSTER_ACCOLADE_SORT_LABELS[achievement.id] ?? achievement.label,
+}));
 const SEASON_TIERS: SeasonTier[] = [
   {
     minScore: 1000,
@@ -305,6 +335,16 @@ function weightedAccoladeScore(player: Player, keys: WeightedAccoladeKey[]) {
   );
 }
 
+function buildRosterSortScores(achievements: AchievementDisplay[]) {
+  return achievements.reduce<RosterSortScores>((scores, achievement) => {
+    scores[achievement.id] = (player) => achievement.sortValue?.(player) ?? achievement.count(player);
+
+    return scores;
+  }, {});
+}
+
+const ALL_TIME_ROSTER_SORT_SCORES = buildRosterSortScores(ACHIEVEMENT_DISPLAY_ORDER);
+
 function buildAchievements(player: Player) {
   return ACHIEVEMENT_DISPLAY_ORDER.flatMap((achievement) => {
     const count = achievement.count(player);
@@ -386,16 +426,6 @@ function positionBonusForSlot(slot: LineupSlot | undefined, assignedPosition: Po
   return points > 0 ? { multiplier, points } : undefined;
 }
 
-function achievementPriorityValue(player: Player, achievementId: string) {
-  const achievement = ACHIEVEMENT_DISPLAY_ORDER.find((candidate) => candidate.id === achievementId);
-
-  if (!achievement) {
-    return 0;
-  }
-
-  return achievement.sortValue ? achievement.sortValue(player) : achievement.count(player);
-}
-
 function playerHasRecordedTeamEra(player: Player, team: string, canonicalEra: string) {
   if (player.team_eras?.length) {
     return player.team_eras.some(
@@ -433,27 +463,14 @@ const allTimeCourtConfig = {
   resultStorageKey: "nba82_all_time_result",
   resultsPath: "/all-time/results",
   seasonTiers: SEASON_TIERS,
-  rosterControls: [
-    {
-      id: "accoladePriority",
-      ariaLabel: "Accolade filter",
-      className: `${ROSTER_CONTROL_BASE_CLASS} w-[132px] focus:border-[#ff8a2a] focus:ring-2 focus:ring-[#ff8a2a]/20`,
-      options: ACHIEVEMENT_DISPLAY_ORDER.map((achievement) => ({
-        id: achievement.id,
-        label: achievement.label,
-      })),
-    },
-  ],
-  defaultRosterControlValues: {
-    accoladePriority: "mvp",
-  },
+  rosterSortOptions: ALL_TIME_ROSTER_SORT_OPTIONS,
+  defaultRosterSortMode: "mvp",
+  defaultRosterSortDirection: "desc",
   courtAchievementLimit: 4,
   buildAchievementTotals: (slots) => buildAchievementTotals(slots.map((slot) => slot.player)),
   buildPlayerAchievements: (player) => buildAchievements(player),
   buildRosterFeedAchievements: (player) => buildAchievements(player),
-  compareRosterPlayers: (a, b, _selection, rosterControls) =>
-    achievementPriorityValue(b, rosterControls.accoladePriority ?? "mvp") -
-    achievementPriorityValue(a, rosterControls.accoladePriority ?? "mvp"),
+  rosterSortScores: ALL_TIME_ROSTER_SORT_SCORES,
   eraOptionsForTeam,
   lineupSlotScore,
   playerScore: playerLegacyScore,

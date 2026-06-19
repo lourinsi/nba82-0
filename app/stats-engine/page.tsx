@@ -5,9 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const TEST_PLAYER_NAME = "Michael Jordan";
-const FALLBACK_SCALING_FACTOR = 200;
+const FALLBACK_SCALING_FACTOR = 250;
 const FALLBACK_ALL_TIME_TS_BASELINE = 0.54;
 const FALLBACK_WS_48_BASELINE = 0.1;
+const DEFAULT_TS_BLEND_WEIGHTS = { absolute: 0.5, era: 0.25 };
 
 type StatWeights = {
   asts: number;
@@ -16,9 +17,19 @@ type StatWeights = {
   stocks: number;
   tsAbsoluteImpact: number;
   tsEraImpact: number;
+  ts_impact: number;
   wsImpact: number;
 };
 type StatWeightKey = keyof StatWeights;
+type ConfigStatWeights = Partial<StatWeights> & {
+  tsAbsoluteImpact?: number;
+  tsEraImpact?: number;
+  tsImpact?: number;
+};
+type TsBlendWeights = {
+  absolute: number;
+  era: number;
+};
 type WeightField = {
   key: StatWeightKey;
   label: string;
@@ -47,6 +58,10 @@ type SeasonStat = {
   BPG?: number | string | null;
   ts_pct?: number | string | null;
   TS_PCT?: number | string | null;
+  "TS%"?: number | string | null;
+  true_shooting_pct?: number | string | null;
+  trueShootingPct?: number | string | null;
+  true_shooting_percentage?: number | string | null;
   ws_48?: number | string | null;
   ws_per_48?: number | string | null;
   wsPer48?: number | string | null;
@@ -69,7 +84,8 @@ type StatsEngineConfigPayload = {
   allTimeTsBaseline?: number;
   leagueAverages?: LeagueAverages;
   scalingFactor?: number;
-  statWeights?: Partial<StatWeights>;
+  statWeights?: ConfigStatWeights;
+  tsBlendWeights?: Partial<TsBlendWeights>;
   ws48Baseline?: number;
 };
 type ScopeOption = {
@@ -112,13 +128,14 @@ type ScoreResult = {
 };
 
 const DEFAULT_WEIGHTS: StatWeights = {
-  asts: 0.8,
-  pts: 1,
-  rebs: 0.8,
-  stocks: 0.5,
-  tsAbsoluteImpact: 0.1,
-  tsEraImpact: 0.1,
-  wsImpact: 0.25,
+  asts: 0.55,
+  pts: 0.8,
+  rebs: 0.45,
+  stocks: 0.25,
+  tsAbsoluteImpact: DEFAULT_TS_BLEND_WEIGHTS.absolute,
+  tsEraImpact: DEFAULT_TS_BLEND_WEIGHTS.era,
+  ts_impact: 1,
+  wsImpact: 1.5,
 };
 
 const WEIGHT_FIELDS: WeightField[] = [
@@ -126,8 +143,9 @@ const WEIGHT_FIELDS: WeightField[] = [
   { key: "asts", label: "AST", min: 0, max: 2.5, step: 0.05, digits: 2 },
   { key: "rebs", label: "REB", min: 0, max: 2.5, step: 0.05, digits: 2 },
   { key: "stocks", label: "Stocks", min: 0, max: 1.5, step: 0.05, digits: 2 },
-  { key: "tsEraImpact", label: "Era TS Impact", min: 0, max: 0.6, step: 0.01, digits: 2 },
-  { key: "tsAbsoluteImpact", label: "Absolute TS Impact", min: 0, max: 0.6, step: 0.01, digits: 2 },
+  { key: "ts_impact", label: "TS% Impact", min: 0, max: 2, step: 0.01, digits: 2 },
+  { key: "tsEraImpact", label: "Era TS Impact", min: 0, max: 1, step: 0.01, digits: 2 },
+  { key: "tsAbsoluteImpact", label: "Absolute TS Impact", min: 0, max: 1, step: 0.01, digits: 2 },
   { key: "wsImpact", label: "WS/48 Impact", min: 0, max: 1.5, step: 0.01, digits: 2 },
 ];
 
@@ -180,7 +198,7 @@ const PLAYER_METRIC_KEYS: Record<keyof StatLine, string[]> = {
   ppg: ["ppg", "PPG"],
   rpg: ["rpg", "RPG"],
   spg: ["spg", "SPG"],
-  ts_pct: ["ts_pct", "TS_PCT"],
+  ts_pct: ["ts_pct", "TS_PCT", "TS%", "true_shooting_pct", "trueShootingPct", "true_shooting_percentage"],
   ws_48: ["ws_48", "ws_per_48", "wsPer48"],
 };
 
@@ -190,7 +208,7 @@ const LEAGUE_METRIC_KEYS: Record<"apg" | "bpg" | "ppg" | "rpg" | "spg" | "ts_pct
   ppg: ["PPG", "ppg"],
   rpg: ["RPG", "rpg"],
   spg: ["SPG", "spg"],
-  ts_pct: ["TS_PCT", "ts_pct"],
+  ts_pct: ["TS_PCT", "ts_pct", "TS%", "true_shooting_pct", "trueShootingPct"],
 };
 
 function numericValue(value: unknown) {
@@ -298,7 +316,47 @@ function gamesPlayed(season: SeasonStat) {
   return firstPositiveNumericValue(season as Record<string, unknown>, ["games_played", "gamesPlayed", "gp", "GP"]);
 }
 
-function mergeWeights(statWeights: Partial<StatWeights> | undefined) {
+function mergeTsBlendWeights(tsBlendWeights: Partial<TsBlendWeights> | undefined): TsBlendWeights {
+  const nextBlendWeights = { ...DEFAULT_TS_BLEND_WEIGHTS };
+  const absolute = numericValue(tsBlendWeights?.absolute);
+  const era = numericValue(tsBlendWeights?.era);
+
+  if (absolute !== null) {
+    nextBlendWeights.absolute = absolute;
+  }
+
+  if (era !== null) {
+    nextBlendWeights.era = era;
+  }
+
+  return nextBlendWeights;
+}
+
+function tsImpactFromConfig(
+  statWeights: ConfigStatWeights | undefined,
+  tsBlendWeights: TsBlendWeights,
+) {
+  const directImpact = numericValue(statWeights?.ts_impact ?? statWeights?.tsImpact);
+
+  if (directImpact !== null) {
+    return directImpact;
+  }
+
+  const absoluteImpact = numericValue(statWeights?.tsAbsoluteImpact);
+  const eraImpact = numericValue(statWeights?.tsEraImpact);
+  const splitImpacts = [
+    absoluteImpact !== null && tsBlendWeights.absolute > 0 ? absoluteImpact / tsBlendWeights.absolute : null,
+    eraImpact !== null && tsBlendWeights.era > 0 ? eraImpact / tsBlendWeights.era : null,
+  ].filter((value): value is number => value !== null && Number.isFinite(value));
+
+  if (!splitImpacts.length) {
+    return null;
+  }
+
+  return splitImpacts.reduce((sum, value) => sum + value, 0) / splitImpacts.length;
+}
+
+function mergeWeights(statWeights: ConfigStatWeights | undefined, tsBlendWeights = DEFAULT_TS_BLEND_WEIGHTS) {
   const nextWeights = { ...DEFAULT_WEIGHTS };
 
   for (const field of WEIGHT_FIELDS) {
@@ -306,6 +364,25 @@ function mergeWeights(statWeights: Partial<StatWeights> | undefined) {
 
     if (numeric !== null) {
       nextWeights[field.key] = numeric;
+    }
+  }
+
+  const tsImpact = tsImpactFromConfig(statWeights, tsBlendWeights);
+
+  if (tsImpact !== null) {
+    nextWeights.ts_impact = tsImpact;
+  }
+
+  if (tsImpact !== null && tsImpact !== 0 && numericValue(statWeights?.ts_impact ?? statWeights?.tsImpact) === null) {
+    const absoluteImpact = numericValue(statWeights?.tsAbsoluteImpact);
+    const eraImpact = numericValue(statWeights?.tsEraImpact);
+
+    if (absoluteImpact !== null) {
+      nextWeights.tsAbsoluteImpact = absoluteImpact / tsImpact;
+    }
+
+    if (eraImpact !== null) {
+      nextWeights.tsEraImpact = eraImpact / tsImpact;
     }
   }
 
@@ -464,9 +541,11 @@ function scoreSeason(
   const playerTs = playerMetricValue(season, "ts_pct");
   const leagueTs = leagueMetricValue(leagueAverage, "ts_pct");
   const playerWs48 = playerMetricValue(season, "ws_48");
-  const tsEra = playerTs !== null && leagueTs ? (playerTs / leagueTs - 1) * weights.tsEraImpact : 0;
+  const tsEra = playerTs !== null && leagueTs ? (playerTs / leagueTs - 1) * weights.tsEraImpact * weights.ts_impact : 0;
   const tsAbsolute =
-    playerTs !== null && allTimeTsBaseline > 0 ? (playerTs / allTimeTsBaseline - 1) * weights.tsAbsoluteImpact : 0;
+    playerTs !== null && allTimeTsBaseline > 0
+      ? (playerTs / allTimeTsBaseline - 1) * weights.tsAbsoluteImpact * weights.ts_impact
+      : 0;
   const ws = playerWs48 !== null ? (playerWs48 - ws48Baseline) * weights.wsImpact : 0;
   const efficiencyModifier = 1 + tsEra + tsAbsolute + ws;
   const baseIndex = ptsComponent + rebsComponent + astsComponent + stocksComponent;
@@ -569,6 +648,7 @@ function weightsObjectString(weights: StatWeights) {
   asts: ${trimNumber(weights.asts)},
   rebs: ${trimNumber(weights.rebs)},
   stocks: ${trimNumber(weights.stocks)},
+  ts_impact: ${trimNumber(weights.ts_impact)},
   tsEraImpact: ${trimNumber(weights.tsEraImpact)},
   tsAbsoluteImpact: ${trimNumber(weights.tsAbsoluteImpact)},
   wsImpact: ${trimNumber(weights.wsImpact)},
@@ -761,7 +841,8 @@ export default function StatsEnginePage() {
         }
 
         const config = (await response.json()) as StatsEngineConfigPayload;
-        const nextWeights = mergeWeights(config.statWeights);
+        const nextTsBlendWeights = mergeTsBlendWeights(config.tsBlendWeights);
+        const nextWeights = mergeWeights(config.statWeights, nextTsBlendWeights);
 
         if (!active) {
           return;

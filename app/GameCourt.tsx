@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, FormEvent } from "react";
@@ -121,6 +122,7 @@ type ResultPlayer = {
     name: string;
   };
   selection: DraftSelection;
+  scoreContribution: number;
   achievements: Achievement[];
   positionBonus?: PositionBonus;
 };
@@ -138,15 +140,12 @@ type GameResultPayload = {
 };
 
 export type GameMode = "classic" | "all-time";
-export type RosterControlValues = Record<string, string>;
-export type RosterControlDefinition = {
-  id: string;
-  ariaLabel: string;
-  className: string;
-  options: readonly {
-    id: string;
-    label: string;
-  }[];
+export type RosterSortMode = string;
+type RosterSortDirection = "desc" | "asc";
+export type RosterSortScores = Record<RosterSortMode, (player: Player, selection: DraftSelection) => number>;
+export type RosterSortOption = {
+  id: RosterSortMode;
+  label: string;
 };
 export type LeagueAverage = Record<string, number | string | null | undefined>;
 export type LeagueAverages = Record<string, LeagueAverage>;
@@ -170,24 +169,24 @@ export type GameCourtConfig = {
   resultStorageKey: string;
   resultsPath: string;
   seasonTiers: SeasonTier[];
-  rosterControls: readonly RosterControlDefinition[];
-  defaultRosterControlValues: RosterControlValues;
   usesStatsEngineConfig?: boolean;
+  rosterSortOptions?: readonly RosterSortOption[];
+  defaultRosterSortMode?: RosterSortMode;
+  defaultRosterSortDirection?: RosterSortDirection;
   courtAchievementLimit: number;
   buildAchievementTotals: (slots: LineupSlot[]) => Achievement[];
   buildPlayerAchievements: (player: Player, selection: DraftSelection) => Achievement[];
+  buildResultAchievements?: (
+    player: Player,
+    selection: DraftSelection,
+    statsEngineConfig: StatsEngineConfig,
+  ) => Achievement[];
   buildRosterFeedAchievements: (
     player: Player,
     selection: DraftSelection,
-    rosterControls: RosterControlValues,
     statsEngineConfig: StatsEngineConfig,
   ) => Achievement[];
-  compareRosterPlayers: (
-    a: Player,
-    b: Player,
-    selection: DraftSelection,
-    rosterControls: RosterControlValues,
-  ) => number;
+  rosterSortScores: RosterSortScores;
   eraOptionsForTeam: (players: Player[], team: string) => string[];
   lineupSlotScore: (slot: LineupSlot | undefined, assignedPosition: Position) => number;
   playerScore: (player: Player, selection: DraftSelection) => number;
@@ -205,6 +204,13 @@ const DEFAULT_STATS_ENGINE_CONFIG: StatsEngineConfig = {
     era: 0.5,
   },
 };
+const DEFAULT_ROSTER_SORT_OPTIONS = [
+  { id: "mixed", label: "Mixed" },
+  { id: "stats", label: "Stats" },
+  { id: "awards", label: "Awards" },
+] as const satisfies readonly RosterSortOption[];
+const ROSTER_SORT_CONTROL_CLASS =
+  "h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-black normal-case tracking-normal text-white outline-none transition focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20";
 const ADMIN_DEFAULT_TEAM = "LAL";
 const ADMIN_DEFAULT_ERA = "10's";
 const PUBLIC_TEAM_PLACEHOLDER = "?";
@@ -624,20 +630,24 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     resultStorageKey,
     resultsPath,
     seasonTiers,
-    rosterControls,
-    defaultRosterControlValues,
     usesStatsEngineConfig = false,
+    rosterSortOptions = DEFAULT_ROSTER_SORT_OPTIONS,
+    defaultRosterSortMode,
+    defaultRosterSortDirection = "desc",
     courtAchievementLimit,
     buildAchievementTotals,
     buildPlayerAchievements,
+    buildResultAchievements,
     buildRosterFeedAchievements,
-    compareRosterPlayers,
+    rosterSortScores,
     eraOptionsForTeam: resolveEraOptionsForTeam,
     lineupSlotScore,
     playerScore,
     playerHasRecordedTeamEra,
     positionBonusForSlot,
   } = config;
+  const initialRosterSortMode =
+    defaultRosterSortMode ?? rosterSortOptions[0]?.id ?? DEFAULT_ROSTER_SORT_OPTIONS[0].id;
   const router = useRouter();
   const courtRef = useRef<HTMLDivElement | null>(null);
   const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -653,9 +663,9 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const [selectedTeam, setSelectedTeam] = useState(PUBLIC_TEAM_PLACEHOLDER);
   const [selectedEra, setSelectedEra] = useState(PUBLIC_ERA_PLACEHOLDER);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("All");
-  const [rosterControlValues, setRosterControlValues] = useState<RosterControlValues>(() => ({
-    ...defaultRosterControlValues,
-  }));
+  const [rosterSortMode, setRosterSortMode] = useState<RosterSortMode>(initialRosterSortMode);
+  const [rosterSortDirection, setRosterSortDirection] =
+    useState<RosterSortDirection>(defaultRosterSortDirection);
   const [statsEngineConfig, setStatsEngineConfig] = useState<StatsEngineConfig>(DEFAULT_STATS_ENGINE_CONFIG);
   const [rosterSearch, setRosterSearch] = useState("");
   const [lineup, setLineup] = useState<Lineup>({});
@@ -897,7 +907,14 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
         })
         .sort((a, b) => {
           const selection = buildDraftSelection(selectedTeam, activeEra);
-          const priorityDelta = compareRosterPlayers(a, b, selection, rosterControlValues);
+          const fallbackSortMode = rosterSortOptions[0]?.id ?? DEFAULT_ROSTER_SORT_OPTIONS[0].id;
+          const sortScore =
+            rosterSortScores[rosterSortMode] ??
+            rosterSortScores[fallbackSortMode] ??
+            rosterSortScores.mixed ??
+            playerScore;
+          const rawPriorityDelta = sortScore(b, selection) - sortScore(a, selection);
+          const priorityDelta = rosterSortDirection === "desc" ? rawPriorityDelta : -rawPriorityDelta;
 
           if (priorityDelta) {
             return priorityDelta;
@@ -911,12 +928,14 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       activeEra,
       hasActiveDraftSelection,
       normalizedRosterSearch,
-      compareRosterPlayers,
       playerHasRecordedTeamEra,
       playerScore,
       players,
       positionFilter,
-      rosterControlValues,
+      rosterSortDirection,
+      rosterSortMode,
+      rosterSortOptions,
+      rosterSortScores,
       selectedPlayerIds,
       selectedTeam,
     ],
@@ -995,7 +1014,10 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
           name: player.name,
         },
         selection,
-        achievements: buildPlayerAchievements(player, selection),
+        scoreContribution: lineupSlotScore(lineup[position], position),
+        achievements: buildResultAchievements
+          ? buildResultAchievements(player, selection, statsEngineConfig)
+          : buildPlayerAchievements(player, selection),
         positionBonus: positionBonusForSlot(lineup[position], position),
       })),
       totals: lineupAchievementTotals,
@@ -1007,11 +1029,13 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   }, [
     activeEra,
     buildPlayerAchievements,
+    buildResultAchievements,
     lineup,
     lineupAchievementTotals,
     lineupComplete,
     lineupEntries,
     lineupHasStephCurry,
+    lineupSlotScore,
     mode,
     positionBonusForSlot,
     resultStorageKey,
@@ -1019,6 +1043,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     router,
     selectedTeam,
     seasonTiers,
+    statsEngineConfig,
     teamLegacyScore,
   ]);
 
@@ -1607,10 +1632,10 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       <header className="game-header border-b border-white/10 bg-[#1c1f29]/95 px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.04)] sm:px-6 lg:px-8">
         <div className="game-header-inner mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="game-brand">
-            <div className="game-logo-mark" aria-hidden="true">
+            <Link className="game-logo-mark" href="/" aria-label="Go to home">
               <span>82-0</span>
               <small>{logoLabel}</small>
-            </div>
+            </Link>
             <div className="game-brand-copy">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#ff8a2a]">
               {isAdmin ? "Admin Mode" : "Public Mode"}
@@ -1872,33 +1897,42 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
                   <input
                     aria-label="Search roster"
-                    className="h-10 min-w-[150px] flex-1 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-semibold normal-case tracking-normal text-white outline-none transition placeholder:text-[#aeb4c2] focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
+                    className="h-10 min-w-[112px] flex-[0.85_1_132px] rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-semibold normal-case tracking-normal text-white outline-none transition placeholder:text-[#aeb4c2] focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
                     placeholder="Search..."
                     type="search"
                     value={rosterSearch}
                     onChange={(event) => setRosterSearch(event.target.value)}
                   />
 
-                  {rosterControls.map((control) => (
+                  <span className="roster-sort-control flex min-w-[150px] items-center gap-2">
                     <select
-                      key={control.id}
-                      aria-label={control.ariaLabel}
-                      className={control.className}
-                      value={rosterControlValues[control.id] ?? ""}
-                      onChange={(event) =>
-                        setRosterControlValues((current) => ({
-                          ...current,
-                          [control.id]: event.target.value,
-                        }))
-                      }
+                      aria-label="Roster sort filter"
+                      className={`${ROSTER_SORT_CONTROL_CLASS} min-w-0 flex-1`}
+                      value={rosterSortMode}
+                      onChange={(event) => setRosterSortMode(event.target.value)}
                     >
-                      {control.options.map((option) => (
+                      {rosterSortOptions.map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.label}
                         </option>
                       ))}
                     </select>
-                  ))}
+                    <button
+                      aria-label={
+                        rosterSortDirection === "desc"
+                          ? "Sort direction descending"
+                          : "Sort direction ascending"
+                      }
+                      className="h-10 w-10 rounded-lg border border-white/12 bg-[#242938] text-lg font-black leading-none tracking-normal text-white outline-none transition hover:border-[#31d6a1]/50 hover:bg-white/[0.07] focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
+                      title={rosterSortDirection === "desc" ? "Descending" : "Ascending"}
+                      type="button"
+                      onClick={() =>
+                        setRosterSortDirection((current) => (current === "desc" ? "asc" : "desc"))
+                      }
+                    >
+                      {rosterSortDirection === "desc" ? "↓" : "↑"}
+                    </button>
+                  </span>
                 </div>
 
                 <p className="mt-3 text-sm font-semibold text-[#cfd3df]">{filteredPlayers.length} players available</p>
@@ -1987,7 +2021,6 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                             achievements={buildRosterFeedAchievements(
                               player,
                               playerSelection,
-                              rosterControlValues,
                               statsEngineConfig,
                             )}
                           />
@@ -2022,6 +2055,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                 swapTarget={dropStatuses[position] === "swap"}
                 achievementLimit={courtAchievementLimit}
                 buildPlayerAchievements={buildPlayerAchievements}
+                showAchievements={isAdmin}
                 onSelect={() => handleCourtSlotSelect(position)}
                 onPlayerDragEnd={handleDragEnd}
                 onPlayerDragStart={(event, player) => handleDragStart(event, player, position)}
@@ -2207,6 +2241,7 @@ function CourtSlot({
   lineup,
   position,
   selected,
+  showAchievements,
   canDrop,
   blocked,
   swapTarget,
@@ -2222,6 +2257,7 @@ function CourtSlot({
   lineup: Lineup;
   position: Position;
   selected: boolean;
+  showAchievements: boolean;
   canDrop: boolean;
   blocked: boolean;
   swapTarget: boolean;
@@ -2233,7 +2269,8 @@ function CourtSlot({
 }) {
   const slot = lineup[position];
   const player = slot?.player;
-  const courtAchievements = player && slot ? buildPlayerAchievements(player, slot.selection).slice(0, achievementLimit) : [];
+  const courtAchievements =
+    showAchievements && player && slot ? buildPlayerAchievements(player, slot.selection).slice(0, achievementLimit) : [];
 
   return (
     <button
