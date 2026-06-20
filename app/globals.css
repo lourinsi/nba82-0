@@ -3230,12 +3230,13 @@ select {
   .roster-filter-row {
     display: grid;
     gap: 6px;
-    grid-template-columns: minmax(106px, 0.58fr) minmax(0, 1fr);
+    grid-template-columns: max-content minmax(76px, 0.75fr) minmax(154px, 1fr);
     width: 100%;
   }
 
   .position-filter-group {
     border-radius: 8px;
+    width: max-content;
   }
 
   .position-filter-group button {
@@ -3247,6 +3248,7 @@ select {
 
   .roster-filter-row input {
     min-width: 0;
+    width: 100%;
   }
 
   .roster-filter-row select {
@@ -3492,6 +3494,20 @@ select {
 }
 
 @media (max-width: 390px) {
+  .roster-filter-row {
+    gap: 4px;
+    grid-template-columns: max-content minmax(0, 1fr) minmax(137px, 1fr);
+  }
+
+  .roster-filter-row select {
+    padding-left: 8px;
+    padding-right: 6px;
+  }
+
+  .roster-sort-control {
+    gap: 4px;
+  }
+
   .game-control-button {
     height: 42px;
     width: 42px;

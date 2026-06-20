@@ -142,7 +142,10 @@ type GameResultPayload = {
 export type GameMode = "classic" | "all-time";
 export type RosterSortMode = string;
 type RosterSortDirection = "desc" | "asc";
-export type RosterSortScores = Record<RosterSortMode, (player: Player, selection: DraftSelection) => number>;
+export type RosterSortScores = Record<
+  RosterSortMode,
+  (player: Player, selection: DraftSelection, statsEngineConfig: StatsEngineConfig) => number
+>;
 export type RosterSortOption = {
   id: RosterSortMode;
   label: string;
@@ -188,10 +191,18 @@ export type GameCourtConfig = {
   ) => Achievement[];
   rosterSortScores: RosterSortScores;
   eraOptionsForTeam: (players: Player[], team: string) => string[];
-  lineupSlotScore: (slot: LineupSlot | undefined, assignedPosition: Position) => number;
-  playerScore: (player: Player, selection: DraftSelection) => number;
+  lineupSlotScore: (
+    slot: LineupSlot | undefined,
+    assignedPosition: Position,
+    statsEngineConfig: StatsEngineConfig,
+  ) => number;
+  playerScore: (player: Player, selection: DraftSelection, statsEngineConfig: StatsEngineConfig) => number;
   playerHasRecordedTeamEra: (player: Player, team: string, canonicalEra: string) => boolean;
-  positionBonusForSlot: (slot: LineupSlot | undefined, assignedPosition: Position) => PositionBonus | undefined;
+  positionBonusForSlot: (
+    slot: LineupSlot | undefined,
+    assignedPosition: Position,
+    statsEngineConfig: StatsEngineConfig,
+  ) => PositionBonus | undefined;
 };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -883,8 +894,32 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const normalizedRosterSearch = useMemo(() => normalizeName(rosterSearch), [rosterSearch]);
 
   const filteredPlayers = useMemo(
-    () =>
-      (hasActiveDraftSelection ? players : [])
+    () => {
+      const selection = buildDraftSelection(selectedTeam, activeEra);
+      const fallbackSortMode = rosterSortOptions[0]?.id ?? DEFAULT_ROSTER_SORT_OPTIONS[0].id;
+      const sortScore =
+        rosterSortScores[rosterSortMode] ??
+        rosterSortScores[fallbackSortMode] ??
+        rosterSortScores.mixed ??
+        playerScore;
+      const scoreCache = new Map<string, { legacy: number; priority: number }>();
+      const scoresForPlayer = (player: Player) => {
+        const cached = scoreCache.get(player.id);
+
+        if (cached) {
+          return cached;
+        }
+
+        const scores = {
+          legacy: playerScore(player, selection, statsEngineConfig),
+          priority: sortScore(player, selection, statsEngineConfig),
+        };
+
+        scoreCache.set(player.id, scores);
+        return scores;
+      };
+
+      return (hasActiveDraftSelection ? players : [])
         .filter((player) => {
           const canonicalSelectedEra = getCanonicalEra(activeEra);
 
@@ -906,24 +941,20 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
           );
         })
         .sort((a, b) => {
-          const selection = buildDraftSelection(selectedTeam, activeEra);
-          const fallbackSortMode = rosterSortOptions[0]?.id ?? DEFAULT_ROSTER_SORT_OPTIONS[0].id;
-          const sortScore =
-            rosterSortScores[rosterSortMode] ??
-            rosterSortScores[fallbackSortMode] ??
-            rosterSortScores.mixed ??
-            playerScore;
-          const rawPriorityDelta = sortScore(b, selection) - sortScore(a, selection);
+          const aScores = scoresForPlayer(a);
+          const bScores = scoresForPlayer(b);
+          const rawPriorityDelta = bScores.priority - aScores.priority;
           const priorityDelta = rosterSortDirection === "desc" ? rawPriorityDelta : -rawPriorityDelta;
 
           if (priorityDelta) {
             return priorityDelta;
           }
 
-          const legacyDelta = playerScore(b, selection) - playerScore(a, selection);
+          const legacyDelta = bScores.legacy - aScores.legacy;
 
           return legacyDelta || a.name.localeCompare(b.name);
-        }),
+        });
+    },
     [
       activeEra,
       hasActiveDraftSelection,
@@ -938,6 +969,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       rosterSortScores,
       selectedPlayerIds,
       selectedTeam,
+      statsEngineConfig,
     ],
   );
 
@@ -983,7 +1015,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   );
   const teamLegacyScore = Number(
     POSITIONS.reduce(
-      (sum, position) => sum + lineupSlotScore(lineup[position], position),
+      (sum, position) => sum + lineupSlotScore(lineup[position], position, statsEngineConfig),
       0,
     ).toFixed(2),
   );
@@ -1014,11 +1046,11 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
           name: player.name,
         },
         selection,
-        scoreContribution: lineupSlotScore(lineup[position], position),
+        scoreContribution: lineupSlotScore(lineup[position], position, statsEngineConfig),
         achievements: buildResultAchievements
           ? buildResultAchievements(player, selection, statsEngineConfig)
           : buildPlayerAchievements(player, selection),
-        positionBonus: positionBonusForSlot(lineup[position], position),
+        positionBonus: positionBonusForSlot(lineup[position], position, statsEngineConfig),
       })),
       totals: lineupAchievementTotals,
     };

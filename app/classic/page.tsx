@@ -5,6 +5,7 @@ import GameCourt, {
   teamEraExists,
   type Accolades,
   type AchievementDisplay,
+  type CareerSeason,
   type ClassicPointBlock,
   type ClassicStatKey,
   type ClassicStatLine,
@@ -51,8 +52,21 @@ const ACCOLADE_WEIGHTS = {
   // games_started: 0.01,
 } satisfies Partial<Record<keyof Accolades, number>>;
 const CLASSIC_ACCOLADE_SCORE_MULTIPLIER = 0.5;
+// Stored JSON points are fallback data; this is the scale baked into those cached points.
 const STORED_CLASSIC_STINT_SCALING_FACTOR = 250;
+const CLASSIC_STAT_WEIGHTS = {
+  ppg: 0.8,
+  rpg: 0.45,
+  apg: 0.55,
+  spg: 0.25,
+  bpg: 0.25,
+  ts_impact: 1.0,
+  ws_impact: 1.5,
+};
 const CLASSIC_STINT_SCALING_FACTOR = 250;
+const CLASSIC_ALL_TIME_TS_BASELINE = 0.54;
+const CLASSIC_TS_BLEND_WEIGHTS = { era: 0.25, absolute: 0.5 };
+const CLASSIC_WS_48_BASELINE = 0.1;
 const LEGACY_ENGINE_FACTORS = {
   descentExponent: 0.2,
   descentNumerator: 3.2,
@@ -60,6 +74,7 @@ const LEGACY_ENGINE_FACTORS = {
   densityBonusMultiplier: 0.1,
 };
 type WeightedAccoladeKey = keyof typeof ACCOLADE_WEIGHTS;
+type ClassicVolumeMetric = "ppg" | "rpg" | "apg" | "spg" | "bpg";
 
 const MERGED_CLASSIC_ACCOLADE_KEYS = [
   "mvp_count",
@@ -105,6 +120,37 @@ const CLASSIC_STORED_STAT_DISPLAY_ORDER: StatDisplay[] = [
   { id: "ts_pct", label: "TS%" },
   { id: "ws_48", label: "WS/48" },
 ];
+const CLASSIC_BASE_METRICS = ["ppg", "rpg", "apg"] as const satisfies readonly ClassicVolumeMetric[];
+const CLASSIC_DEFENSIVE_METRICS = ["spg", "bpg"] as const satisfies readonly ClassicVolumeMetric[];
+const CLASSIC_VOLUME_METRICS = [
+  ...CLASSIC_BASE_METRICS,
+  ...CLASSIC_DEFENSIVE_METRICS,
+] as const satisfies readonly ClassicVolumeMetric[];
+const PLAYER_DIRECT_STAT_KEYS: Record<ClassicStatKey, string[]> = {
+  ppg: ["ppg", "PPG", "points_per_game", "pointsPerGame", "pts_per_game", "ptsPerGame"],
+  rpg: ["rpg", "RPG", "rebounds_per_game", "reboundsPerGame", "reb_per_game", "rebPerGame", "trb_per_game"],
+  apg: ["apg", "APG", "assists_per_game", "assistsPerGame", "ast_per_game", "astPerGame"],
+  spg: ["spg", "SPG", "steals_per_game", "stealsPerGame", "stl_per_game", "stlPerGame"],
+  bpg: ["bpg", "BPG", "blocks_per_game", "blocksPerGame", "blk_per_game", "blkPerGame"],
+  ts_pct: ["ts_pct", "TS_PCT", "tsPct", "true_shooting_pct", "trueShootingPct", "true_shooting_percentage"],
+  ws_48: ["ws_48", "WS_48", "ws_per_48", "WS_PER_48", "wsPer48", "win_shares_per_48", "winSharesPer48"],
+};
+const PLAYER_TOTAL_STAT_KEYS: Record<ClassicVolumeMetric, string[]> = {
+  ppg: ["pts", "PTS", "points", "total_points"],
+  rpg: ["reb", "REB", "trb", "TRB", "rebounds", "total_rebounds"],
+  apg: ["ast", "AST", "assists", "total_assists"],
+  spg: ["stl", "STL", "steals", "total_steals"],
+  bpg: ["blk", "BLK", "blocks", "total_blocks"],
+};
+const LEAGUE_AVERAGE_KEYS: Record<ClassicVolumeMetric | "ts_pct", string[]> = {
+  ppg: ["PPG", "ppg"],
+  rpg: ["RPG", "rpg"],
+  apg: ["APG", "apg"],
+  spg: ["SPG", "spg"],
+  bpg: ["BPG", "bpg"],
+  ts_pct: ["TS_PCT", "ts_pct", "TS%", "true_shooting_pct", "trueShootingPct"],
+};
+const GAMES_KEYS = ["games_played", "gamesPlayed", "gp", "GP"];
 const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   // {
   //   id: "goat",
@@ -296,21 +342,21 @@ const SEASON_TIERS: SeasonTier[] = [
     description: "Wait 'Til Next Year. The season was over before Christmas and the only thing developing here is depression.",
   },
   {
-    minScore: 21,
+    minScore: 19,
     minWins: 10,
     maxWins: 14,
     tier: "D- (The Process)",
     description: "The Tank Job. Management traded everything that could dribble and is now selling patience like it is a real product.",
   },
   {
-    minScore: 15,
+    minScore: 9,
     minWins: 5,
     maxWins: 9,
     tier: "F+ (The G-League Call-Ups)",
     description: "Opposing teams are resting their starters against you and still winning by 30. Your mascot has more trade value than half the roster.",
   },
   {
-    minScore: 8,
+    minScore: 0,
     minWins: 1,
     maxWins: 4,
     tier: "F (The Basement Dwellers)",
@@ -458,6 +504,106 @@ function firstPositiveNumericValue(source: Record<string, unknown> | undefined |
   return numeric !== null && numeric > 0 ? numeric : null;
 }
 
+function isClassicVolumeMetric(metric: ClassicStatKey): metric is ClassicVolumeMetric {
+  return CLASSIC_VOLUME_METRICS.includes(metric as ClassicVolumeMetric);
+}
+
+function playerMetricValue(season: CareerSeason, metric: ClassicStatKey) {
+  const direct = firstNumericValue(season as Record<string, unknown>, PLAYER_DIRECT_STAT_KEYS[metric]);
+
+  if (direct !== null) {
+    return direct;
+  }
+
+  if (!isClassicVolumeMetric(metric)) {
+    return null;
+  }
+
+  const total = firstNumericValue(season as Record<string, unknown>, PLAYER_TOTAL_STAT_KEYS[metric]);
+  const gamesPlayed = firstPositiveNumericValue(season as Record<string, unknown>, GAMES_KEYS);
+
+  if (total === null || !gamesPlayed) {
+    return null;
+  }
+
+  return total / gamesPlayed;
+}
+
+function leagueMetricValue(leagueAverage: LeagueAverage | null | undefined, metric: ClassicVolumeMetric | "ts_pct") {
+  return firstPositiveNumericValue(leagueAverage, LEAGUE_AVERAGE_KEYS[metric]);
+}
+
+function hasDefensiveLeagueAverages(leagueAverage: LeagueAverage | null | undefined) {
+  return CLASSIC_DEFENSIVE_METRICS.every((metric) => leagueMetricValue(leagueAverage, metric) !== null);
+}
+
+function metricWeightsForSeason(leagueAverage: LeagueAverage | null | undefined) {
+  if (!hasDefensiveLeagueAverages(leagueAverage)) {
+    const totalWeight = CLASSIC_VOLUME_METRICS.reduce(
+      (sum, metric) => sum + Number(CLASSIC_STAT_WEIGHTS[metric] || 0),
+      0,
+    );
+    const balancedWeight = totalWeight / CLASSIC_BASE_METRICS.length;
+
+    return Object.fromEntries(CLASSIC_BASE_METRICS.map((metric) => [metric, balancedWeight])) as Partial<
+      Record<ClassicVolumeMetric, number>
+    >;
+  }
+
+  return Object.fromEntries(
+    CLASSIC_VOLUME_METRICS.map((metric) => [metric, Number(CLASSIC_STAT_WEIGHTS[metric] || 0)]),
+  ) as Partial<Record<ClassicVolumeMetric, number>>;
+}
+
+function scoreClassicSeasonAgainstLeague(season: CareerSeason, leagueAverage: LeagueAverage) {
+  const weights = metricWeightsForSeason(leagueAverage);
+  let baseVolumeIndex = 0;
+
+  for (const metric of CLASSIC_VOLUME_METRICS) {
+    if (!Object.prototype.hasOwnProperty.call(weights, metric)) {
+      continue;
+    }
+
+    const weight = weights[metric] ?? 0;
+    const playerValue = playerMetricValue(season, metric);
+    const leagueValue = leagueMetricValue(leagueAverage, metric);
+
+    if (playerValue === null || leagueValue === null) {
+      return null;
+    }
+
+    baseVolumeIndex += (playerValue / leagueValue) * weight;
+  }
+
+  let efficiencyModifier = 1;
+  const playerTs = playerMetricValue(season, "ts_pct");
+  const leagueTs = leagueMetricValue(leagueAverage, "ts_pct");
+  const tsBaseline = positiveNumber(CLASSIC_ALL_TIME_TS_BASELINE);
+
+  if (playerTs !== null && leagueTs !== null && tsBaseline) {
+    const eraRelativeTs = playerTs / leagueTs;
+    const absoluteRelativeTs = playerTs / tsBaseline;
+    const blendedTsRatio =
+      eraRelativeTs * CLASSIC_TS_BLEND_WEIGHTS.era + absoluteRelativeTs * CLASSIC_TS_BLEND_WEIGHTS.absolute;
+
+    if (Number.isFinite(blendedTsRatio)) {
+      efficiencyModifier += (blendedTsRatio - 1) * Number(CLASSIC_STAT_WEIGHTS.ts_impact || 0);
+    }
+  }
+
+  const playerWs48 = playerMetricValue(season, "ws_48");
+
+  if (playerWs48 !== null) {
+    const wsBonus = playerWs48 - CLASSIC_WS_48_BASELINE;
+
+    if (Number.isFinite(wsBonus)) {
+      efficiencyModifier += wsBonus * Number(CLASSIC_STAT_WEIGHTS.ws_impact || 0);
+    }
+  }
+
+  return baseVolumeIndex * efficiencyModifier;
+}
+
 function seasonEndYear(season: unknown) {
   const value = String(season || "").trim();
   const fullYearRange = value.match(/^(\d{4})\D+(\d{4})/);
@@ -519,6 +665,59 @@ function careerSeasonsForSelection(player: Player, selection: TeamEra) {
       (season) => season.team === selection.team && getCanonicalEra(String(season.era || "")) === selectedEra,
     ) ?? []
   );
+}
+
+function careerSeasonsForClassicBlock(player: Player, block: ClassicPointBlock) {
+  return (
+    player.career_seasons?.filter(
+      (season) => season.team === block.team && String(season.era || "") === block.era,
+    ) ?? []
+  );
+}
+
+function runtimeClassicStintPointsForBlock(
+  player: Player,
+  block: ClassicPointBlock,
+  statsEngineConfig: StatsEngineConfig | undefined,
+) {
+  if (!statsEngineConfig?.leagueAverages || !Object.keys(statsEngineConfig.leagueAverages).length) {
+    return null;
+  }
+
+  const matchingSeasons = careerSeasonsForClassicBlock(player, block);
+  let indexTotal = 0;
+  let scoredSeasons = 0;
+
+  for (const season of matchingSeasons) {
+    const leagueAverage = leagueAverageForSeason(statsEngineConfig.leagueAverages, season.season);
+
+    if (!leagueAverage) {
+      continue;
+    }
+
+    const index = scoreClassicSeasonAgainstLeague(season, leagueAverage);
+
+    if (index === null) {
+      continue;
+    }
+
+    indexTotal += index;
+    scoredSeasons += 1;
+  }
+
+  if (!scoredSeasons) {
+    return null;
+  }
+
+  return (indexTotal / scoredSeasons) * CLASSIC_STINT_SCALING_FACTOR;
+}
+
+function classicBlockPoints(
+  player: Player,
+  block: ClassicPointBlock,
+  statsEngineConfig: StatsEngineConfig | undefined,
+) {
+  return runtimeClassicStintPointsForBlock(player, block, statsEngineConfig) ?? scaledClassicStintPoints(block.points);
 }
 
 function leagueTsValue(leagueAverage: LeagueAverage | null) {
@@ -699,17 +898,21 @@ function weightedBlockAverage(blocks: ClassicPointBlock[], value: (block: Classi
   return weightTotal > 0 ? Number((weightedTotal / weightTotal).toFixed(2)) : 0;
 }
 
-function classicBlockForSelection(player: Player | undefined, selection: TeamEra | undefined) {
+function classicBlockForSelection(
+  player: Player | undefined,
+  selection: TeamEra | undefined,
+  statsEngineConfig?: StatsEngineConfig,
+) {
   const blocks = classicBlocksForSelection(player, selection);
 
-  if (!blocks.length || !selection) {
+  if (!player || !blocks.length || !selection) {
     return undefined;
   }
 
   if (blocks.length === 1) {
     return {
       ...blocks[0],
-      points: scaledClassicStintPoints(blocks[0].points),
+      points: classicBlockPoints(player, blocks[0], statsEngineConfig),
       scoringAccolades: scoringAccoladesForBlock(blocks[0]),
     };
   }
@@ -717,7 +920,7 @@ function classicBlockForSelection(player: Player | undefined, selection: TeamEra
   return {
     team: selection.team,
     era: getCanonicalEra(selection.era),
-    points: weightedBlockAverage(blocks, (block) => scaledClassicStintPoints(block.points)),
+    points: weightedBlockAverage(blocks, (block) => classicBlockPoints(player, block, statsEngineConfig)),
     stats: mergeClassicStats(blocks),
     accolades: mergeClassicAccolades(blocks) as Accolades | undefined,
     scoringAccolades: mergeClassicAccolades(blocks, true) as ScoringAccolades | undefined,
@@ -927,8 +1130,12 @@ function buildAchievementTotals(slots: LineupSlot[]) {
   return [...statTotals, ...efficiencyTotals, ...accoladeTotals];
 }
 
-function playerLegacyScore(player: Player | undefined, selection: TeamEra | undefined) {
-  const block = classicBlockForSelection(player, selection);
+function playerLegacyScore(
+  player: Player | undefined,
+  selection: TeamEra | undefined,
+  statsEngineConfig?: StatsEngineConfig,
+) {
+  const block = classicBlockForSelection(player, selection, statsEngineConfig);
 
   if (!block) {
     return 0;
@@ -944,8 +1151,8 @@ function playerLegacyScore(player: Player | undefined, selection: TeamEra | unde
   return Number(classicScore.toFixed(2));
 }
 
-function playerClassicStatsScore(player: Player, selection: TeamEra | undefined) {
-  const statPoints = Number(classicBlockForSelection(player, selection)?.points ?? 0);
+function playerClassicStatsScore(player: Player, selection: TeamEra | undefined, statsEngineConfig?: StatsEngineConfig) {
+  const statPoints = Number(classicBlockForSelection(player, selection, statsEngineConfig)?.points ?? 0);
 
   return Number.isFinite(statPoints) ? statPoints : 0;
 }
@@ -975,20 +1182,30 @@ function positionScoreMultiplier(player: Player | undefined, assignedPosition: P
 
   return isTop100Goat ? 1.10 : 1.10;
 }
-function lineupSlotScore(slot: LineupSlot | undefined, assignedPosition: Position) {
+function lineupSlotScore(
+  slot: LineupSlot | undefined,
+  assignedPosition: Position,
+  statsEngineConfig?: StatsEngineConfig,
+) {
   if (!slot) {
     return 0;
   }
 
-  return Number((playerLegacyScore(slot.player, slot.selection) * positionScoreMultiplier(slot.player, assignedPosition)).toFixed(2));
+  return Number(
+    (playerLegacyScore(slot.player, slot.selection, statsEngineConfig) * positionScoreMultiplier(slot.player, assignedPosition)).toFixed(2),
+  );
 }
 
-function positionBonusForSlot(slot: LineupSlot | undefined, assignedPosition: Position): PositionBonus | undefined {
+function positionBonusForSlot(
+  slot: LineupSlot | undefined,
+  assignedPosition: Position,
+  statsEngineConfig?: StatsEngineConfig,
+): PositionBonus | undefined {
   if (!slot) {
     return undefined;
   }
 
-  const baseScore = playerLegacyScore(slot.player, slot.selection);
+  const baseScore = playerLegacyScore(slot.player, slot.selection, statsEngineConfig);
   const multiplier = positionScoreMultiplier(slot.player, assignedPosition);
   const points = Number((baseScore * multiplier - baseScore).toFixed(2));
 
