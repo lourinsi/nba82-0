@@ -56,16 +56,16 @@ const CLASSIC_ACCOLADE_SCORE_MULTIPLIER = 0.5;
 const STORED_CLASSIC_STINT_SCALING_FACTOR = 250;
 const CLASSIC_STAT_WEIGHTS = {
   ppg: 0.8,
-  rpg: 0.45,
-  apg: 0.55,
-  spg: 0.25,
-  bpg: 0.25,
-  ts_impact: 1.0,
-  ws_impact: 1.5,
+  rpg: 0.4,
+  apg: 0.5,
+  spg: 0.2,
+  bpg: 0.2,
+  ts_impact: 0.5,
+  ts_peer_weight: 0.5,
+  ts_skill_weight: 0.5,
+  ws_impact: 1.0,
 };
 const CLASSIC_STINT_SCALING_FACTOR = 250;
-const CLASSIC_ALL_TIME_TS_BASELINE = 0.54;
-const CLASSIC_TS_BLEND_WEIGHTS = { era: 0.25, absolute: 0.5 };
 const CLASSIC_WS_48_BASELINE = 0.1;
 const LEGACY_ENGINE_FACTORS = {
   descentExponent: 0.2,
@@ -120,6 +120,15 @@ const CLASSIC_STORED_STAT_DISPLAY_ORDER: StatDisplay[] = [
   { id: "ts_pct", label: "TS%" },
   { id: "ws_48", label: "WS/48" },
 ];
+const CLASSIC_STAT_TOOLTIPS: Record<ClassicStatKey, string> = {
+  apg: "AST - Assists per game",
+  bpg: "BLK - Blocks per game",
+  ppg: "PTS - Points per game",
+  rpg: "REB - Rebounds per game",
+  spg: "STL - Steals per game",
+  ts_pct: "TS% - True shooting",
+  ws_48: "WS/48 - Win shares per 48",
+};
 const CLASSIC_BASE_METRICS = ["ppg", "rpg", "apg"] as const satisfies readonly ClassicVolumeMetric[];
 const CLASSIC_DEFENSIVE_METRICS = ["spg", "bpg"] as const satisfies readonly ClassicVolumeMetric[];
 const CLASSIC_VOLUME_METRICS = [
@@ -148,7 +157,7 @@ const LEAGUE_AVERAGE_KEYS: Record<ClassicVolumeMetric | "ts_pct", string[]> = {
   apg: ["APG", "apg"],
   spg: ["SPG", "spg"],
   bpg: ["BPG", "bpg"],
-  ts_pct: ["TS_PCT", "ts_pct", "TS%", "true_shooting_pct", "trueShootingPct"],
+  ts_pct: ["league_ts_pct", "leagueTsPct", "TS_PCT", "ts_pct", "TS%", "true_shooting_pct", "trueShootingPct"],
 };
 const GAMES_KEYS = ["games_played", "gamesPlayed", "gp", "GP"];
 const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
@@ -234,6 +243,27 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   //   weight: ACCOLADE_WEIGHTS.games_started,
   // },
 ];
+const CLASSIC_ACCOLADE_TOOLTIPS: Record<string, string> = {
+  "all-defense": "DEF - All-Defense teams",
+  "all-nba": "ALL NBA - All-NBA teams",
+  "all-rookie-1st": "R1 - All-Rookie 1st team",
+  "all-rookie-2nd": "R2 - All-Rookie 2nd team",
+  "all-star": "AS - All-Star selections",
+  "all-star-mvp": "ASM - All-Star MVPs",
+  assists: "AST - Assist titles",
+  blocks: "BLK - Block titles",
+  dpoy: "DPOY - Defensive Player of the Year",
+  "sixth-man": "6MOY - Sixth Man of the Year",
+  fmvp: "FMVP - Finals MVP",
+  mvp: "MVP - Most Valuable Player",
+  "most-improved": "MIP - Most Improved Player",
+  rebounds: "REB - Rebound titles",
+  rings: "RING - Championships",
+  roy: "ROY - Rookie of the Year",
+  scoring: "SCO - Scoring titles",
+  seasons: "YRS - Seasons played",
+  steals: "STL - Steal titles",
+};
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
 const SEASON_TIERS: SeasonTier[] = [
   {
@@ -457,6 +487,14 @@ function positiveNumber(value: unknown) {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function roundWeight(value: number) {
+  return Number(value.toFixed(4));
+}
+
 function scaledClassicStintPoints(points: unknown) {
   const numeric = Number(points ?? 0);
 
@@ -478,6 +516,33 @@ function numericValue(value: unknown) {
   const numeric = Number(value);
 
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function resolveTsWeights(weights: Partial<typeof CLASSIC_STAT_WEIGHTS> = CLASSIC_STAT_WEIGHTS) {
+  const peerWeight = numericValue(weights.ts_peer_weight);
+  const skillWeight = numericValue(weights.ts_skill_weight);
+  const peer = clamp(
+    peerWeight !== null
+      ? peerWeight
+      : skillWeight !== null
+        ? 1 - skillWeight
+        : CLASSIC_STAT_WEIGHTS.ts_peer_weight,
+    0,
+    1,
+  );
+
+  return { peer: roundWeight(peer), skill: roundWeight(1 - peer) };
+}
+
+function eraAdjustedTsPct(playerTs: number, leagueTs: number) {
+  return playerTs + (playerTs - leagueTs);
+}
+
+function tsHybridPct(playerTs: number, leagueTs: number, weights = CLASSIC_STAT_WEIGHTS) {
+  const tsWeights = resolveTsWeights(weights);
+  const adjustedTs = eraAdjustedTsPct(playerTs, leagueTs);
+
+  return adjustedTs * tsWeights.peer + playerTs * tsWeights.skill;
 }
 
 function firstNumericValue(source: Record<string, unknown> | undefined | null, keys: string[]) {
@@ -578,16 +643,12 @@ function scoreClassicSeasonAgainstLeague(season: CareerSeason, leagueAverage: Le
   let efficiencyModifier = 1;
   const playerTs = playerMetricValue(season, "ts_pct");
   const leagueTs = leagueMetricValue(leagueAverage, "ts_pct");
-  const tsBaseline = positiveNumber(CLASSIC_ALL_TIME_TS_BASELINE);
 
-  if (playerTs !== null && leagueTs !== null && tsBaseline) {
-    const eraRelativeTs = playerTs / leagueTs;
-    const absoluteRelativeTs = playerTs / tsBaseline;
-    const blendedTsRatio =
-      eraRelativeTs * CLASSIC_TS_BLEND_WEIGHTS.era + absoluteRelativeTs * CLASSIC_TS_BLEND_WEIGHTS.absolute;
+  if (playerTs !== null && leagueTs !== null) {
+    const tsHybrid = tsHybridPct(playerTs, leagueTs);
 
-    if (Number.isFinite(blendedTsRatio)) {
-      efficiencyModifier += (blendedTsRatio - 1) * Number(CLASSIC_STAT_WEIGHTS.ts_impact || 0);
+    if (Number.isFinite(tsHybrid)) {
+      efficiencyModifier += (tsHybrid - leagueTs) * Number(CLASSIC_STAT_WEIGHTS.ts_impact || 0);
     }
   }
 
@@ -721,37 +782,20 @@ function classicBlockPoints(
 }
 
 function leagueTsValue(leagueAverage: LeagueAverage | null) {
-  return firstPositiveNumericValue(leagueAverage, ["TS_PCT", "ts_pct", "TS%"]);
+  return firstPositiveNumericValue(leagueAverage, ["league_ts_pct", "leagueTsPct", "TS_PCT", "ts_pct", "TS%"]);
 }
 
-function adjustedTsPercentForSeason(
-  playerTs: number,
-  leagueTs: number,
-  statsEngineConfig: StatsEngineConfig,
-) {
-  const baseline = positiveNumber(statsEngineConfig.allTimeTsBaseline);
+function tsHybridPercentForSeason(playerTs: number, leagueTs: number) {
+  const tsHybrid = tsHybridPct(playerTs, leagueTs);
 
-  if (!baseline) {
-    return null;
-  }
-
-  const totalBlendWeight =
-    positiveNumber(statsEngineConfig.tsBlendWeights.era) +
-    positiveNumber(statsEngineConfig.tsBlendWeights.absolute);
-  const eraWeight =
-    totalBlendWeight > 0 ? positiveNumber(statsEngineConfig.tsBlendWeights.era) / totalBlendWeight : 0.5;
-  const absoluteWeight =
-    totalBlendWeight > 0 ? positiveNumber(statsEngineConfig.tsBlendWeights.absolute) / totalBlendWeight : 0.5;
-  const blendedTsRatio = (playerTs / leagueTs) * eraWeight + (playerTs / baseline) * absoluteWeight;
-
-  return Number.isFinite(blendedTsRatio) ? blendedTsRatio * baseline * 100 : null;
+  return Number.isFinite(tsHybrid) ? tsHybrid * 100 : null;
 }
 
-function adjustedTsPercentValue(
+function weightedTsPercentForSelection(
   player: Player,
   selection: TeamEra,
-  block: ClassicPointBlock,
   statsEngineConfig: StatsEngineConfig,
+  valueForSeason: (playerTs: number, leagueTs: number) => number | null,
 ) {
   let weightedTotal = 0;
   let weightTotal = 0;
@@ -766,32 +810,61 @@ function adjustedTsPercentValue(
       continue;
     }
 
-    const adjustedTsPercent = adjustedTsPercentForSeason(playerTs, leagueTs, statsEngineConfig);
+    const tsPercent = valueForSeason(playerTs, leagueTs);
 
-    if (adjustedTsPercent === null) {
+    if (tsPercent === null) {
       continue;
     }
 
     const gamesPlayed = positiveNumber(season.games_played);
 
     if (gamesPlayed) {
-      weightedTotal += adjustedTsPercent * gamesPlayed;
+      weightedTotal += tsPercent * gamesPlayed;
       weightTotal += gamesPlayed;
     } else {
-      sampleTotal += adjustedTsPercent;
+      sampleTotal += tsPercent;
       sampleCount += 1;
     }
   }
 
   if (weightTotal > 0) {
-    return `${Math.round(weightedTotal / weightTotal)}%`;
+    return weightedTotal / weightTotal;
   }
 
   if (sampleCount > 0) {
-    return `${Math.round(sampleTotal / sampleCount)}%`;
+    return sampleTotal / sampleCount;
   }
 
-  return tsPercentValue(block.stats?.ts_pct);
+  return null;
+}
+
+function tsHybridPercentValue(
+  player: Player,
+  selection: TeamEra,
+  block: ClassicPointBlock,
+  statsEngineConfig: StatsEngineConfig,
+) {
+  const tsHybridPercent = weightedTsPercentForSelection(
+    player,
+    selection,
+    statsEngineConfig,
+    tsHybridPercentForSeason,
+  );
+
+  return tsHybridPercent === null ? tsPercentValue(block.stats?.ts_pct) : `${Math.round(tsHybridPercent)}%`;
+}
+
+function tsHybridPercentNumber(
+  player: Player,
+  selection: TeamEra,
+  statsEngineConfig: StatsEngineConfig,
+) {
+  return weightedTsPercentForSelection(
+    player,
+    selection,
+    statsEngineConfig,
+    tsHybridPercentForSeason,
+  );
 }
 
 function classicBlocksForSelection(player: Player | undefined, selection: TeamEra | undefined) {
@@ -945,12 +1018,13 @@ function buildBoxScoreAchievements(block: ClassicPointBlock | undefined) {
       id: stat.id,
       value: statValue(value),
       label: stat.label,
+      title: CLASSIC_STAT_TOOLTIPS[stat.id],
     };
   });
 }
 
 function buildStocksAchievement(block: ClassicPointBlock) {
-  return { id: "stocks", value: stocksValue(block), label: "STOCKS" };
+  return { id: "stocks", value: stocksValue(block), label: "STOCKS", title: "Stocks - Stls + Blks" };
 }
 
 function buildMixedStatAchievements(
@@ -964,10 +1038,15 @@ function buildMixedStatAchievements(
   }
 
   return [
-    { id: "pra", value: compactPraValue(block), label: "P/R/A" },
+    { id: "pra", value: compactPraValue(block), label: "P/R/A", title: "PRA - Pts + Rebs + Asts" },
     buildStocksAchievement(block),
-    { id: "ts-plus", value: adjustedTsPercentValue(player, selection, block, statsEngineConfig), label: "TS+" },
-    { id: "ws-48", value: ws48Value(block.stats?.ws_48), label: "WS/48" },
+    {
+      id: "ts-star",
+      value: tsHybridPercentValue(player, selection, block, statsEngineConfig),
+      label: "TS*",
+      title: "TS* - TS+ & TS% combined",
+    },
+    { id: "ws-48", value: ws48Value(block.stats?.ws_48), label: "WS/48", title: "WS/48 - Win shares per 48 minutes" },
   ];
 }
 
@@ -1013,6 +1092,7 @@ function buildAccoladeAchievements(player: Player, selection?: TeamEra) {
                 ? String(count)
                 : countValue(count),
             label: achievement.label,
+            title: CLASSIC_ACCOLADE_TOOLTIPS[achievement.id] || achievement.label,
           },
         ]
       : [];
@@ -1067,7 +1147,7 @@ function averageClassicStat(slots: LineupSlot[], stat: ClassicStatKey) {
   return count > 0 ? total / count : null;
 }
 
-function buildAchievementTotals(slots: LineupSlot[]) {
+function buildAchievementTotals(slots: LineupSlot[], statsEngineConfig: StatsEngineConfig) {
   const statTotals = CLASSIC_BOX_SCORE_DISPLAY_ORDER.flatMap((stat) => {
     const total = slots.reduce((sum, slot) => {
       const value = Number(classicBlockForSelection(slot.player, slot.selection)?.stats?.[stat.id] ?? 0);
@@ -1081,19 +1161,27 @@ function buildAchievementTotals(slots: LineupSlot[]) {
             id: stat.id,
             value: statValue(Number(total.toFixed(1))),
             label: stat.label,
+            title: CLASSIC_STAT_TOOLTIPS[stat.id],
           },
         ]
       : [];
   });
-  const avgTsPct = averageClassicStat(slots, "ts_pct");
+  const tsStarValues = slots
+    .map((slot) => tsHybridPercentNumber(slot.player, slot.selection, statsEngineConfig))
+    .filter((value): value is number => value !== null && Number.isFinite(value));
+  const avgTsStar =
+    tsStarValues.length > 0
+      ? tsStarValues.reduce((sum, value) => sum + value, 0) / tsStarValues.length
+      : null;
   const avgWs48 = averageClassicStat(slots, "ws_48");
   const efficiencyTotals = [
-    ...(avgTsPct !== null
+    ...(avgTsStar !== null
       ? [
           {
-            id: "avg-ts-pct",
-            value: tsPercentValue(avgTsPct),
-            label: "AVG TS%",
+            id: "avg-ts-star",
+            value: `${Math.round(avgTsStar)}%`,
+            label: "AVG TS*",
+            title: "AVG TS* - average TS+ & TS% combined",
           },
         ]
       : []),
@@ -1103,6 +1191,7 @@ function buildAchievementTotals(slots: LineupSlot[]) {
             id: "avg-ws-48",
             value: ws48Value(avgWs48),
             label: "AVG WS/48",
+            title: "AVG WS/48 - average win shares per 48 minutes",
           },
         ]
       : []),
@@ -1122,6 +1211,7 @@ function buildAchievementTotals(slots: LineupSlot[]) {
                 ? String(total)
                 : countValue(total),
             label: achievement.label,
+            title: CLASSIC_ACCOLADE_TOOLTIPS[achievement.id] || achievement.label,
           },
         ]
       : [];

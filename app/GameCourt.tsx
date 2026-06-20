@@ -86,7 +86,7 @@ export type LineupSlot = {
   selection: DraftSelection;
 };
 type Lineup = Partial<Record<Position, LineupSlot>>;
-export type Achievement = { id: string; value: string; label: string };
+export type Achievement = { id: string; value: string; label: string; title?: string };
 export type AchievementDisplay = {
   id: string;
   label: string;
@@ -177,7 +177,7 @@ export type GameCourtConfig = {
   defaultRosterSortMode?: RosterSortMode;
   defaultRosterSortDirection?: RosterSortDirection;
   courtAchievementLimit: number;
-  buildAchievementTotals: (slots: LineupSlot[]) => Achievement[];
+  buildAchievementTotals: (slots: LineupSlot[], statsEngineConfig: StatsEngineConfig) => Achievement[];
   buildPlayerAchievements: (player: Player, selection: DraftSelection) => Achievement[];
   buildResultAchievements?: (
     player: Player,
@@ -1010,8 +1010,8 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     [lineup],
   );
   const lineupAchievementTotals = useMemo(
-    () => buildAchievementTotals(lineupEntries.map(({ player, selection }) => ({ player, selection }))),
-    [buildAchievementTotals, lineupEntries],
+    () => buildAchievementTotals(lineupEntries.map(({ player, selection }) => ({ player, selection })), statsEngineConfig),
+    [buildAchievementTotals, lineupEntries, statsEngineConfig],
   );
   const teamLegacyScore = Number(
     POSITIONS.reduce(
@@ -2246,6 +2246,48 @@ function SpinTile({
   );
 }
 
+const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
+  apg: "AST - Assists per game",
+  "all-defense": "DEF - All-Defense teams",
+  "all-nba": "ALL NBA - All-NBA teams",
+  "all-rookie-1st": "R1 - All-Rookie 1st team",
+  "all-rookie-2nd": "R2 - All-Rookie 2nd team",
+  "all-star": "AS - All-Star selections",
+  "all-star-mvp": "ASM - All-Star MVPs",
+  assists: "AST - Assist titles",
+  "avg-ts-pct": "AVG TS% - average true shooting",
+  "avg-ts-star": "AVG TS* - average TS+ & TS% combined",
+  "avg-ws-48": "AVG WS/48 - average win shares per 48",
+  bpg: "BLK - Blocks per game",
+  blocks: "BLK - Block titles",
+  championship_rings: "RING - Championships",
+  dpoy: "DPOY - Defensive Player of the Year",
+  "sixth-man": "6MOY - Sixth Man of the Year",
+  fmvp: "FMVP - Finals MVP",
+  goat: "GOAT rank",
+  mvp: "MVP - Most Valuable Player",
+  "most-improved": "MIP - Most Improved Player",
+  pra: "PRA - Pts + Rebs + Asts",
+  rebs: "REB - Rebound titles",
+  rebounds: "REB - Rebound titles",
+  rings: "RING - Championships",
+  roy: "ROY - Rookie of the Year",
+  rpg: "REB - Rebounds per game",
+  scoring: "SCO - Scoring titles",
+  seasons: "YRS - Seasons played",
+  spg: "STL - Steals per game",
+  steals: "STL - Steal titles",
+  stocks: "Stocks - Stls + Blks",
+  "ts-plus": "TS+ - era-adjusted TS%",
+  "ts-star": "TS* - TS+ & TS% combined",
+  ts_pct: "TS% - true shooting",
+  "ws-48": "WS/48 - Win shares per 48",
+};
+
+function achievementTitle(achievement: Achievement) {
+  return achievement.title || ACHIEVEMENT_TITLE_BY_ID[achievement.id] || `${achievement.label}: ${achievement.value}`;
+}
+
 function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
   if (achievements.length === 0) {
     return <span className="achievement-strip achievement-strip-empty" aria-hidden="true" />;
@@ -2257,7 +2299,13 @@ function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
       aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}
     >
       {achievements.map((achievement) => (
-        <span className={`achievement-stat achievement-stat-${achievement.id} flex-shrink-0`} key={achievement.id}>
+        <span
+          aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
+          className={`achievement-stat achievement-stat-${achievement.id} flex-shrink-0`}
+          data-tooltip={achievementTitle(achievement)}
+          key={achievement.id}
+          title={achievementTitle(achievement)}
+        >
           <span className="achievement-value">{achievement.value}</span>
           <span className="achievement-label">{achievement.label}</span>
         </span>
@@ -2353,7 +2401,13 @@ function CourtAchievementGrid({ achievements }: { achievements: Achievement[] })
       {rows.map((row) => (
         <span className="court-achievement-row" key={row.map((achievement) => achievement.id).join("-")}>
           {row.map((achievement, index) => (
-            <span className="court-achievement-item" key={achievement.id}>
+            <span
+              aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
+              className="court-achievement-item"
+              data-tooltip={achievementTitle(achievement)}
+              key={achievement.id}
+              title={achievementTitle(achievement)}
+            >
               {index > 0 ? <span className="court-achievement-separator">/</span> : null}
               <span className="court-achievement-value">{achievement.value}</span>
               <span className="court-achievement-label">{achievement.label}</span>

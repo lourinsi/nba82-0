@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { teamThemeStyle } from "../teamStyles";
 
 type Position = "PG" | "SG" | "SF" | "PF" | "C";
-type Achievement = { id: string; value: string; label: string };
+type Achievement = { id: string; value: string; label: string; title?: string };
 type SeasonProjection = {
   score: number;
   wins: number;
@@ -44,6 +44,32 @@ type AllTimeResultPayload = {
 };
 
 const ALL_TIME_RESULT_STORAGE_KEY = "nba82_all_time_result";
+const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
+  "all-defense": "DEF - All-Defense teams",
+  "all-nba": "ALL NBA - All-NBA teams",
+  "all-rookie-1st": "R1 - All-Rookie 1st team",
+  "all-rookie-2nd": "R2 - All-Rookie 2nd team",
+  "all-star": "AS - All-Star selections",
+  "all-star-mvp": "ASM - All-Star MVPs",
+  assists: "AST - Assist titles",
+  blocks: "BLK - Block titles",
+  dpoy: "DPOY - Defensive Player of the Year",
+  "sixth-man": "6MOY - Sixth Man of the Year",
+  fmvp: "FMVP - Finals MVP",
+  goat: "GOAT - all-time rank",
+  mvp: "MVP - Most Valuable Player",
+  "most-improved": "MIP - Most Improved Player",
+  rebounds: "REB - Rebound titles",
+  rings: "RING - Championships",
+  roy: "ROY - Rookie of the Year",
+  scoring: "SCO - Scoring titles",
+  seasons: "YRS - Seasons played",
+  steals: "STL - Steal titles",
+};
+
+function achievementTitle(achievement: Achievement) {
+  return achievement.title || ACHIEVEMENT_TITLE_BY_ID[achievement.id] || `${achievement.label}: ${achievement.value}`;
+}
 
 function playerInitials(name: string) {
   const initials = name
@@ -285,7 +311,13 @@ function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
   return (
     <span className="achievement-strip flex overflow-x-auto whitespace-nowrap pb-1 min-w-0" aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}>
       {achievements.map((achievement) => (
-        <span className="achievement-stat flex-shrink-0" key={achievement.id}>
+        <span
+          aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
+          className="achievement-stat flex-shrink-0"
+          data-tooltip={achievementTitle(achievement)}
+          key={achievement.id}
+          title={achievementTitle(achievement)}
+        >
           <span className="achievement-value">{achievement.value}</span>
           <span className="achievement-label">{achievement.label}</span>
         </span>

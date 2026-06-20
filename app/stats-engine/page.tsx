@@ -6,29 +6,23 @@ import { useEffect, useMemo, useState } from "react";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const TEST_PLAYER_NAME = "Michael Jordan";
 const FALLBACK_SCALING_FACTOR = 250;
-const FALLBACK_ALL_TIME_TS_BASELINE = 0.54;
 const FALLBACK_WS_48_BASELINE = 0.1;
-const DEFAULT_TS_BLEND_WEIGHTS = { absolute: 0.5, era: 0.25 };
 
 type StatWeights = {
   asts: number;
   pts: number;
   rebs: number;
   stocks: number;
-  tsAbsoluteImpact: number;
-  tsEraImpact: number;
   ts_impact: number;
+  ts_peer_weight: number;
+  ts_skill_weight: number;
   wsImpact: number;
 };
 type StatWeightKey = keyof StatWeights;
 type ConfigStatWeights = Partial<StatWeights> & {
-  tsAbsoluteImpact?: number;
-  tsEraImpact?: number;
   tsImpact?: number;
-};
-type TsBlendWeights = {
-  absolute: number;
-  era: number;
+  tsPeerWeight?: number;
+  tsSkillWeight?: number;
 };
 type WeightField = {
   key: StatWeightKey;
@@ -81,11 +75,9 @@ type Player = {
 type LeagueAverage = Record<string, number | string | null | undefined>;
 type LeagueAverages = Record<string, LeagueAverage>;
 type StatsEngineConfigPayload = {
-  allTimeTsBaseline?: number;
   leagueAverages?: LeagueAverages;
   scalingFactor?: number;
   statWeights?: ConfigStatWeights;
-  tsBlendWeights?: Partial<TsBlendWeights>;
   ws48Baseline?: number;
 };
 type ScopeOption = {
@@ -102,8 +94,7 @@ type SeasonScore = {
     pts: number;
     rebs: number;
     stocks: number;
-    tsAbsolute: number;
-    tsEra: number;
+    tsHybrid: number;
     ws: number;
   };
   efficiencyModifier: number;
@@ -132,9 +123,9 @@ const DEFAULT_WEIGHTS: StatWeights = {
   pts: 0.8,
   rebs: 0.45,
   stocks: 0.25,
-  tsAbsoluteImpact: DEFAULT_TS_BLEND_WEIGHTS.absolute,
-  tsEraImpact: DEFAULT_TS_BLEND_WEIGHTS.era,
   ts_impact: 1,
+  ts_peer_weight: 0.5,
+  ts_skill_weight: 0.5,
   wsImpact: 1.5,
 };
 
@@ -144,8 +135,8 @@ const WEIGHT_FIELDS: WeightField[] = [
   { key: "rebs", label: "REB", min: 0, max: 2.5, step: 0.05, digits: 2 },
   { key: "stocks", label: "Stocks", min: 0, max: 1.5, step: 0.05, digits: 2 },
   { key: "ts_impact", label: "TS% Impact", min: 0, max: 2, step: 0.01, digits: 2 },
-  { key: "tsEraImpact", label: "Era TS Impact", min: 0, max: 1, step: 0.01, digits: 2 },
-  { key: "tsAbsoluteImpact", label: "Absolute TS Impact", min: 0, max: 1, step: 0.01, digits: 2 },
+  { key: "ts_peer_weight", label: "TS Peer Weight", min: 0, max: 1, step: 0.01, digits: 2 },
+  { key: "ts_skill_weight", label: "TS Skill Weight", min: 0, max: 1, step: 0.01, digits: 2 },
   { key: "wsImpact", label: "WS/48 Impact", min: 0, max: 1.5, step: 0.01, digits: 2 },
 ];
 
@@ -164,8 +155,7 @@ const EMPTY_COMPONENTS: SeasonScore["components"] = {
   pts: 0,
   rebs: 0,
   stocks: 0,
-  tsAbsolute: 0,
-  tsEra: 0,
+  tsHybrid: 0,
   ws: 0,
 };
 
@@ -208,7 +198,7 @@ const LEAGUE_METRIC_KEYS: Record<"apg" | "bpg" | "ppg" | "rpg" | "spg" | "ts_pct
   ppg: ["PPG", "ppg"],
   rpg: ["RPG", "rpg"],
   spg: ["SPG", "spg"],
-  ts_pct: ["TS_PCT", "ts_pct", "TS%", "true_shooting_pct", "trueShootingPct"],
+  ts_pct: ["league_ts_pct", "leagueTsPct", "TS_PCT", "ts_pct", "TS%", "true_shooting_pct", "trueShootingPct"],
 };
 
 function numericValue(value: unknown) {
@@ -227,6 +217,40 @@ function numberValue(value: unknown, fallback = 0) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function roundWeight(value: number) {
+  return Number(value.toFixed(4));
+}
+
+function resolveTsWeights(peerInput: unknown, skillInput?: unknown) {
+  const peerWeight = numericValue(peerInput);
+  const skillWeight = numericValue(skillInput);
+  const peer = clamp(
+    peerWeight !== null
+      ? peerWeight
+      : skillWeight !== null
+        ? 1 - skillWeight
+        : DEFAULT_WEIGHTS.ts_peer_weight,
+    0,
+    1,
+  );
+
+  return {
+    peer: roundWeight(peer),
+    skill: roundWeight(1 - peer),
+  };
+}
+
+function eraAdjustedTsPct(playerTs: number, leagueTs: number) {
+  return playerTs + (playerTs - leagueTs);
+}
+
+function tsHybridPct(playerTs: number, leagueTs: number, weights: StatWeights) {
+  const tsWeights = resolveTsWeights(weights.ts_peer_weight, weights.ts_skill_weight);
+  const adjustedTs = eraAdjustedTsPct(playerTs, leagueTs);
+
+  return adjustedTs * tsWeights.peer + playerTs * tsWeights.skill;
 }
 
 function firstNumericValue(source: Record<string, unknown> | undefined | null, keys: string[]) {
@@ -316,47 +340,7 @@ function gamesPlayed(season: SeasonStat) {
   return firstPositiveNumericValue(season as Record<string, unknown>, ["games_played", "gamesPlayed", "gp", "GP"]);
 }
 
-function mergeTsBlendWeights(tsBlendWeights: Partial<TsBlendWeights> | undefined): TsBlendWeights {
-  const nextBlendWeights = { ...DEFAULT_TS_BLEND_WEIGHTS };
-  const absolute = numericValue(tsBlendWeights?.absolute);
-  const era = numericValue(tsBlendWeights?.era);
-
-  if (absolute !== null) {
-    nextBlendWeights.absolute = absolute;
-  }
-
-  if (era !== null) {
-    nextBlendWeights.era = era;
-  }
-
-  return nextBlendWeights;
-}
-
-function tsImpactFromConfig(
-  statWeights: ConfigStatWeights | undefined,
-  tsBlendWeights: TsBlendWeights,
-) {
-  const directImpact = numericValue(statWeights?.ts_impact ?? statWeights?.tsImpact);
-
-  if (directImpact !== null) {
-    return directImpact;
-  }
-
-  const absoluteImpact = numericValue(statWeights?.tsAbsoluteImpact);
-  const eraImpact = numericValue(statWeights?.tsEraImpact);
-  const splitImpacts = [
-    absoluteImpact !== null && tsBlendWeights.absolute > 0 ? absoluteImpact / tsBlendWeights.absolute : null,
-    eraImpact !== null && tsBlendWeights.era > 0 ? eraImpact / tsBlendWeights.era : null,
-  ].filter((value): value is number => value !== null && Number.isFinite(value));
-
-  if (!splitImpacts.length) {
-    return null;
-  }
-
-  return splitImpacts.reduce((sum, value) => sum + value, 0) / splitImpacts.length;
-}
-
-function mergeWeights(statWeights: ConfigStatWeights | undefined, tsBlendWeights = DEFAULT_TS_BLEND_WEIGHTS) {
+function mergeWeights(statWeights: ConfigStatWeights | undefined) {
   const nextWeights = { ...DEFAULT_WEIGHTS };
 
   for (const field of WEIGHT_FIELDS) {
@@ -367,24 +351,17 @@ function mergeWeights(statWeights: ConfigStatWeights | undefined, tsBlendWeights
     }
   }
 
-  const tsImpact = tsImpactFromConfig(statWeights, tsBlendWeights);
+  const tsImpact = numericValue(statWeights?.ts_impact ?? statWeights?.tsImpact);
+  const tsPeerWeight = numericValue(statWeights?.ts_peer_weight ?? statWeights?.tsPeerWeight);
+  const tsSkillWeight = numericValue(statWeights?.ts_skill_weight ?? statWeights?.tsSkillWeight);
+  const tsWeights = resolveTsWeights(tsPeerWeight, tsSkillWeight);
 
   if (tsImpact !== null) {
     nextWeights.ts_impact = tsImpact;
   }
 
-  if (tsImpact !== null && tsImpact !== 0 && numericValue(statWeights?.ts_impact ?? statWeights?.tsImpact) === null) {
-    const absoluteImpact = numericValue(statWeights?.tsAbsoluteImpact);
-    const eraImpact = numericValue(statWeights?.tsEraImpact);
-
-    if (absoluteImpact !== null) {
-      nextWeights.tsAbsoluteImpact = absoluteImpact / tsImpact;
-    }
-
-    if (eraImpact !== null) {
-      nextWeights.tsEraImpact = eraImpact / tsImpact;
-    }
-  }
+  nextWeights.ts_peer_weight = tsWeights.peer;
+  nextWeights.ts_skill_weight = tsWeights.skill;
 
   return nextWeights;
 }
@@ -491,7 +468,6 @@ function scoreSeason(
   season: SeasonStat,
   leagueAverages: LeagueAverages,
   weights: StatWeights,
-  allTimeTsBaseline: number,
   ws48Baseline: number,
   scalingFactor: number,
 ): SeasonScore | null {
@@ -541,13 +517,16 @@ function scoreSeason(
   const playerTs = playerMetricValue(season, "ts_pct");
   const leagueTs = leagueMetricValue(leagueAverage, "ts_pct");
   const playerWs48 = playerMetricValue(season, "ws_48");
-  const tsEra = playerTs !== null && leagueTs ? (playerTs / leagueTs - 1) * weights.tsEraImpact * weights.ts_impact : 0;
-  const tsAbsolute =
-    playerTs !== null && allTimeTsBaseline > 0
-      ? (playerTs / allTimeTsBaseline - 1) * weights.tsAbsoluteImpact * weights.ts_impact
-      : 0;
+  let tsHybrid = 0;
+
+  if (playerTs !== null && leagueTs) {
+    const hybrid = tsHybridPct(playerTs, leagueTs, weights);
+
+    tsHybrid = Number.isFinite(hybrid) ? (hybrid - leagueTs) * weights.ts_impact : 0;
+  }
+
   const ws = playerWs48 !== null ? (playerWs48 - ws48Baseline) * weights.wsImpact : 0;
-  const efficiencyModifier = 1 + tsEra + tsAbsolute + ws;
+  const efficiencyModifier = 1 + tsHybrid + ws;
   const baseIndex = ptsComponent + rebsComponent + astsComponent + stocksComponent;
   const totalIndex = baseIndex * efficiencyModifier;
 
@@ -558,8 +537,7 @@ function scoreSeason(
       pts: ptsComponent,
       rebs: rebsComponent,
       stocks: stocksComponent,
-      tsAbsolute,
-      tsEra,
+      tsHybrid,
       ws,
     },
     efficiencyModifier,
@@ -576,13 +554,12 @@ function scorePlayer(
   scope: ScopeOption,
   leagueAverages: LeagueAverages,
   weights: StatWeights,
-  allTimeTsBaseline: number,
   ws48Baseline: number,
   scalingFactor: number,
 ): ScoreResult {
   const seasons = seasonsForScope(player, scope);
   const seasonScores = seasons
-    .map((season) => scoreSeason(season, leagueAverages, weights, allTimeTsBaseline, ws48Baseline, scalingFactor))
+    .map((season) => scoreSeason(season, leagueAverages, weights, ws48Baseline, scalingFactor))
     .filter((score): score is SeasonScore => Boolean(score));
 
   if (!seasonScores.length) {
@@ -601,8 +578,7 @@ function scorePlayer(
         pts: sum.components.pts + seasonScore.components.pts,
         rebs: sum.components.rebs + seasonScore.components.rebs,
         stocks: sum.components.stocks + seasonScore.components.stocks,
-        tsAbsolute: sum.components.tsAbsolute + seasonScore.components.tsAbsolute,
-        tsEra: sum.components.tsEra + seasonScore.components.tsEra,
+        tsHybrid: sum.components.tsHybrid + seasonScore.components.tsHybrid,
         ws: sum.components.ws + seasonScore.components.ws,
       },
       efficiencyModifier: sum.efficiencyModifier + seasonScore.efficiencyModifier,
@@ -629,8 +605,7 @@ function scorePlayer(
       pts: totals.components.pts / scoredSeasons,
       rebs: totals.components.rebs / scoredSeasons,
       stocks: totals.components.stocks / scoredSeasons,
-      tsAbsolute: totals.components.tsAbsolute / scoredSeasons,
-      tsEra: totals.components.tsEra / scoredSeasons,
+      tsHybrid: totals.components.tsHybrid / scoredSeasons,
       ws: totals.components.ws / scoredSeasons,
     },
     issueCount: totals.issues,
@@ -643,14 +618,16 @@ function scorePlayer(
 }
 
 function weightsObjectString(weights: StatWeights) {
+  const tsWeights = resolveTsWeights(weights.ts_peer_weight, weights.ts_skill_weight);
+
   return `const STATS_ENGINE_WEIGHTS = {
   pts: ${trimNumber(weights.pts)},
   asts: ${trimNumber(weights.asts)},
   rebs: ${trimNumber(weights.rebs)},
   stocks: ${trimNumber(weights.stocks)},
   ts_impact: ${trimNumber(weights.ts_impact)},
-  tsEraImpact: ${trimNumber(weights.tsEraImpact)},
-  tsAbsoluteImpact: ${trimNumber(weights.tsAbsoluteImpact)},
+  ts_peer_weight: ${trimNumber(tsWeights.peer)},
+  ts_skill_weight: ${trimNumber(tsWeights.skill)},
   wsImpact: ${trimNumber(weights.wsImpact)},
 };`;
 }
@@ -730,7 +707,6 @@ export default function StatsEnginePage() {
   const [defaultWeights, setDefaultWeights] = useState<StatWeights>(DEFAULT_WEIGHTS);
   const [weights, setWeights] = useState<StatWeights>(DEFAULT_WEIGHTS);
   const [leagueAverages, setLeagueAverages] = useState<LeagueAverages>({});
-  const [allTimeTsBaseline, setAllTimeTsBaseline] = useState(FALLBACK_ALL_TIME_TS_BASELINE);
   const [ws48Baseline, setWs48Baseline] = useState(FALLBACK_WS_48_BASELINE);
   const [scalingFactor, setScalingFactor] = useState(FALLBACK_SCALING_FACTOR);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -759,11 +735,10 @@ export default function StatsEnginePage() {
         selectedScope,
         leagueAverages,
         weights,
-        allTimeTsBaseline,
         ws48Baseline,
         scalingFactor,
       ),
-    [activePlayer, allTimeTsBaseline, leagueAverages, scalingFactor, selectedScope, weights, ws48Baseline],
+    [activePlayer, leagueAverages, scalingFactor, selectedScope, weights, ws48Baseline],
   );
   const weightsCode = useMemo(() => weightsObjectString(weights), [weights]);
   const sortedPlayers = useMemo(
@@ -795,7 +770,6 @@ export default function StatsEnginePage() {
             { key: "career", label: "Career" },
             leagueAverages,
             weights,
-            allTimeTsBaseline,
             ws48Baseline,
             scalingFactor,
           );
@@ -805,7 +779,7 @@ export default function StatsEnginePage() {
         .filter((row) => row.score.scoredSeasons > 0)
         .sort((a, b) => b.score.points - a.score.points)
         .slice(0, 10),
-    [allTimeTsBaseline, leagueAverages, players, scalingFactor, weights, ws48Baseline],
+    [leagueAverages, players, scalingFactor, weights, ws48Baseline],
   );
   const componentRows = useMemo(
     () => [
@@ -813,8 +787,7 @@ export default function StatsEnginePage() {
       { label: "AST", value: selectedScore.componentAverages.asts },
       { label: "REB", value: selectedScore.componentAverages.rebs },
       { label: "Stocks", value: selectedScore.componentAverages.stocks },
-      { label: "Era TS", value: selectedScore.componentAverages.tsEra },
-      { label: "Absolute TS", value: selectedScore.componentAverages.tsAbsolute },
+      { label: "TS Hybrid", value: selectedScore.componentAverages.tsHybrid },
       { label: "WS/48", value: selectedScore.componentAverages.ws },
     ],
     [selectedScore],
@@ -841,8 +814,7 @@ export default function StatsEnginePage() {
         }
 
         const config = (await response.json()) as StatsEngineConfigPayload;
-        const nextTsBlendWeights = mergeTsBlendWeights(config.tsBlendWeights);
-        const nextWeights = mergeWeights(config.statWeights, nextTsBlendWeights);
+        const nextWeights = mergeWeights(config.statWeights);
 
         if (!active) {
           return;
@@ -851,7 +823,6 @@ export default function StatsEnginePage() {
         setDefaultWeights(nextWeights);
         setWeights(nextWeights);
         setLeagueAverages(config.leagueAverages || {});
-        setAllTimeTsBaseline(numberValue(config.allTimeTsBaseline, FALLBACK_ALL_TIME_TS_BASELINE));
         setWs48Baseline(numberValue(config.ws48Baseline, FALLBACK_WS_48_BASELINE));
         setScalingFactor(numberValue(config.scalingFactor, FALLBACK_SCALING_FACTOR));
       } catch {
@@ -916,7 +887,29 @@ export default function StatsEnginePage() {
   }, [copied]);
 
   function updateWeight(key: StatWeightKey, value: number) {
-    setWeights((currentWeights) => ({ ...currentWeights, [key]: value }));
+    setWeights((currentWeights) => {
+      if (key === "ts_peer_weight") {
+        const tsWeights = resolveTsWeights(value);
+
+        return {
+          ...currentWeights,
+          ts_peer_weight: tsWeights.peer,
+          ts_skill_weight: tsWeights.skill,
+        };
+      }
+
+      if (key === "ts_skill_weight") {
+        const tsWeights = resolveTsWeights(null, value);
+
+        return {
+          ...currentWeights,
+          ts_peer_weight: tsWeights.peer,
+          ts_skill_weight: tsWeights.skill,
+        };
+      }
+
+      return { ...currentWeights, [key]: value };
+    });
   }
 
   function selectPlayer(player: Player) {
@@ -1053,9 +1046,6 @@ export default function StatsEnginePage() {
           </label>
 
           <div className="stats-baseline-strip">
-            <span>
-              TS Base <strong>{formatNumber(allTimeTsBaseline, 3)}</strong>
-            </span>
             <span>
               WS/48 Base <strong>{formatNumber(ws48Baseline, 3)}</strong>
             </span>
