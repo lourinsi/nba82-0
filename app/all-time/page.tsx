@@ -14,6 +14,7 @@ import GameCourt, {
   type RosterSortScores,
   type SeasonTier,
 } from "../GameCourt";
+import { ALL_TIME_HOW_TO, HOW_TO_STORAGE_KEYS } from "../howToContent";
 
 const DEFAULT_ERAS = ["60's", "90's", "00's", "10's", "20's"];
 
@@ -462,6 +463,10 @@ const allTimeCourtConfig = {
   scoreLabel: "Grand Legacy Score",
   resultStorageKey: "nba82_all_time_result",
   resultsPath: "/all-time/results",
+  howTo: {
+    content: ALL_TIME_HOW_TO,
+    storageKey: HOW_TO_STORAGE_KEYS.allTime,
+  },
   seasonTiers: SEASON_TIERS,
   rosterSortOptions: ALL_TIME_ROSTER_SORT_OPTIONS,
   defaultRosterSortMode: "mvp",

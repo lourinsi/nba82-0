@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, FormEvent } from "react";
+import HowToOverlay from "./HowToOverlay";
 import { teamThemeStyle } from "./all-time/teamStyles";
+import type { HowToOverlayContent } from "./howToContent";
 
 export type Position = "PG" | "SG" | "SF" | "PF" | "C";
 
@@ -171,6 +173,10 @@ export type GameCourtConfig = {
   scoreLabel: string;
   resultStorageKey: string;
   resultsPath: string;
+  howTo?: {
+    content: HowToOverlayContent;
+    storageKey: string;
+  };
   seasonTiers: SeasonTier[];
   usesStatsEngineConfig?: boolean;
   rosterSortOptions?: readonly RosterSortOption[];
@@ -640,6 +646,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     scoreLabel,
     resultStorageKey,
     resultsPath,
+    howTo,
     seasonTiers,
     usesStatsEngineConfig = false,
     rosterSortOptions = DEFAULT_ROSTER_SORT_OPTIONS,
@@ -2165,6 +2172,8 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
         </div>
       ) : null}
 
+      {howTo ? <HowToOverlay content={howTo.content} storageKey={howTo.storageKey} /> : null}
+
       <nav className="mobile-lineup-rail" aria-label="Lineup positions">
         {POSITIONS.map((position) => {
           const slot = lineup[position];
@@ -2248,40 +2257,40 @@ function SpinTile({
 
 const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
   apg: "AST - Assists per game",
-  "all-defense": "DEF - All-Defense teams",
-  "all-nba": "ALL NBA - All-NBA teams",
-  "all-rookie-1st": "R1 - All-Rookie 1st team",
-  "all-rookie-2nd": "R2 - All-Rookie 2nd team",
-  "all-star": "AS - All-Star selections",
-  "all-star-mvp": "ASM - All-Star MVPs",
-  assists: "AST - Assist titles",
-  "avg-ts-pct": "AVG TS% - average true shooting",
-  "avg-ts-star": "AVG TS* - average TS+ & TS% combined",
-  "avg-ws-48": "AVG WS/48 - average win shares per 48",
-  bpg: "BLK - Blocks per game",
-  blocks: "BLK - Block titles",
-  championship_rings: "RING - Championships",
-  dpoy: "DPOY - Defensive Player of the Year",
-  "sixth-man": "6MOY - Sixth Man of the Year",
-  fmvp: "FMVP - Finals MVP",
+  "all-defense": "All-Defense teams",
+  "all-nba": "All-NBA teams",
+  "all-rookie-1st": "All-Rookie 1st team",
+  "all-rookie-2nd": "All-Rookie 2nd team",
+  "all-star": "All-Star selections",
+  "all-star-mvp": "All-Star MVPs",
+  assists: "Assist Champions",
+  "avg-ts-pct": "Average true shooting",
+  "avg-ts-star": "Average TS+ & TS% combined",
+  "avg-ws-48": "Average win shares per 48",
+  bpg: "Blocks per game",
+  blocks: "Block Champions",
+  championship_rings: "Championships",
+  dpoy: "Defensive Player of the Year",
+  "sixth-man": "Sixth Man of the Year",
+  fmvp: "Finals MVP",
   goat: "GOAT rank",
-  mvp: "MVP - Most Valuable Player",
-  "most-improved": "MIP - Most Improved Player",
-  pra: "PRA - Pts + Rebs + Asts",
-  rebs: "REB - Rebound titles",
-  rebounds: "REB - Rebound titles",
-  rings: "RING - Championships",
-  roy: "ROY - Rookie of the Year",
-  rpg: "REB - Rebounds per game",
-  scoring: "SCO - Scoring titles",
-  seasons: "YRS - Seasons played",
-  spg: "STL - Steals per game",
-  steals: "STL - Steal titles",
-  stocks: "Stocks - Stls + Blks",
-  "ts-plus": "TS+ - era-adjusted TS%",
-  "ts-star": "TS* - TS+ & TS% combined",
-  ts_pct: "TS% - true shooting",
-  "ws-48": "WS/48 - Win shares per 48",
+  mvp: "Most Valuable Player",
+  "most-improved": "Most Improved Player",
+  pra: "Pts + Rebs + Asts",
+  rebs: "Rebound Champions",
+  rebounds: "Rebound Champions",
+  rings: "Championships",
+  roy: "Rookie of the Year",
+  rpg: "Rebounds per game",
+  scoring: "Scoring Champions",
+  seasons: "Seasons played",
+  spg: "Steals per game",
+  steals: "Steal Champions",
+  stocks: "Stls + Blks",
+  "ts-plus": "era-adjusted TS%",
+  "ts-star": "TS+ & TS% combined",
+  ts_pct: "True shooting",
+  "ws-48": "Win shares per 48",
 };
 
 function achievementTitle(achievement: Achievement) {

@@ -22,6 +22,7 @@ import GameCourt, {
   type StatsEngineConfig,
   type TeamEra,
 } from "../GameCourt";
+import { CLASSIC_HOW_TO, HOW_TO_STORAGE_KEYS } from "../howToContent";
 
 const DEFAULT_ERAS = ["60's", "90's", "00's", "10's", "20's"];
 
@@ -121,13 +122,13 @@ const CLASSIC_STORED_STAT_DISPLAY_ORDER: StatDisplay[] = [
   { id: "ws_48", label: "WS/48" },
 ];
 const CLASSIC_STAT_TOOLTIPS: Record<ClassicStatKey, string> = {
-  apg: "AST - Assists per game",
-  bpg: "BLK - Blocks per game",
-  ppg: "PTS - Points per game",
-  rpg: "REB - Rebounds per game",
-  spg: "STL - Steals per game",
-  ts_pct: "TS% - True shooting",
-  ws_48: "WS/48 - Win shares per 48",
+  apg: "Assists per game",
+  bpg: "Blocks per game",
+  ppg: "Points per game",
+  rpg: "Rebounds per game",
+  spg: "Steals per game",
+  ts_pct: "Avg True shooting",
+  ws_48: "Avg Win shares per 48",
 };
 const CLASSIC_BASE_METRICS = ["ppg", "rpg", "apg"] as const satisfies readonly ClassicVolumeMetric[];
 const CLASSIC_DEFENSIVE_METRICS = ["spg", "bpg"] as const satisfies readonly ClassicVolumeMetric[];
@@ -244,25 +245,25 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   // },
 ];
 const CLASSIC_ACCOLADE_TOOLTIPS: Record<string, string> = {
-  "all-defense": "DEF - All-Defense teams",
-  "all-nba": "ALL NBA - All-NBA teams",
-  "all-rookie-1st": "R1 - All-Rookie 1st team",
-  "all-rookie-2nd": "R2 - All-Rookie 2nd team",
-  "all-star": "AS - All-Star selections",
-  "all-star-mvp": "ASM - All-Star MVPs",
-  assists: "AST - Assist titles",
-  blocks: "BLK - Block titles",
-  dpoy: "DPOY - Defensive Player of the Year",
-  "sixth-man": "6MOY - Sixth Man of the Year",
-  fmvp: "FMVP - Finals MVP",
-  mvp: "MVP - Most Valuable Player",
-  "most-improved": "MIP - Most Improved Player",
-  rebounds: "REB - Rebound titles",
-  rings: "RING - Championships",
-  roy: "ROY - Rookie of the Year",
-  scoring: "SCO - Scoring titles",
-  seasons: "YRS - Seasons played",
-  steals: "STL - Steal titles",
+  "all-defense": "All-Defense teams",
+  "all-nba": "All-NBA teams",
+  "all-rookie-1st": "All-Rookie 1st team",
+  "all-rookie-2nd": "All-Rookie 2nd team",
+  "all-star": "All-Star selections",
+  "all-star-mvp": "All-Star MVPs",
+  assists: "Assist Champions",
+  blocks: "Block Champions",
+  dpoy: "Defensive Player of the Year",
+  "sixth-man": "6MOYSixth Man of the Year",
+  fmvp: "Finals MVP",
+  mvp: "Most Valuable Player",
+  "most-improved": "Most Improved Player",
+  rebounds: "Rebound Champions",
+  rings: "Championships",
+  roy: "Rookie of the Year",
+  scoring: "Scoring Champions",
+  seasons: "Seasons played",
+  steals: "Steal Champions",
 };
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
 const SEASON_TIERS: SeasonTier[] = [
@@ -386,7 +387,7 @@ const SEASON_TIERS: SeasonTier[] = [
     description: "Opposing teams are resting their starters against you and still winning by 30. Your mascot has more trade value than half the roster.",
   },
   {
-    minScore: 0,
+    minScore: 1,
     minWins: 1,
     maxWins: 4,
     tier: "F (The Basement Dwellers)",
@@ -1024,7 +1025,7 @@ function buildBoxScoreAchievements(block: ClassicPointBlock | undefined) {
 }
 
 function buildStocksAchievement(block: ClassicPointBlock) {
-  return { id: "stocks", value: stocksValue(block), label: "STOCKS", title: "Stocks - Stls + Blks" };
+  return { id: "stocks", value: stocksValue(block), label: "STOCKS", title: "Stls + Blks" };
 }
 
 function buildMixedStatAchievements(
@@ -1038,15 +1039,15 @@ function buildMixedStatAchievements(
   }
 
   return [
-    { id: "pra", value: compactPraValue(block), label: "P/R/A", title: "PRA - Pts + Rebs + Asts" },
+    { id: "pra", value: compactPraValue(block), label: "P/R/A", title: "Pts + Rebs + Asts" },
     buildStocksAchievement(block),
     {
       id: "ts-star",
       value: tsHybridPercentValue(player, selection, block, statsEngineConfig),
       label: "TS*",
-      title: "TS* - TS+ & TS% combined",
+      title: "TS+ & TS% combined",
     },
-    { id: "ws-48", value: ws48Value(block.stats?.ws_48), label: "WS/48", title: "WS/48 - Win shares per 48 minutes" },
+    { id: "ws-48", value: ws48Value(block.stats?.ws_48), label: "WS/48", title: "Win shares per 48 minutes" },
   ];
 }
 
@@ -1181,7 +1182,7 @@ function buildAchievementTotals(slots: LineupSlot[], statsEngineConfig: StatsEng
             id: "avg-ts-star",
             value: `${Math.round(avgTsStar)}%`,
             label: "AVG TS*",
-            title: "AVG TS* - average TS+ & TS% combined",
+            title: "Avg TS+ & TS% combined",
           },
         ]
       : []),
@@ -1191,7 +1192,7 @@ function buildAchievementTotals(slots: LineupSlot[], statsEngineConfig: StatsEng
             id: "avg-ws-48",
             value: ws48Value(avgWs48),
             label: "AVG WS/48",
-            title: "AVG WS/48 - average win shares per 48 minutes",
+            title: "Avg win shares per 48 minutes",
           },
         ]
       : []),
@@ -1337,6 +1338,10 @@ const classicCourtConfig = {
   scoreLabel: "Classic Score",
   resultStorageKey: "nba82_classic_result",
   resultsPath: "/classic/results",
+  howTo: {
+    content: CLASSIC_HOW_TO,
+    storageKey: HOW_TO_STORAGE_KEYS.classic,
+  },
   seasonTiers: SEASON_TIERS,
   usesStatsEngineConfig: true,
   courtAchievementLimit: 5,

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import HowToOverlay from "./HowToOverlay";
+import { HOME_HOW_TO, HOW_TO_STORAGE_KEYS } from "./howToContent";
 
 const GAME_MODES = [
   {
@@ -68,6 +70,7 @@ export default function LandingPage() {
           )}
         </div>
       </section>
+      <HowToOverlay content={HOME_HOW_TO} storageKey={HOW_TO_STORAGE_KEYS.home} />
     </main>
   );
 }
