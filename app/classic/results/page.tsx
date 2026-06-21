@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { teamThemeStyle } from "../teamStyles";
+import { teamThemeStyle } from "../../all-time/teamStyles";
 
 type Position = "PG" | "SG" | "SF" | "PF" | "C";
 type Achievement = { id: string; value: string; label: string; title?: string };
@@ -34,8 +34,8 @@ type ResultPlayer = {
   achievements: Achievement[];
   positionBonus?: PositionBonus;
 };
-type AllTimeResultPayload = {
-  mode: "all-time";
+type ClassicResultPayload = {
+  mode: "classic";
   selectedTeam: string;
   selectedEraLabel: string;
   simulationResult: SeasonProjection;
@@ -43,28 +43,34 @@ type AllTimeResultPayload = {
   totals: Achievement[];
 };
 
-const ALL_TIME_RESULT_STORAGE_KEY = "nba82_all_time_result";
+const CLASSIC_RESULT_STORAGE_KEY = "nba82_classic_result";
 const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
-  "all-defense": "DEF - All-Defense teams",
-  "all-nba": "ALL NBA - All-NBA teams",
-  "all-rookie-1st": "R1 - All-Rookie 1st team",
-  "all-rookie-2nd": "R2 - All-Rookie 2nd team",
-  "all-star": "AS - All-Star selections",
-  "all-star-mvp": "ASM - All-Star MVPs",
-  assists: "AST - Assist titles",
-  blocks: "BLK - Block titles",
-  dpoy: "DPOY - Defensive Player of the Year",
-  "sixth-man": "6MOY - Sixth Man of the Year",
-  fmvp: "FMVP - Finals MVP",
-  goat: "GOAT - all-time rank",
-  mvp: "MVP - Most Valuable Player",
+  "all-defense": "All-Defense teams",
+  "all-nba": "All-NBA teams",
+  "all-rookie-1st": "All-Rookie 1st team",
+  "all-rookie-2nd": "All-Rookie 2nd team",
+  "all-star": "All-Star selections",
+  "all-star-mvp": "All-Star MVPs",
+  assists: "Assist Champions",
+  "avg-ts-star": "Avg TS+ & TS% combined",
+  "avg-ws-48": "Avg win shares per 48",
+  blocks: "Block Champions",
+  dpoy: "Defensive Player of the Year",
+  "sixth-man": "Sixth Man of the Year",
+  fmvp: "Finals MVP",
+  mvp: "Most Valuable Player",
   "most-improved": "MIP - Most Improved Player",
-  rebounds: "REB - Rebound titles",
-  rings: "RING - Championships",
-  roy: "ROY - Rookie of the Year",
-  scoring: "SCO - Scoring titles",
-  seasons: "YRS - Seasons played",
-  steals: "STL - Steal titles",
+  pra: "Pts + Rebs + Asts",
+  rebounds: "Rebound Champions",
+  rings: "Championships",
+  roy: "Rookie of the Year",
+  scoring: "Scoring Champions",
+  seasons: "Seasons played",
+  steals: "Steal Champions",
+  stocks: "Stocks - Stls + Blks",
+  "ts-plus": "Era-adjusted TS%",
+  "ts-star": "TS+ & TS% combined",
+  "ws-48": "Win shares per 48",
 };
 
 function achievementTitle(achievement: Achievement) {
@@ -98,23 +104,23 @@ function formatBoostPercent(multiplier: number) {
 
 function readStoredResult() {
   try {
-    const raw = sessionStorage.getItem(ALL_TIME_RESULT_STORAGE_KEY);
+    const raw = sessionStorage.getItem(CLASSIC_RESULT_STORAGE_KEY);
 
     if (!raw) {
       return null;
     }
 
-    const payload = JSON.parse(raw) as AllTimeResultPayload;
+    const payload = JSON.parse(raw) as ClassicResultPayload;
 
-    return payload.mode === "all-time" && payload.simulationResult && Array.isArray(payload.lineup) ? payload : null;
+    return payload.mode === "classic" && payload.simulationResult && Array.isArray(payload.lineup) ? payload : null;
   } catch {
     return null;
   }
 }
 
-export default function AllTimeResultsPage() {
+export default function ClassicResultsPage() {
   const router = useRouter();
-  const [payload, setPayload] = useState<AllTimeResultPayload | null>(null);
+  const [payload, setPayload] = useState<ClassicResultPayload | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -126,13 +132,13 @@ export default function AllTimeResultsPage() {
     return () => window.clearTimeout(timeout);
   }, []);
 
-  function goToAllTime() {
-    router.push("/all-time");
+  function goToClassic() {
+    router.push("/classic");
   }
 
   function buildAnother() {
-    sessionStorage.removeItem(ALL_TIME_RESULT_STORAGE_KEY);
-    router.push("/all-time");
+    sessionStorage.removeItem(CLASSIC_RESULT_STORAGE_KEY);
+    router.push("/classic");
   }
 
   if (!loaded) {
@@ -147,13 +153,13 @@ export default function AllTimeResultsPage() {
             <Link className="season-result-logo" href="/" aria-label="Go to home">
               82-0
             </Link>
-            <h1>All Time Results</h1>
+            <h1>Classic Results</h1>
           </header>
 
           <section className="season-result-empty">
             <p>No simulated season found.</p>
-            <button type="button" onClick={goToAllTime}>
-              Build All Time Team
+            <button type="button" onClick={goToClassic}>
+              Build Classic Team
             </button>
           </section>
         </div>
@@ -175,7 +181,7 @@ export default function AllTimeResultsPage() {
 
         <section className="season-result-card">
           <div className="season-result-hero">
-            <p className="season-result-mode">All Time Mode</p>
+            <p className="season-result-mode">Classic Mode</p>
             <p className="season-result-kicker">Projected Record</p>
             <p className="season-result-record">
               {simulationResult.wins}
@@ -194,7 +200,7 @@ export default function AllTimeResultsPage() {
           <button
             className="h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1]"
             type="button"
-            onClick={goToAllTime}
+            onClick={goToClassic}
           >
             Back to Court
           </button>
@@ -313,7 +319,7 @@ function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
       {achievements.map((achievement) => (
         <span
           aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
-          className="achievement-stat flex-shrink-0"
+          className={`achievement-stat achievement-stat-${achievement.id} flex-shrink-0`}
           data-tooltip={achievementTitle(achievement)}
           key={achievement.id}
           title={achievementTitle(achievement)}

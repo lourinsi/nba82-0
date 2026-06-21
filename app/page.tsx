@@ -1,4 +1,6 @@
 import Link from "next/link";
+import HowToOverlay from "./HowToOverlay";
+import { HOME_HOW_TO, HOW_TO_STORAGE_KEYS } from "./howToContent";
 
 const GAME_MODES = [
   {
@@ -9,10 +11,25 @@ const GAME_MODES = [
     enabled: true,
   },
   {
+    title: "Legacy Engine",
+    status: "Simulator",
+    href: "/legacy-engine",
+    description: "Tune accolade weights and the Pro-Peak curve in real time.",
+    enabled: true,
+  },
+  {
+    title: "Stats Engine",
+    status: "Simulator",
+    href: "/stats-engine",
+    description: "Tune era-relative stats, TS hybrid, and WS/48 multipliers.",
+    enabled: true,
+  },
+  {
     title: "Classic",
-    status: "Coming Soon",
+    status: "Playable",
+    href: "/classic",
     description: "The streamlined 82-0 draft format.",
-    enabled: false,
+    enabled: true,
   },
   {
     title: "You Know Ball",
@@ -27,9 +44,9 @@ export default function LandingPage() {
     <main className="landing-page">
       <section className="landing-shell">
         <header className="landing-header">
-          <div className="season-result-logo" aria-hidden="true">
+          <Link className="season-result-logo" href="/" aria-label="Go to home">
             82-0
-          </div>
+          </Link>
           <h1>Can you go 82-0?</h1>
         </header>
 
@@ -53,6 +70,7 @@ export default function LandingPage() {
           )}
         </div>
       </section>
+      <HowToOverlay content={HOME_HOW_TO} storageKey={HOW_TO_STORAGE_KEYS.home} />
     </main>
   );
 }
