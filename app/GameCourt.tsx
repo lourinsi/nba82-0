@@ -750,7 +750,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
   const toggleLightMode = useCallback(() => setStoredLightMode(!lightMode), [lightMode]);
-  const adjustedStatsEnabled = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => true);
+  const adjustedStatsEnabled = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => false);
   const showAdjustedStats = supportsAdjustedStats && adjustedStatsEnabled;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [, setStatus] = useState("Ready");
@@ -763,10 +763,13 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
   useEffect(() => {
     const controller = new AbortController();
+    let active = true;
 
     async function loadPlayers() {
       try {
-        setLoading(true);
+        if (active) {
+          setLoading(true);
+        }
         const response = await fetch(`${API_BASE_URL}/api/players`, {
           cache: "no-store",
           headers: {
@@ -780,22 +783,31 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
         }
 
         const data = (await response.json()) as Player[];
-        setPlayers(data);
-        setError(null);
+        if (active) {
+          setPlayers(data);
+          setError(null);
+        }
       } catch (fetchError) {
         if (fetchError instanceof DOMException && fetchError.name === "AbortError") {
           return;
         }
 
-        setError(fetchError instanceof Error ? fetchError.message : "Unable to fetch players");
+        if (active) {
+          setError(fetchError instanceof Error ? fetchError.message : "Unable to fetch players");
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     }
 
     loadPlayers();
 
-    return () => controller.abort();
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -1360,6 +1372,27 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
   function handleCourtSlotSelect(position: Position) {
     setMobileMoveSource(null);
+
+    if (positionPickerPlayer && !isMobileViewport) {
+      const assignablePositions = rosterAssignablePositions(positionPickerPlayer);
+
+      if (!assignablePositions.includes(position)) {
+        const slot = lineup[position];
+        const playsPosition = positionPickerPlayer.positions.includes(position);
+        const detail = slot
+          ? `${position} is already filled.`
+          : playsPosition
+            ? `${position} is not available right now.`
+            : `${positionPickerPlayer.name} does not play ${position}.`;
+
+        setStatus(detail);
+        return;
+      }
+
+      choosePositionForPicker(position);
+      return;
+    }
+
     setPositionPickerPlayer(null);
 
     if (!isAdmin && lineup[position]) {
@@ -1466,6 +1499,10 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     }
 
     setPositionPickerPlayer(player);
+    setMobileMoveSource(null);
+    setDraggedPlayerId(null);
+    setDraggedFromPosition(null);
+    setStatus(`Select a position for ${player.name}. True-position picks score higher.`);
   }
 
   function choosePositionForPicker(position: Position) {
@@ -1832,6 +1869,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
     setSelectedSlot(null);
     setMobileMoveSource(null);
+    setRosterSearch("");
     setDraggedPlayerId(null);
     setDraggedFromPosition(null);
     setSpinningTarget(target);
@@ -1868,6 +1906,10 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   }
 
   const positionPickerAssignablePositions = positionPickerPlayer ? rosterAssignablePositions(positionPickerPlayer) : [];
+  const desktopPositionPickerPlayer = !isMobileViewport ? positionPickerPlayer : null;
+  const desktopPositionPickerTooltip = desktopPositionPickerPlayer
+    ? `Select a position for ${desktopPositionPickerPlayer.name}. True-position picks score higher.`
+    : null;
   const renderAuthPanel = (className = "") => (
     <form
       className={`game-auth-panel ${className} grid w-[280px] max-w-[calc(100vw-2rem)] gap-3 rounded-lg border border-white/12 bg-[#202431] p-4 shadow-2xl shadow-black/35`}
@@ -2090,7 +2132,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                 </div>
 
                 <p className="roster-count mt-3 text-sm font-semibold text-[#cfd3df]">
-                  {filteredPlayers.length} players available
+                  {loading ? "Loading players..." : `${filteredPlayers.length} players available`}
                 </p>
 
                 {showPublicRosterSpinCta ? (
@@ -2220,6 +2262,9 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                 canDrop={draggedPlayer ? dropStatuses[position] !== "blocked" : false}
                 blocked={Boolean(draggedPlayer && dropStatuses[position] === "blocked")}
                 swapTarget={dropStatuses[position] === "swap"}
+                placementActive={Boolean(desktopPositionPickerPlayer)}
+                placementAssignable={positionPickerAssignablePositions.includes(position)}
+                placementPrimary={desktopPositionPickerPlayer?.primary_position === position}
                 achievementLimit={courtAchievementLimit}
                 badgeScoreWeights={badgeScoreWeights}
                 buildPlayerAchievements={buildPlayerAchievements}
@@ -2234,6 +2279,11 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
               />
             ))}
           </div>
+          {desktopPositionPickerTooltip ? (
+            <div className="court-placement-tooltip" role="status">
+              {desktopPositionPickerTooltip}
+            </div>
+          ) : null}
 
           {isAdmin ? (
             <div className="game-score-panel flex flex-col gap-3 rounded-lg border border-[#ff8a2a]/25 bg-[#202431] p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -2254,7 +2304,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
         </section>
       </section>
 
-      {positionPickerPlayer ? (
+      {positionPickerPlayer && isMobileViewport ? (
         <div
           aria-labelledby="position-picker-title"
           aria-modal="true"
@@ -2795,6 +2845,9 @@ function CourtSlot({
   canDrop,
   blocked,
   swapTarget,
+  placementActive,
+  placementAssignable,
+  placementPrimary,
   onSelect,
   onPlayerDragEnd,
   onPlayerDragStart,
@@ -2819,6 +2872,9 @@ function CourtSlot({
   canDrop: boolean;
   blocked: boolean;
   swapTarget: boolean;
+  placementActive: boolean;
+  placementAssignable: boolean;
+  placementPrimary: boolean;
   onSelect: () => void;
   onPlayerDragEnd: (event: DragEvent<HTMLButtonElement>) => void;
   onPlayerDragStart: (event: DragEvent<HTMLButtonElement>, player: Player) => void;
@@ -2839,6 +2895,7 @@ function CourtSlot({
   const courtBadgeSummary = courtBadgeAchievements.length
     ? `, ${courtBadgeAchievements.map((achievement) => `${achievement.value} ${achievementTitle(achievement)}`).join(", ")}`
     : "";
+  const placementSummary = placementActive ? (placementAssignable ? ", available position" : ", unavailable position") : "";
 
   return (
     <button
@@ -2846,10 +2903,15 @@ function CourtSlot({
         player ? "court-slot-filled" : ""
       } ${player && !canDragPlayer ? "court-slot-locked" : ""} ${canDrop ? "court-slot-can-drop" : ""} ${swapTarget ? "court-slot-swap-target" : ""} ${
         blocked ? "court-slot-blocked" : ""
+      } ${placementActive ? "court-slot-placement-mode" : ""} ${
+        placementAssignable ? "court-slot-placement-target" : ""
+      } ${placementAssignable && placementPrimary ? "court-slot-placement-primary" : ""} ${
+        placementActive && !placementAssignable ? "court-slot-placement-unavailable" : ""
       }`}
       type="button"
       aria-grabbed={player ? undefined : false}
-      aria-label={player ? `${player.name}, ${position}${courtBadgeSummary}` : `${position} slot`}
+      aria-label={player ? `${player.name}, ${position}${courtBadgeSummary}${placementSummary}` : `${position} slot${placementSummary}`}
+      aria-disabled={placementActive && !placementAssignable ? true : undefined}
       data-player-name={player?.name}
       draggable={canDragPlayer && Boolean(player)}
       style={slot ? teamThemeStyle(slot.selection.team) : undefined}

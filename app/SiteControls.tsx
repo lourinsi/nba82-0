@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
+import { Moon, RotateCcw, Sun } from "lucide-react";
 import {
   ADMIN_SESSION_CHANGE_EVENT,
   adjustedStatsSnapshot,
@@ -58,12 +59,12 @@ const ROUTE_GUIDES: Record<string, RouteGuide> = {
 };
 
 const MENU_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/all-time", label: "All Time" },
-  { href: "/classic", label: "Classic" },
-  { href: "/classic/you-know-ball", label: "You Know Ball" },
-  { href: "/legacy-engine", label: "Legacy Engine" },
-  { href: "/stats-engine", label: "Stats Engine" },
+  { href: "/", label: "Home", adminOnly: false },
+  { href: "/classic", label: "Classic", adminOnly: false },
+  { href: "/classic/you-know-ball", label: "You Know Ball", adminOnly: false },
+  { href: "/all-time", label: "All Time", adminOnly: false },
+  { href: "/legacy-engine", label: "Legacy Engine", adminOnly: true },
+  { href: "/stats-engine", label: "Stats Engine", adminOnly: true },
 ] as const;
 
 function normalizePathname(pathname: string | null) {
@@ -103,12 +104,13 @@ export default function SiteControls() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
   const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
-  const adjustedStats = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => true);
+  const adjustedStats = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => false);
   const tipsEnabled = useSyncExternalStore(
     subscribeToHowToState,
     () => howToTipsEnabledSnapshot(GUIDE_STORAGE_KEYS),
     () => false,
   );
+  const visibleMenuLinks = MENU_LINKS.filter((link) => !link.adminOnly || isAdmin);
 
   useEffect(() => {
     document.documentElement.classList.toggle("site-light-mode", lightMode);
@@ -289,7 +291,7 @@ export default function SiteControls() {
               type="button"
               onClick={toggleLightMode}
             >
-              <IconSun />
+              {lightMode ? <Sun className="site-icon" /> : <Moon className="site-icon" />}
             </button>
             {gameHeaderState?.showReset ? (
               <button
@@ -299,7 +301,7 @@ export default function SiteControls() {
                 type="button"
                 onClick={() => requestGameHeaderAction("reset")}
               >
-                <IconReset />
+                <RotateCcw />
               </button>
             ) : null}
             <button
@@ -352,7 +354,7 @@ export default function SiteControls() {
             </header>
 
             <nav className="site-menu-list" aria-label="Primary">
-              {MENU_LINKS.map((link) => (
+              {visibleMenuLinks.map((link) => (
                 <Link
                   className="site-menu-item"
                   href={link.href}
@@ -453,28 +455,10 @@ export default function SiteControls() {
   );
 }
 
-function IconSun() {
-  return (
-    <svg aria-hidden="true" className="site-icon" fill="none" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" />
-    </svg>
-  );
-}
-
 function IconMenu() {
   return (
     <svg aria-hidden="true" className="site-icon" fill="none" viewBox="0 0 24 24">
       <path d="M4 7h16M4 12h16M4 17h16" />
-    </svg>
-  );
-}
-
-function IconReset() {
-  return (
-    <svg aria-hidden="true" className="site-icon" fill="none" viewBox="0 0 24 24">
-      <path d="M3 8V3h5" />
-      <path d="M3.8 13a8.2 8.2 0 1 0 2.4-5.8L3 10.4" />
     </svg>
   );
 }
