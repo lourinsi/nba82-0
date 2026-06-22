@@ -722,6 +722,8 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const courtRef = useRef<HTMLDivElement | null>(null);
   const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resultNavigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const calculatingResultsRef = useRef(false);
   const openingAutoSpinStartedAtRef = useRef<number | null>(null);
   const gameHeaderActionRef = useRef<(action: GameHeaderAction) => void>(() => {});
   const [players, setPlayers] = useState<Player[]>(() => getCachedPlayers<Player>() ?? []);
@@ -761,6 +763,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(() => !getCachedPlayers<Player>());
+  const [calculatingResults, setCalculatingResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTipIndex, setActiveTipIndex] = useState(0);
   const activeTip = GAME_TIPS[activeTipIndex] ?? GAME_TIPS[0];
@@ -921,6 +924,10 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       if (spinTimeoutRef.current) {
         clearTimeout(spinTimeoutRef.current);
       }
+
+      if (resultNavigationTimeoutRef.current) {
+        clearTimeout(resultNavigationTimeoutRef.current);
+      }
     },
     [],
   );
@@ -1044,7 +1051,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   useEffect(() => {
     setGameHeaderState({
       eyebrow: gameHeaderEyebrow,
-      resetDisabled: !authChecked || isSpinning,
+      resetDisabled: !authChecked || isSpinning || calculatingResults,
       resetLabel: isAdmin ? "Clear lineup" : "Reset draft",
       showAdjustedStatsToggle: supportsAdjustedStats && mode === "classic",
       showReset: true,
@@ -1052,6 +1059,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     });
   }, [
     authChecked,
+    calculatingResults,
     gameHeaderEyebrow,
     gameHeaderTitle,
     isAdmin,
@@ -1227,51 +1235,71 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const eraTileSpinning = spinningTarget === "all" || spinningTarget === "era";
 
   const simulateSeason = useCallback(() => {
+    if (calculatingResultsRef.current) {
+      return;
+    }
+
     if (!lineupComplete) {
       setStatus("Fill all five court slots before simulating.");
       return;
     }
 
-    const result = projectSeasonRecord(teamLegacyScore, lineupHasStephCurry, seasonTiers);
-    const payload: GameResultPayload = {
-      mode,
-      selectedTeam,
-      selectedEraLabel: fullEraLabel(activeEra),
-      resultModeLabel,
-      returnPath,
-      simulationResult: result,
-      lineup: lineupEntries.map(({ position, player, selection }) => {
-        const resultAchievements = (adjusted: boolean) =>
-          buildResultAchievements
-            ? buildResultAchievements(player, selection, statsEngineConfig, adjusted)
-            : buildPlayerAchievements(player, selection, statsEngineConfig, adjusted);
-        const originalAchievements = resultAchievements(false);
-        const adjustedAchievements = supportsAdjustedStats ? resultAchievements(true) : originalAchievements;
+    calculatingResultsRef.current = true;
+    setCalculatingResults(true);
+    setStatus("Calculating results...");
 
-        return {
-          position,
-          player: {
-            id: player.id,
-            name: player.name,
-          },
-          selection,
-          scoreContribution: lineupSlotScore(lineup[position], position, statsEngineConfig),
-          achievements:
-            supportsAdjustedStats && showAdjustedStats ? adjustedAchievements : originalAchievements,
-          originalAchievements: supportsAdjustedStats ? originalAchievements : undefined,
-          adjustedAchievements: supportsAdjustedStats ? adjustedAchievements : undefined,
-          positionBonus: positionBonusForSlot(lineup[position], position, statsEngineConfig),
+    if (resultNavigationTimeoutRef.current) {
+      clearTimeout(resultNavigationTimeoutRef.current);
+    }
+
+    resultNavigationTimeoutRef.current = setTimeout(() => {
+      try {
+        const result = projectSeasonRecord(teamLegacyScore, lineupHasStephCurry, seasonTiers);
+        const payload: GameResultPayload = {
+          mode,
+          selectedTeam,
+          selectedEraLabel: fullEraLabel(activeEra),
+          resultModeLabel,
+          returnPath,
+          simulationResult: result,
+          lineup: lineupEntries.map(({ position, player, selection }) => {
+            const resultAchievements = (adjusted: boolean) =>
+              buildResultAchievements
+                ? buildResultAchievements(player, selection, statsEngineConfig, adjusted)
+                : buildPlayerAchievements(player, selection, statsEngineConfig, adjusted);
+            const originalAchievements = resultAchievements(false);
+            const adjustedAchievements = supportsAdjustedStats ? resultAchievements(true) : originalAchievements;
+
+            return {
+              position,
+              player: {
+                id: player.id,
+                name: player.name,
+              },
+              selection,
+              scoreContribution: lineupSlotScore(lineup[position], position, statsEngineConfig),
+              achievements:
+                supportsAdjustedStats && showAdjustedStats ? adjustedAchievements : originalAchievements,
+              originalAchievements: supportsAdjustedStats ? originalAchievements : undefined,
+              adjustedAchievements: supportsAdjustedStats ? adjustedAchievements : undefined,
+              positionBonus: positionBonusForSlot(lineup[position], position, statsEngineConfig),
+            };
+          }),
+          totals: lineupAchievementTotals,
+          originalTotals: supportsAdjustedStats ? originalLineupAchievementTotals : undefined,
+          adjustedTotals: supportsAdjustedStats ? adjustedLineupAchievementTotals : undefined,
+          showAdjustedStats: supportsAdjustedStats ? showAdjustedStats : undefined,
         };
-      }),
-      totals: lineupAchievementTotals,
-      originalTotals: supportsAdjustedStats ? originalLineupAchievementTotals : undefined,
-      adjustedTotals: supportsAdjustedStats ? adjustedLineupAchievementTotals : undefined,
-      showAdjustedStats: supportsAdjustedStats ? showAdjustedStats : undefined,
-    };
 
-    sessionStorage.setItem(resultStorageKey, JSON.stringify(payload));
-    setStatus(`${result.tier}: ${result.wins}-${result.losses}`);
-    router.push(resultsPath);
+        sessionStorage.setItem(resultStorageKey, JSON.stringify(payload));
+        setStatus(`${result.tier}: ${result.wins}-${result.losses}`);
+        router.push(resultsPath);
+      } catch {
+        calculatingResultsRef.current = false;
+        setCalculatingResults(false);
+        setStatus("Unable to calculate results. Try again.");
+      }
+    }, 0);
   }, [
     activeEra,
     adjustedLineupAchievementTotals,
@@ -1302,6 +1330,10 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const hasAutoSimulated = useRef(false);
 
   useEffect(() => {
+    if (calculatingResults) {
+      return;
+    }
+
     if (lineupComplete && !isAdmin && !isSpinning) {
       if (!hasAutoSimulated.current) {
         hasAutoSimulated.current = true;
@@ -1310,7 +1342,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     } else {
       hasAutoSimulated.current = false;
     }
-  }, [lineupComplete, isAdmin, isSpinning, simulateSeason]);
+  }, [calculatingResults, lineupComplete, isAdmin, isSpinning, simulateSeason]);
 
   function enterAdminMode() {
     setIsAdmin(true);
@@ -2127,6 +2159,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
   return (
     <main
+      aria-busy={calculatingResults}
       className={`game-page game-page-${mode} ${
         lightMode ? "game-page-light" : "game-page-dark"
       } min-h-screen bg-[#15171f] text-[#f4f2ec]`}
@@ -2497,11 +2530,11 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
               </div>
               <button
                 className="simulate-button h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#8f96a7]"
-                disabled={!lineupComplete || isSpinning}
+                disabled={!lineupComplete || isSpinning || calculatingResults}
                 type="button"
                 onClick={simulateSeason}
               >
-                Simulate Season
+                {calculatingResults ? "Calculating..." : "Simulate Season"}
               </button>
             </div>
           ) : null}
@@ -2613,6 +2646,8 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       ) : null}
 
       {authPanelOpen ? renderAuthPanel("game-auth-panel-mobile") : null}
+
+      {calculatingResults ? <CalculatingResultsOverlay tip={activeTip} /> : null}
 
       <footer className="mobile-game-footer" aria-label="Mobile game navigation">
         <nav className="mobile-lineup-rail" aria-label="Lineup positions">
@@ -2963,6 +2998,22 @@ function RosterTipCard({ className = "", tip }: { className?: string; tip: GameT
         <span className="roster-tip-kicker">{tip.eyebrow}</span>
         <span className="roster-tip-copy">{tip.text}</span>
       </span>
+    </div>
+  );
+}
+
+function CalculatingResultsOverlay({ tip }: { tip: GameTip }) {
+  return (
+    <div className="results-calculating-layer" role="status" aria-live="polite">
+      <div className="results-calculating-card">
+        <span className="results-calculating-spinner" aria-hidden="true" />
+        <span className="results-calculating-kicker">Season Simulation</span>
+        <strong>Calculating Results</strong>
+        <span className="roster-tip-content" key={`${tip.eyebrow}-${tip.text}`}>
+          <span className="roster-tip-kicker">{tip.eyebrow}</span>
+          <span className="roster-tip-copy">{tip.text}</span>
+        </span>
+      </div>
     </div>
   );
 }
