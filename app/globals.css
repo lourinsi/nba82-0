@@ -3,6 +3,7 @@
 :root {
   --background: #15171f;
   --foreground: #f4f2ec;
+  --site-topbar-height: 58px;
 }
 
 @theme inline {
@@ -24,6 +25,525 @@ select {
   font: inherit;
 }
 
+.mobile-header-actions,
+.mobile-draw-row,
+.mobile-game-footer,
+.mobile-menu-layer,
+.game-auth-panel-mobile {
+  display: none;
+}
+
+.mobile-icon {
+  display: block;
+  height: 1.35em;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 1.35em;
+}
+
+.site-topbar {
+  backdrop-filter: blur(18px);
+  background: rgba(20, 24, 34, 0.94);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  color: #f4f2ec;
+  position: sticky;
+  top: 0;
+  z-index: 150;
+}
+
+.site-topbar-inner {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 auto;
+  min-height: var(--site-topbar-height);
+  padding: 0 16px;
+  width: min(100%, 1320px);
+}
+
+.site-topbar-main {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.site-topbar-logo {
+  align-items: center;
+  border: 2px solid rgba(255, 111, 19, 0.82);
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-grid;
+  font-size: 0.98rem;
+  font-weight: 950;
+  height: 38px;
+  justify-items: center;
+  line-height: 1;
+  text-decoration: none;
+  width: 58px;
+}
+
+.site-game-status {
+  display: grid;
+  gap: 2px;
+  line-height: 1;
+  min-width: 0;
+}
+
+.site-game-status small {
+  color: #ff8a2a;
+  font-size: 0.58rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.site-game-status strong {
+  color: #f4f2ec;
+  font-size: 0.98rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-topbar-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.site-control-button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #d7dbe5;
+  cursor: pointer;
+  display: inline-grid;
+  height: 40px;
+  justify-items: center;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+  width: 40px;
+}
+
+.site-control-button:hover,
+.site-control-button:focus-visible,
+.site-control-button[aria-pressed="true"],
+.site-control-button[aria-expanded="true"] {
+  background: rgba(255, 138, 42, 0.15);
+  border-color: rgba(255, 138, 42, 0.5);
+  color: #ffffff;
+  outline: none;
+}
+
+.site-control-button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.site-reset-button {
+  color: #ffbf86;
+}
+
+.site-reset-button:hover,
+.site-reset-button:focus-visible {
+  background: rgba(255, 111, 19, 0.15);
+  border-color: rgba(255, 111, 19, 0.5);
+  color: #ffffff;
+}
+
+.site-adjusted-toggle-button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #f4f2ec;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  height: 40px;
+  justify-content: center;
+  min-width: 124px;
+  padding: 0 10px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.site-adjusted-toggle-button:hover,
+.site-adjusted-toggle-button:focus-visible {
+  background: rgba(255, 138, 42, 0.12);
+  border-color: rgba(255, 138, 42, 0.45);
+  outline: none;
+}
+
+.site-adjusted-toggle-button[aria-pressed="true"] {
+  background: rgba(49, 214, 161, 0.1);
+  border-color: rgba(49, 214, 161, 0.44);
+}
+
+.site-adjusted-toggle-copy {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  line-height: 1;
+}
+
+.site-adjusted-toggle-copy span {
+  color: #f4f2ec;
+  font-size: 0.62rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.site-adjusted-toggle-copy small {
+  color: #aeb4c2;
+  font-size: 0.56rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.site-adjusted-toggle-button[aria-pressed="true"] .stats-toggle-switch {
+  background: #31d6a1;
+  border-color: rgba(137, 240, 205, 0.72);
+}
+
+.site-adjusted-toggle-button[aria-pressed="true"] .stats-toggle-knob {
+  background: #15171f;
+  transform: translateX(20px);
+}
+
+.site-adjusted-toggle-button[aria-pressed="true"] .site-adjusted-toggle-copy small {
+  color: #89f0cd;
+}
+
+.site-icon {
+  display: block;
+  height: 1.26em;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 1.26em;
+}
+
+.site-menu-layer {
+  inset: 0;
+  position: fixed;
+  z-index: 170;
+}
+
+.site-menu-backdrop {
+  background: rgba(6, 8, 12, 0.58);
+  border: 0;
+  inset: 0;
+  position: absolute;
+}
+
+.site-menu-panel {
+  background: #1a1f2b;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  bottom: 0;
+  box-shadow: -22px 0 44px rgba(0, 0, 0, 0.32);
+  color: #f4f2ec;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  max-width: 390px;
+  overflow: auto;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: min(88vw, 390px);
+}
+
+.site-menu-header,
+.site-auth-header {
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 0 22px;
+}
+
+.site-menu-header h2,
+.site-auth-header h2,
+.site-menu-section h3 {
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.site-menu-close {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #cfd3df;
+  cursor: pointer;
+  display: grid;
+  height: 38px;
+  justify-items: center;
+  width: 38px;
+}
+
+.site-menu-list,
+.site-menu-section {
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px;
+}
+
+.site-menu-section {
+  align-content: start;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.site-menu-item {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  color: #f4f2ec;
+  cursor: pointer;
+  display: flex;
+  font-size: 0.94rem;
+  font-weight: 900;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.site-menu-item:hover,
+.site-menu-item:focus-visible {
+  background: rgba(255, 138, 42, 0.12);
+  border-color: rgba(255, 138, 42, 0.4);
+  outline: none;
+}
+
+.site-menu-toggle-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
+}
+
+.site-menu-toggle-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.site-menu-toggle-copy small {
+  color: #aeb4c2;
+  font-size: 0.68rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.site-menu-toggle-item[aria-pressed="true"] .stats-toggle-switch {
+  background: #31d6a1;
+  border-color: rgba(137, 240, 205, 0.72);
+}
+
+.site-menu-toggle-item[aria-pressed="true"] .stats-toggle-knob {
+  background: #15171f;
+  transform: translateX(20px);
+}
+
+.site-auth-popover {
+  background: #1a1f2b;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.34);
+  color: #f4f2ec;
+  position: fixed;
+  right: 14px;
+  top: calc(var(--site-topbar-height) + 10px);
+  width: min(360px, calc(100vw - 28px));
+  z-index: 165;
+}
+
+.site-auth-header {
+  min-height: 58px;
+  padding: 0 16px;
+}
+
+.site-auth-body {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.site-auth-body p {
+  color: #cfd3df;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.site-auth-body label {
+  color: #cfd3df;
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 950;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.site-auth-body input {
+  background: #242938;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #ffffff;
+  height: 42px;
+  outline: none;
+  padding: 0 12px;
+  text-transform: none;
+}
+
+.site-auth-body input:focus {
+  border-color: rgba(49, 214, 161, 0.7);
+  box-shadow: 0 0 0 3px rgba(49, 214, 161, 0.16);
+}
+
+.site-auth-error {
+  color: #ffbf86 !important;
+}
+
+.site-auth-submit {
+  background: #31d6a1;
+  border: 1px solid #31d6a1;
+  border-radius: 8px;
+  color: #15171f;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 950;
+  min-height: 42px;
+}
+
+.site-auth-submit:hover {
+  background: #65e8bf;
+}
+
+.site-auth-submit:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.site-light-mode body {
+  background: #e9eef5;
+  color: #172033;
+}
+
+.site-light-mode .site-topbar,
+.site-light-mode .site-menu-panel,
+.site-light-mode .site-auth-popover {
+  background: rgba(244, 247, 252, 0.98);
+  border-color: rgba(40, 49, 67, 0.16);
+  color: #1c2431;
+}
+
+.site-light-mode .site-topbar-logo,
+.site-light-mode .site-game-status strong,
+.site-light-mode .site-menu-header h2,
+.site-light-mode .site-auth-header h2,
+.site-light-mode .site-menu-section h3,
+.site-light-mode .site-menu-item {
+  color: #1c2431;
+}
+
+.site-light-mode .site-game-status small {
+  color: #b85a14;
+}
+
+.site-light-mode .site-control-button,
+.site-light-mode .site-adjusted-toggle-button,
+.site-light-mode .site-menu-item,
+.site-light-mode .site-auth-body input {
+  background: #e5ebf4;
+  border-color: rgba(43, 53, 72, 0.14);
+  color: #1c2431;
+}
+
+.site-light-mode .site-reset-button {
+  color: #8d3d15;
+}
+
+.site-light-mode .site-adjusted-toggle-copy span {
+  color: #1c2431;
+}
+
+.site-light-mode .site-menu-close {
+  color: #43506a;
+}
+
+.site-light-mode .site-auth-body p,
+.site-light-mode .site-auth-body label,
+.site-light-mode .site-adjusted-toggle-copy small,
+.site-light-mode .site-menu-toggle-copy small {
+  color: #536078;
+}
+
+.site-light-mode .site-adjusted-toggle-button[aria-pressed="true"] {
+  background: #d8efe8;
+  border-color: rgba(25, 145, 108, 0.44);
+}
+
+.site-light-mode .site-adjusted-toggle-button[aria-pressed="true"] .site-adjusted-toggle-copy small {
+  color: #0b7e60;
+}
+
+@media (max-width: 460px) {
+  .site-topbar-inner {
+    padding: 0 10px;
+  }
+
+  .site-topbar-actions {
+    gap: 6px;
+  }
+
+  .site-game-status {
+    display: none;
+  }
+
+  .site-adjusted-toggle-button {
+    min-width: 58px;
+    padding: 0 7px;
+  }
+
+  .site-adjusted-toggle-copy {
+    display: none;
+  }
+
+  .site-adjusted-toggle-switch {
+    height: 22px;
+    width: 40px;
+  }
+
+  .site-adjusted-toggle-switch .stats-toggle-knob {
+    height: 16px;
+    width: 16px;
+  }
+
+  .site-adjusted-toggle-button[aria-pressed="true"] .stats-toggle-knob {
+    transform: translateX(18px);
+  }
+}
+
 .landing-page {
   align-items: center;
   background:
@@ -31,7 +551,7 @@ select {
     linear-gradient(180deg, #1d222e 0%, #202637 48%, #151923 100%);
   color: #f4f2ec;
   display: flex;
-  min-height: 100vh;
+  min-height: calc(100svh - var(--site-topbar-height));
   padding: 28px 16px;
 }
 
@@ -139,7 +659,7 @@ select {
   inset: 0;
   padding: 24px;
   position: fixed;
-  z-index: 120;
+  z-index: 190;
 }
 
 .how-to-backdrop {
@@ -408,7 +928,7 @@ select {
   color: #f4f2ec;
   display: grid;
   grid-template-columns: minmax(286px, 360px) minmax(0, 1fr);
-  min-height: 100vh;
+  min-height: calc(100svh - var(--site-topbar-height));
 }
 
 .legacy-engine-page button {
@@ -448,9 +968,9 @@ select {
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  max-height: 100vh;
+  max-height: calc(100svh - var(--site-topbar-height));
   position: sticky;
-  top: 0;
+  top: var(--site-topbar-height);
 }
 
 .legacy-sidebar-header {
@@ -968,7 +1488,7 @@ select {
   color: #f4f2ec;
   display: grid;
   grid-template-columns: minmax(286px, 360px) minmax(0, 1fr);
-  min-height: 100vh;
+  min-height: calc(100svh - var(--site-topbar-height));
 }
 
 .stats-engine-page button {
@@ -1009,9 +1529,9 @@ select {
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  max-height: 100vh;
+  max-height: calc(100svh - var(--site-topbar-height));
   position: sticky;
-  top: 0;
+  top: var(--site-topbar-height);
 }
 
 .stats-sidebar-header {
@@ -2273,6 +2793,278 @@ select {
   max-width: 58px;
 }
 
+.achievement-badge-face {
+  display: none;
+}
+
+.game-page-classic .roster-player-card {
+  align-items: center;
+  gap: 16px;
+  grid-template-columns: minmax(154px, 0.82fr) minmax(0, 1.18fr);
+  min-height: 112px;
+  overflow: visible;
+  padding: 15px 16px 15px 18px;
+}
+
+.game-page-classic .player-card-info {
+  display: grid;
+  gap: 4px;
+}
+
+.game-page-classic .player-card-name {
+  font-size: 1rem;
+}
+
+.game-page-classic .player-card-positions {
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.game-page-classic .player-card-team {
+  color: color-mix(in srgb, var(--team-readable-secondary) 64%, #cfd3df);
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.game-page-classic .roster-player-card .achievement-strip {
+  display: grid;
+  gap: 10px 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  justify-content: stretch;
+  overflow: hidden;
+  padding: 0;
+  scrollbar-width: none;
+  white-space: normal;
+}
+
+.game-page-classic .roster-player-card .achievement-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.game-page-classic .roster-player-card .achievement-stat {
+  min-width: 0;
+  overflow: visible;
+}
+
+.game-page-classic .roster-player-card .achievement-stat-metric {
+  align-items: center;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-height: 34px;
+}
+
+.game-page-classic .roster-player-card .achievement-value {
+  color: #f4f2ec;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.game-page-classic .roster-player-card .achievement-label {
+  color: rgba(207, 211, 223, 0.78);
+  font-size: 0.56rem;
+  line-height: 1;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.game-page-classic .roster-player-card .achievement-stat-award {
+  align-items: center;
+  display: grid;
+  justify-items: center;
+  min-width: 28px;
+}
+
+.game-page-classic .roster-player-card .achievement-stat-award .achievement-value,
+.game-page-classic .roster-player-card .achievement-stat-award .achievement-label {
+  display: none;
+}
+
+.game-page-classic .roster-player-card .achievement-badge-face {
+  align-items: center;
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.52), transparent 34%),
+    linear-gradient(145deg, #5ba0ff, #173a72);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 999px;
+  box-shadow:
+    0 7px 13px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  color: #ffffff;
+  display: grid;
+  height: 24px;
+  justify-items: center;
+  line-height: 1;
+  position: relative;
+  width: 24px;
+}
+
+.achievement-badge-symbol {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
+}
+
+.achievement-badge-count {
+  color: #ffffff;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.52));
+  font-family: "Segoe Print", "Bradley Hand ITC", "Comic Sans MS", cursive;
+  font-size: 0.42rem;
+  font-weight: 800;
+  line-height: 1;
+  position: absolute;
+  right: -4px;
+  text-transform: uppercase;
+  top: -5px;
+  white-space: nowrap;
+}
+
+.game-page-classic .roster-player-card .court-achievement-badge-all-star-logo .achievement-badge-symbol,
+.game-page-classic .roster-player-card .court-achievement-badge-nba .achievement-badge-symbol,
+.game-page-classic .roster-player-card .court-achievement-badge-points .achievement-badge-symbol,
+.game-page-classic .roster-player-card .court-achievement-badge-assist .achievement-badge-symbol,
+.game-page-classic .roster-player-card .court-achievement-badge-rebound .achievement-badge-symbol,
+.game-page-classic .roster-player-card .court-achievement-badge-defense .achievement-badge-symbol,
+.game-page-classic .roster-player-card .court-achievement-badge-rookie .achievement-badge-symbol {
+  font-size: 0.4rem;
+}
+
+.game-page-classic .roster-mode-awards .achievement-strip {
+  gap: 10px;
+  grid-template-columns: repeat(3, 28px);
+  justify-content: end;
+}
+
+.game-page-classic .roster-mode-mixed {
+  margin-top: 10px;
+}
+
+.game-page-classic .roster-mode-mixed .achievement-strip {
+  overflow: visible;
+}
+
+.roster-feed-badges {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  left: 28px;
+  max-width: calc(100% - 56px);
+  overflow: visible;
+  position: absolute;
+  top: -12px;
+  white-space: nowrap;
+  z-index: 8;
+}
+
+.roster-feed-badges .court-achievement-badge {
+  height: 22px;
+  width: 22px;
+}
+
+.game-page-classic .roster-mode-awards {
+  min-height: 92px;
+}
+
+.game-page-classic .roster-mode-awards .achievement-strip {
+  display: flex;
+  gap: 20px;
+  justify-content: flex-start;
+  overflow-x: auto;
+  padding: 2px 4px 8px;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+.game-page-classic .roster-mode-awards .achievement-stat-award {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 44px;
+  position: static;
+}
+
+.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-badge-face {
+  display: none;
+}
+
+.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value,
+.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+  display: block;
+}
+
+.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+  color: #f4f2ec;
+  font-size: 1rem;
+}
+
+.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+  color: rgba(207, 211, 223, 0.78);
+  font-size: 0.56rem;
+}
+
+.game-page-classic .roster-player-card {
+  align-items: center;
+  gap: 16px;
+  grid-template-columns: minmax(170px, 0.8fr) minmax(0, 1.2fr);
+  min-height: 88px;
+  padding: 12px 16px 12px 18px;
+}
+
+.game-page-classic .roster-mode-mixed {
+  margin-top: 12px;
+}
+
+.game-page-classic .roster-player-card .achievement-strip,
+.game-page-classic .roster-mode-awards .achievement-strip {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 22px;
+  justify-content: flex-start;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 3px 2px 7px;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+.game-page-classic .roster-player-card .achievement-stat,
+.game-page-classic .roster-player-card .achievement-stat:nth-child(n + 9) {
+  display: grid;
+}
+
+.game-page-classic .roster-player-card .achievement-stat-metric,
+.game-page-classic .roster-player-card .achievement-stat-award {
+  flex: 0 0 auto;
+  gap: 4px;
+  min-height: 36px;
+  min-width: 54px;
+}
+
+.game-page-classic .roster-player-card .achievement-stat-pra {
+  min-width: 72px;
+}
+
+.game-page-classic .roster-mode-awards .achievement-stat-award {
+  min-width: 48px;
+}
+
+.game-page-classic .roster-player-card .achievement-value,
+.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+  font-size: 1rem;
+}
+
+.game-page-classic .roster-player-card .achievement-label,
+.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+  font-size: 0.56rem;
+}
+
 .achievement-strip {
   align-items: center;
   display: flex;
@@ -2335,7 +3127,7 @@ select {
     radial-gradient(circle at 50% 0%, rgba(47, 134, 255, 0.12), transparent 34rem),
     linear-gradient(180deg, #1d222e 0%, #202637 48%, #151923 100%);
   color: #f4f2ec;
-  min-height: 100vh;
+  min-height: calc(100svh - var(--site-topbar-height));
 }
 
 .season-result-shell {
@@ -2393,6 +3185,16 @@ select {
   display: grid;
   justify-items: center;
   text-align: center;
+}
+
+.season-result-hero-top,
+.season-result-record-block {
+  display: grid;
+  justify-items: center;
+}
+
+.season-result-score-summary {
+  display: none;
 }
 
 .season-result-mode {
@@ -2464,7 +3266,7 @@ select {
   border-radius: 8px;
   box-shadow: 0 20px 42px rgba(0, 0, 0, 0.22);
   margin-top: 14px;
-  overflow: hidden;
+  overflow: visible;
   padding: 14px;
 }
 
@@ -2489,6 +3291,14 @@ select {
   overflow: visible;
   padding: 16px 18px;
   position: relative;
+  z-index: 0;
+}
+
+.result-player-row:has(.result-award-badge:hover),
+.result-player-row:has(.result-award-badge:focus),
+.result-player-row:has(.result-award-badge:focus-visible),
+.result-player-row:has(.result-award-badge:active) {
+  z-index: 80;
 }
 
 .result-player-row::before {
@@ -2499,41 +3309,6 @@ select {
   position: absolute;
   top: 14px;
   width: 4px;
-}
-
-.result-player-score {
-  align-items: baseline;
-  color: #ffffff;
-  display: inline-flex;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
-  font-family: "Segoe Print", "Bradley Hand ITC", "Comic Sans MS", cursive;
-  gap: 3px;
-  left: 50px;
-  line-height: 1;
-  padding: 0;
-  pointer-events: none;
-  position: absolute;
-  text-transform: uppercase;
-  top: 5px;
-  transform: rotate(-8deg);
-  transform-origin: center;
-  white-space: nowrap;
-  z-index: 4;
-}
-
-.result-player-score span:first-child {
-  color: #ffffff;
-  font-size: 0.66rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.result-player-score span:last-child {
-  color: #ffffff;
-  font-size: 0.42rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  line-height: 1;
 }
 
 .result-player-row > .achievement-strip,
@@ -2580,30 +3355,110 @@ select {
   color: color-mix(in srgb, var(--team-accent) 82%, #ffffff);
 }
 
+.result-player-score {
+  align-items: baseline;
+  color: #ffffff;
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 7px;
+  text-transform: uppercase;
+}
+
+.result-player-score span:first-child {
+  font-size: 0.86rem;
+  font-weight: 950;
+}
+
+.result-player-score span:last-child {
+  color: rgba(244, 242, 236, 0.74);
+  font-size: 0.58rem;
+  font-weight: 900;
+}
+
+.result-accolade-badges {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  left: 18px;
+  max-width: none;
+  overflow: visible;
+  position: absolute;
+  top: -12px;
+  white-space: nowrap;
+  width: max-content;
+  z-index: 7;
+}
+
+.result-award-badge:nth-of-type(n + 9) {
+  display: none;
+}
+
+.result-award-badge {
+  cursor: help;
+}
+
+.result-award-badge:focus-visible {
+  outline: 2px solid rgba(49, 214, 161, 0.88);
+  outline-offset: 2px;
+}
+
+.result-badge-score {
+  align-items: baseline;
+  background: rgba(10, 12, 18, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  height: 22px;
+  line-height: 1;
+  padding: 5px 8px 4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.result-badge-score span:first-child {
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.result-badge-score span:last-child {
+  color: rgba(244, 242, 236, 0.78);
+  font-size: 0.48rem;
+  font-weight: 900;
+}
+
 .result-position-boost {
   align-items: center;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--team-accent) 82%, #fff5c8), #ffe27a);
-  border: 1px solid color-mix(in srgb, var(--team-accent) 62%, rgba(255, 255, 255, 0.5));
+  background: color-mix(in srgb, var(--team-primary) 18%, rgba(255, 255, 255, 0.05));
+  border: 1px solid color-mix(in srgb, var(--team-accent) 34%, rgba(255, 255, 255, 0.1));
   border-radius: 999px;
-  box-shadow:
-    0 10px 22px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  color: #15171f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: color-mix(in srgb, var(--team-accent) 76%, #ffffff);
   cursor: help;
   display: inline-flex;
-  font-size: 0.68rem;
-  font-weight: 950;
+  gap: 4px;
+  font-size: 0.58rem;
+  font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
-  min-height: 24px;
-  padding: 6px 9px;
+  min-height: 20px;
+  padding: 4px 7px;
   position: absolute;
-  right: 14px;
+  right: 12px;
   text-transform: uppercase;
-  top: -10px;
+  top: 9px;
   white-space: nowrap;
   z-index: 3;
+}
+
+.result-position-boost > span:first-child {
+  color: rgba(244, 242, 236, 0.66);
+}
+
+.result-position-boost > span:nth-child(2) {
+  color: #f4f2ec;
 }
 
 .result-position-boost:focus-visible {
@@ -2692,7 +3547,7 @@ select {
 .season-result-actions {
   display: grid;
   gap: 10px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
   margin: 26px 0 0;
 }
 
@@ -2725,6 +3580,82 @@ select {
   font-weight: 950;
   line-height: 1;
   padding: 13px 18px;
+}
+
+.season-result-page-light {
+  background:
+    radial-gradient(circle at 16% -12%, rgba(255, 111, 19, 0.13), transparent 24rem),
+    radial-gradient(circle at 88% 10%, rgba(49, 111, 184, 0.14), transparent 26rem),
+    linear-gradient(180deg, #d8e0ea 0%, #ccd6e2 54%, #c1ccd9 100%);
+  color: #17202d;
+}
+
+.season-result-page-light .season-result-header h1,
+.season-result-page-light .season-result-record {
+  color: #17202d;
+}
+
+.season-result-page-light .season-result-logo {
+  background:
+    radial-gradient(circle at 50% 8px, #ff8a2a 0 10px, transparent 11px),
+    linear-gradient(180deg, #eef3fa, #d7e0eb);
+  box-shadow: 0 10px 22px rgba(54, 68, 92, 0.16);
+  color: #1c2737;
+  text-shadow: none;
+}
+
+.season-result-page-light .season-result-mode {
+  background: rgba(47, 134, 255, 0.16);
+  color: #1f6fd8;
+}
+
+.season-result-page-light .season-result-kicker {
+  color: #607087;
+}
+
+.season-result-page-light .season-result-record span {
+  color: rgba(23, 32, 45, 0.36);
+}
+
+.season-result-page-light .season-result-tier {
+  color: #1f6fd8;
+}
+
+.season-result-page-light .season-result-tier span {
+  color: #4f5e73;
+}
+
+.season-result-page-light .season-result-description {
+  border-color: rgba(40, 52, 72, 0.14);
+  color: #25344a;
+}
+
+.season-result-page-light .season-result-board,
+.season-result-page-light .season-result-empty {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(218, 228, 241, 0.9)),
+    #d7e0eb;
+  border-color: rgba(40, 52, 72, 0.16);
+  box-shadow: 0 18px 36px rgba(54, 68, 92, 0.14);
+}
+
+.season-result-page-light .result-totals {
+  border-color: rgba(40, 52, 72, 0.14);
+}
+
+.season-result-page-light .result-totals .achievement-value,
+.season-result-page-light .result-totals-label span:first-child {
+  color: #182334;
+}
+
+.season-result-page-light .result-totals .achievement-label,
+.season-result-page-light .result-totals-label span:last-child,
+.season-result-page-light .season-result-empty p {
+  color: #405066;
+}
+
+.season-result-page-light .result-player-score {
+  color: #ffffff;
 }
 
 .court-blueprint {
@@ -2878,6 +3809,11 @@ select {
   transform: translate(-50%, 0);
 }
 
+.court-slot-filled:has(.court-achievement-badge:hover)::after {
+  opacity: 0;
+  transform: translate(-50%, -4px);
+}
+
 .court-slot-filled:active {
   cursor: grabbing;
 }
@@ -2927,6 +3863,7 @@ select {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
+  line-clamp: 1;
 }
 
 .court-slot-team {
@@ -2941,49 +3878,299 @@ select {
   white-space: nowrap;
 }
 
-.court-achievement-grid {
-  align-items: center;
-  display: grid;
-  gap: 2px;
-  justify-items: center;
-  width: 100%;
-}
-
-.court-achievement-row {
-  align-items: center;
+.court-achievement-badges {
+  align-items: flex-start;
   display: flex;
-  flex-wrap: nowrap;
-  gap: 3px;
-  justify-content: center;
-  min-width: 0;
-  text-align: center;
-  width: 100%;
+  gap: 6px;
+  justify-content: flex-end;
+  position: absolute;
+  right: 8px;
+  top: -12px;
+  z-index: 7;
 }
 
-.court-achievement-item {
-  align-items: baseline;
-  display: inline-flex;
-  gap: 1px;
-  min-width: 0;
-}
-
-.court-achievement-value,
-.court-achievement-label,
-.court-achievement-separator {
-  color: #cfd3df;
-  font-size: clamp(0.46rem, 0.62vw, 0.54rem);
-  font-weight: 900;
+.court-achievement-badge {
+  align-items: center;
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.52), transparent 34%),
+    linear-gradient(145deg, #5ba0ff, #173a72);
+  border: 1px solid rgba(255, 255, 255, 0.54);
+  border-radius: 999px;
+  box-shadow:
+    0 7px 13px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  color: #ffffff;
+  display: grid;
+  flex: 0 0 auto;
+  height: 22px;
+  justify-items: center;
   line-height: 1;
+  overflow: visible;
+  pointer-events: auto;
+  position: relative;
+  width: 22px;
+  z-index: 1;
+}
+
+.court-achievement-badge::after {
+  background: rgba(10, 12, 18, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.3);
+  color: #f4f2ec;
+  content: attr(data-tooltip);
+  font-size: 0.66rem;
+  font-weight: 850;
+  line-height: 1.18;
+  max-width: 155px;
+  min-width: max-content;
+  opacity: 0;
+  padding: 7px 9px;
+  pointer-events: none;
+  position: absolute;
+  right: -4px;
+  text-align: left;
+  top: calc(100% + 8px);
+  transform: translateY(-3px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  white-space: nowrap;
+  z-index: 1000;
+}
+
+.court-achievement-badge::before {
+  border-color: transparent transparent rgba(10, 12, 18, 0.96);
+  border-style: solid;
+  border-width: 0 5px 6px;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 8px;
+  top: calc(100% + 3px);
+  transform: translateY(-3px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  z-index: 1001;
+}
+
+.court-achievement-badge:hover,
+.court-achievement-badge:focus,
+.court-achievement-badge:focus-visible,
+.court-achievement-badge:active {
+  z-index: 1002;
+}
+
+.court-achievement-badge:hover::after,
+.court-achievement-badge:hover::before,
+.court-achievement-badge:focus::after,
+.court-achievement-badge:focus::before,
+.court-achievement-badge:focus-visible::after,
+.court-achievement-badge:focus-visible::before,
+.court-achievement-badge:active::after,
+.court-achievement-badge:active::before {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.court-achievement-badge-symbol {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
+}
+
+.court-achievement-badge-count {
+  color: #ffffff;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.52));
+  font-family: "Segoe Print", "Bradley Hand ITC", "Comic Sans MS", cursive;
+  font-size: 0.48rem;
+  font-weight: 800;
+  line-height: 1;
+  position: absolute;
+  right: -4px;
+  text-transform: uppercase;
+  top: -5px;
   white-space: nowrap;
 }
 
-.court-achievement-value {
-  color: #f4f2ec;
+.court-achievement-badge-mvp {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.68), transparent 34%),
+    linear-gradient(145deg, #fff08a, #d79a1d 60%, #6f430c);
+  box-shadow:
+    0 7px 13px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 -2px 0 rgba(81, 45, 8, 0.42);
 }
 
-.court-achievement-separator {
-  color: #8f96a7;
-  margin-right: 2px;
+.court-achievement-badge-mvp .court-achievement-badge-symbol,
+.court-achievement-badge-mvp .achievement-badge-symbol {
+  font-size: 0.62rem;
+  font-weight: 950;
+}
+
+.court-achievement-badge-fmvp {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.68), transparent 34%),
+    linear-gradient(145deg, #ffe58a, #d39a19 48%, #c9082a);
+  border-color: rgba(255, 231, 143, 0.76);
+  color: #ffffff;
+  box-shadow:
+    0 7px 13px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 -2px 0 rgba(100, 8, 22, 0.42);
+}
+
+.court-achievement-badge-fmvp .court-achievement-badge-symbol,
+.court-achievement-badge-fmvp .achievement-badge-symbol {
+  font-size: 0.68rem;
+  font-weight: 950;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
+}
+
+.court-achievement-badge-nba {
+  background: linear-gradient(90deg, #17408b 0 50%, #c9082a 50% 100%);
+  border-radius: 7px;
+}
+
+.court-achievement-badge-nba .court-achievement-badge-symbol {
+  font-size: 0.45rem;
+}
+
+.court-achievement-badge-all-star-logo {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.court-achievement-badge-all-star-mvp {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.38), transparent 38%),
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.68), transparent 34%),
+    linear-gradient(145deg, #fff6b8, #f7b733 54%, #7b4ce6);
+  border-color: rgba(255, 245, 176, 0.82);
+  box-shadow:
+    0 8px 15px rgba(0, 0, 0, 0.32),
+    0 0 0 2px rgba(123, 76, 230, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48);
+}
+
+.court-achievement-badge-all-star-logo .court-achievement-badge-symbol,
+.court-achievement-badge-all-star-logo .achievement-badge-symbol {
+  background: url("/nba-all-star.png") 50% 51% / contain no-repeat;
+  display: block;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.42));
+  font-size: 0;
+  height: 24px;
+  transform: translateY(0.5px);
+  width: 24px;
+}
+
+.court-achievement-badge-all-star-mvp .court-achievement-badge-symbol,
+.court-achievement-badge-all-star-mvp .achievement-badge-symbol {
+  font-size: 0.86rem;
+  transform: translateY(-0.03rem);
+}
+
+.court-achievement-badge-defense {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.5), transparent 34%),
+    linear-gradient(145deg, #89f0cd, #257e68 68%, #163b5f);
+}
+
+.court-achievement-badge-dpoy {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.5), transparent 34%),
+    linear-gradient(145deg, #9af2d1, #238364 66%, #15395f);
+  border-color: rgba(177, 255, 224, 0.62);
+  border-radius: 999px;
+  width: 22px;
+}
+
+.court-achievement-badge-dpoy .court-achievement-badge-symbol,
+.court-achievement-badge-dpoy .achievement-badge-symbol {
+  display: block;
+  font-size: 0.31rem;
+  font-weight: 950;
+  line-height: 1;
+  transform: none;
+}
+
+.court-achievement-badge-dpoy .court-achievement-badge-symbol::before,
+.court-achievement-badge-dpoy .achievement-badge-symbol::before {
+  content: none;
+  display: none;
+}
+
+.court-achievement-badge-dpoy .court-achievement-badge-symbol::after,
+.court-achievement-badge-dpoy .achievement-badge-symbol::after {
+  content: none;
+  display: none;
+}
+
+.court-achievement-badge-ring {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.58), transparent 34%),
+    linear-gradient(145deg, #ffd1e8, #d69d2a 64%, #6a3d8f);
+}
+
+.court-achievement-badge-points {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.48), transparent 34%),
+    linear-gradient(145deg, #ffbf86, #dd5b20 64%, #5f2d16);
+}
+
+.court-achievement-badge-assist {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.5), transparent 34%),
+    linear-gradient(145deg, #79e2ff, #276d98 66%, #1d355f);
+}
+
+.court-achievement-badge-rebound,
+.court-achievement-badge-sixth,
+.court-achievement-badge-rookie,
+.court-achievement-badge-rise {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.48), transparent 34%),
+    linear-gradient(145deg, #ff9fbd, #8747d2 66%, #2f315f);
+}
+
+.court-achievement-badge-roy {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.52), transparent 34%),
+    linear-gradient(145deg, #c6ff77, #2f9f6f 58%, #23405f);
+  border-color: rgba(205, 255, 136, 0.62);
+  border-radius: 999px;
+  width: 22px;
+}
+
+.court-achievement-badge-roy .court-achievement-badge-symbol,
+.court-achievement-badge-roy .achievement-badge-symbol {
+  font-size: 0.36rem;
+  font-weight: 950;
+}
+
+.game-page-classic .roster-player-card .achievement-badge-face.court-achievement-badge-dpoy {
+  width: 24px;
+}
+
+.game-page-classic .roster-player-card .achievement-badge-face.court-achievement-badge-roy {
+  width: 24px;
+}
+
+.court-achievement-badge-points .court-achievement-badge-symbol,
+.court-achievement-badge-assist .court-achievement-badge-symbol,
+.court-achievement-badge-rebound .court-achievement-badge-symbol,
+.court-achievement-badge-defense .court-achievement-badge-symbol,
+.court-achievement-badge-rookie .court-achievement-badge-symbol,
+.court-achievement-badge-sixth .court-achievement-badge-symbol {
+  font-size: 0.43rem;
 }
 
 .court-slot-pg {
@@ -3085,10 +4272,8 @@ select {
     padding: 16px;
   }
 
-  .result-player-score {
-    left: 34px;
-    top: 4px;
-    transform: rotate(-7deg);
+  .result-award-badge:nth-of-type(n + 7) {
+    display: none;
   }
 
   .court-blueprint {
@@ -3117,17 +4302,24 @@ select {
   }
 }
 
+@media (max-width: 560px) {
+  .result-award-badge:nth-of-type(n + 5) {
+    display: none;
+  }
+}
+
 .game-page {
   background:
     radial-gradient(circle at 50% -10%, rgba(255, 111, 19, 0.12), transparent 30rem),
     radial-gradient(circle at 92% 22%, rgba(184, 112, 255, 0.12), transparent 24rem),
     linear-gradient(180deg, #1d222e 0%, #171b25 55%, #12161f 100%);
+  min-height: calc(100svh - var(--site-topbar-height));
 }
 
 .game-header {
   backdrop-filter: blur(18px);
   position: sticky;
-  top: 0;
+  top: var(--site-topbar-height);
   z-index: 50;
 }
 
@@ -3211,6 +4403,110 @@ select {
   align-items: center;
   display: inline-grid;
   justify-items: center;
+}
+
+.stats-toggle-button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #f4f2ec;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 10px;
+  height: 44px;
+  justify-content: center;
+  min-width: 176px;
+  padding: 0 12px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.stats-toggle-button:hover {
+  background: rgba(255, 255, 255, 0.085);
+  border-color: rgba(255, 138, 42, 0.45);
+}
+
+.stats-toggle-button[aria-pressed="true"] {
+  background: rgba(49, 214, 161, 0.1);
+  border-color: rgba(49, 214, 161, 0.44);
+}
+
+.stats-toggle-button[aria-pressed="true"]:hover {
+  background: rgba(49, 214, 161, 0.16);
+  border-color: rgba(49, 214, 161, 0.66);
+}
+
+.stats-toggle-button:focus-visible {
+  outline: 3px solid rgba(49, 214, 161, 0.48);
+  outline-offset: 3px;
+}
+
+.stats-toggle-switch {
+  align-items: center;
+  background: rgba(143, 150, 167, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 2px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+  width: 44px;
+}
+
+.stats-toggle-knob {
+  background: #cfd3df;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.34);
+  display: block;
+  height: 18px;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+  width: 18px;
+}
+
+.stats-toggle-button[aria-pressed="true"] .stats-toggle-switch {
+  background: #31d6a1;
+  border-color: rgba(137, 240, 205, 0.72);
+}
+
+.stats-toggle-button[aria-pressed="true"] .stats-toggle-knob {
+  background: #15171f;
+  transform: translateX(20px);
+}
+
+.stats-toggle-copy {
+  align-items: start;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  line-height: 1;
+  min-width: 0;
+}
+
+.stats-toggle-label {
+  color: #f4f2ec;
+  font-size: 0.72rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.stats-toggle-state {
+  color: #aeb4c2;
+  font-size: 0.62rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.stats-toggle-button[aria-pressed="true"] .stats-toggle-state {
+  color: #89f0cd;
 }
 
 .mobile-lineup-rail {
@@ -3331,13 +4627,13 @@ select {
 
 @media (max-width: 760px) {
   .game-page {
-    min-height: 100svh;
+    min-height: calc(100svh - var(--site-topbar-height));
     overflow-x: hidden;
-    padding-bottom: calc(112px + env(safe-area-inset-bottom));
+    padding-bottom: calc(118px + env(safe-area-inset-bottom));
   }
 
   .game-header {
-    padding: 9px 10px;
+    padding: 8px 10px;
   }
 
   .game-header-inner {
@@ -3394,6 +4690,19 @@ select {
     height: 46px;
     padding: 0;
     width: 46px;
+  }
+
+  .game-stats-toggle-button {
+    gap: 0;
+    height: 46px;
+    justify-content: center;
+    min-width: 0;
+    padding: 0;
+    width: 62px;
+  }
+
+  .game-stats-toggle-button .stats-toggle-copy {
+    display: none;
   }
 
   .game-control-button::before,
@@ -3473,7 +4782,7 @@ select {
     border-color: rgba(255, 255, 255, 0.11);
     border-radius: 8px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
-    height: calc(100svh - 190px);
+    height: calc(100svh - 174px);
     max-height: none;
     min-height: 430px;
   }
@@ -3495,9 +4804,22 @@ select {
     gap: 14px;
   }
 
+  .game-page-classic .roster-draw-grid {
+    align-items: center;
+    gap: 8px;
+    grid-template-columns: max-content max-content;
+    margin-top: 10px;
+  }
+
   .spin-tile {
     border-radius: 8px;
     min-height: 110px;
+  }
+
+  .game-page-classic .roster-draw-grid .spin-tile {
+    border-radius: 999px;
+    min-height: 42px;
+    min-width: 72px;
   }
 
   .spin-tile-team {
@@ -3519,8 +4841,17 @@ select {
     padding: 11px;
   }
 
+  .game-page-classic .roster-draw-grid .spin-tile-inner {
+    display: block;
+    padding: 0;
+  }
+
   .spin-tile-topline {
     justify-content: center;
+  }
+
+  .game-page-classic .roster-draw-grid .spin-tile-topline {
+    display: none;
   }
 
   .spin-tile-label {
@@ -3539,9 +4870,21 @@ select {
     padding: 0 8px;
   }
 
+  .game-page-classic .roster-draw-grid .spin-tile-reel {
+    border-radius: 999px;
+    min-height: 40px;
+    padding: 0 15px;
+  }
+
   .spin-tile-value {
     font-size: clamp(2.05rem, 12vw, 2.85rem);
     text-align: center;
+  }
+
+  .game-page-classic .roster-draw-grid .spin-tile-value {
+    font-size: 1.08rem;
+    line-height: 1;
+    text-shadow: none;
   }
 
   .roster-filter-row {
@@ -3659,6 +5002,148 @@ select {
     white-space: nowrap;
   }
 
+  .game-page-classic .roster-player-card {
+    align-items: stretch;
+    gap: 14px;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 132px;
+    padding: 14px 16px 15px 18px;
+  }
+
+  .game-page-classic .player-card-info {
+    gap: 5px;
+  }
+
+  .game-page-classic .player-card-name {
+    font-size: 1.02rem;
+    line-height: 1.04;
+  }
+
+  .game-page-classic .player-card-positions {
+    font-size: 0.72rem;
+  }
+
+  .game-page-classic .player-card-team {
+    font-size: 0.62rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-strip {
+    gap: 11px 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .game-page-classic .roster-player-card .achievement-stat {
+    overflow: visible;
+  }
+
+  .game-page-classic .roster-player-card .achievement-stat:nth-child(n + 9) {
+    display: grid;
+  }
+
+  .game-page-classic .roster-player-card .achievement-stat-metric {
+    gap: 4px;
+    min-height: 38px;
+  }
+
+  .game-page-classic .roster-player-card .achievement-value {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .game-page-classic .roster-player-card .achievement-stat-award {
+    justify-items: center;
+  }
+
+  .game-page-classic .roster-player-card .achievement-label {
+    font-size: 0.56rem;
+    line-height: 1;
+  }
+
+  .game-page-classic .roster-player-card .achievement-badge-face {
+    height: 26px;
+    width: 26px;
+  }
+
+  .roster-feed-badges {
+    left: 22px;
+    top: -11px;
+  }
+
+  .roster-feed-badges .court-achievement-badge {
+    height: 20px;
+    width: 20px;
+  }
+
+  .game-page-classic .roster-mode-awards {
+    min-height: 104px;
+  }
+
+  .game-page-classic .roster-mode-awards .achievement-strip {
+    grid-template-columns: repeat(3, 30px);
+    justify-content: start;
+  }
+
+  .game-page-classic .roster-player-card {
+    align-items: center;
+    gap: 12px;
+    grid-template-columns: minmax(132px, 0.72fr) minmax(0, 1.28fr);
+    min-height: 84px;
+    padding: 12px 12px 12px 16px;
+  }
+
+  .game-page-classic .roster-mode-mixed {
+    margin-top: 11px;
+  }
+
+  .game-page-classic .player-card-info {
+    gap: 4px;
+  }
+
+  .game-page-classic .player-card-name {
+    font-size: 0.98rem;
+    line-height: 1.04;
+  }
+
+  .game-page-classic .player-card-positions {
+    font-size: 0.7rem;
+  }
+
+  .game-page-classic .player-card-team {
+    font-size: 0.62rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-strip,
+  .game-page-classic .roster-mode-awards .achievement-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 18px;
+    grid-template-columns: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 3px 2px 7px;
+    white-space: nowrap;
+  }
+
+  .game-page-classic .roster-player-card .achievement-stat-metric,
+  .game-page-classic .roster-player-card .achievement-stat-award {
+    min-height: 34px;
+    min-width: 48px;
+  }
+
+  .game-page-classic .roster-player-card .achievement-stat-pra {
+    min-width: 68px;
+  }
+
+  .game-page-classic .roster-player-card .achievement-value,
+  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+    font-size: 0.96rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-label,
+  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+    font-size: 0.52rem;
+  }
+
   .game-court-section {
     gap: 10px;
   }
@@ -3693,7 +5178,7 @@ select {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     left: 50%;
     max-width: 430px;
-    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    padding: 14px 12px calc(13px + env(safe-area-inset-bottom));
     position: fixed;
     transform: translateX(-50%);
     width: 100%;
@@ -3709,7 +5194,81 @@ select {
     gap: 4px;
     justify-items: center;
     min-width: 0;
+    overflow: visible;
     padding: 0;
+    position: relative;
+  }
+
+  .mobile-lineup-slot .court-achievement-badges {
+    gap: 3px;
+    justify-content: center;
+    left: 50%;
+    right: auto;
+    top: -7px;
+    transform: translateX(-50%);
+  }
+
+  .mobile-lineup-slot .court-achievement-badge {
+    height: 18px;
+    width: 18px;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-dpoy {
+    width: 18px;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-roy {
+    width: 18px;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-symbol {
+    font-size: 0.55rem;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-all-star-logo .court-achievement-badge-symbol {
+    height: 20px;
+    width: 20px;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-all-star-mvp .court-achievement-badge-symbol {
+    font-size: 0.68rem;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-fmvp .court-achievement-badge-symbol {
+    font-size: 0.56rem;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-dpoy .court-achievement-badge-symbol {
+    font-size: 0.25rem;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-dpoy .court-achievement-badge-symbol::before {
+    content: none;
+    display: none;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-dpoy .court-achievement-badge-symbol::after {
+    content: none;
+    display: none;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-roy .court-achievement-badge-symbol {
+    font-size: 0.29rem;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-nba .court-achievement-badge-symbol,
+  .mobile-lineup-slot .court-achievement-badge-points .court-achievement-badge-symbol,
+  .mobile-lineup-slot .court-achievement-badge-assist .court-achievement-badge-symbol,
+  .mobile-lineup-slot .court-achievement-badge-rebound .court-achievement-badge-symbol,
+  .mobile-lineup-slot .court-achievement-badge-defense .court-achievement-badge-symbol,
+  .mobile-lineup-slot .court-achievement-badge-rookie .court-achievement-badge-symbol {
+    font-size: 0.34rem;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-count {
+    font-size: 0.38rem;
+    right: -5px;
+    top: -5px;
   }
 
   .mobile-lineup-token {
@@ -3811,6 +5370,10 @@ select {
 }
 
 @media (max-width: 390px) {
+  .result-award-badge:nth-of-type(n + 4) {
+    display: none;
+  }
+
   .roster-filter-row {
     gap: 4px;
     grid-template-columns: max-content minmax(0, 1fr) minmax(137px, 1fr);
@@ -3840,7 +5403,7 @@ select {
   }
 
   .game-roster-panel {
-    height: calc(100svh - 184px);
+    height: calc(100svh - 170px);
   }
 
   .roster-player-card {
@@ -3864,6 +5427,71 @@ select {
     font-size: 0.46rem;
   }
 
+  .game-page-classic .roster-player-card {
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 128px;
+    padding: 13px 14px 14px 16px;
+  }
+
+  .game-page-classic .roster-player-card .achievement-strip {
+    gap: 10px 8px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .game-page-classic .roster-player-card .achievement-value {
+    font-size: 0.9rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-label {
+    font-size: 0.5rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-badge-face {
+    height: 24px;
+    width: 24px;
+  }
+
+  .game-page-classic .roster-mode-awards {
+    min-height: 100px;
+  }
+
+  .game-page-classic .roster-mode-awards .achievement-strip {
+    grid-template-columns: repeat(3, 28px);
+  }
+
+  .game-page-classic .roster-player-card {
+    gap: 10px;
+    grid-template-columns: minmax(116px, 0.68fr) minmax(0, 1.32fr);
+    min-height: 82px;
+    padding: 11px 10px 11px 14px;
+  }
+
+  .game-page-classic .roster-player-card .achievement-strip,
+  .game-page-classic .roster-mode-awards .achievement-strip {
+    gap: 15px;
+    grid-template-columns: none;
+  }
+
+  .game-page-classic .roster-player-card .achievement-stat-metric,
+  .game-page-classic .roster-player-card .achievement-stat-award {
+    min-width: 44px;
+  }
+
+  .game-page-classic .roster-player-card .achievement-stat-pra {
+    min-width: 64px;
+  }
+
+  .game-page-classic .roster-player-card .achievement-value,
+  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+    font-size: 0.88rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-label,
+  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+    font-size: 0.48rem;
+  }
+
   .mobile-lineup-rail {
     gap: 7px;
     padding-left: 10px;
@@ -3876,5 +5504,1578 @@ select {
 
   .position-picker-option {
     min-height: 88px;
+  }
+}
+
+/* Classic roster feed: keep primary stat lanes visible, let overflow scroll. */
+.game-page-classic .roster-player-card {
+  gap: 14px;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1.3fr);
+  min-height: 86px;
+}
+
+.game-page-classic .roster-player-card .achievement-strip {
+  gap: 10px;
+  overscroll-behavior-x: contain;
+  padding: 2px 2px 6px;
+  scrollbar-width: thin;
+}
+
+.game-page-classic .roster-player-card .achievement-strip::-webkit-scrollbar {
+  display: block;
+  height: 6px;
+}
+
+.game-page-classic .roster-mode-stats .achievement-strip {
+  display: flex;
+  gap: 6px;
+}
+
+.game-page-classic .roster-mode-stats .achievement-stat-metric {
+  flex: 0 0 calc((100% - 24px) / 5);
+  min-width: 0;
+  width: auto;
+}
+
+.game-page-classic .roster-mode-mixed .achievement-strip {
+  display: flex;
+  gap: 5px;
+}
+
+.game-page-classic .roster-mode-mixed .achievement-stat {
+  flex: 0 0 calc((100% - 15px) / 4);
+  min-width: 0;
+  width: auto;
+}
+
+.game-page-classic .roster-mode-awards .achievement-strip {
+  gap: 18px;
+}
+
+@media (max-width: 760px) {
+  .game-page-classic .roster-player-card {
+    gap: 8px;
+    grid-template-columns: minmax(102px, 0.52fr) minmax(0, 1.48fr);
+    min-height: 76px;
+    padding: 10px 10px 10px 14px;
+  }
+
+  .game-page-classic .player-card-info {
+    gap: 3px;
+  }
+
+  .game-page-classic .player-card-name {
+    font-size: 0.88rem;
+    line-height: 1.02;
+  }
+
+  .game-page-classic .player-card-positions {
+    font-size: 0.62rem;
+  }
+
+  .game-page-classic .player-card-team {
+    font-size: 0.58rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-strip {
+    gap: 6px;
+    padding: 2px 0 5px;
+  }
+
+  .game-page-classic .roster-player-card .achievement-stat-metric,
+  .game-page-classic .roster-player-card .achievement-stat-award {
+    min-height: 31px;
+  }
+
+  .game-page-classic .roster-mode-stats .achievement-strip {
+    gap: 4px;
+  }
+
+  .game-page-classic .roster-mode-stats .achievement-stat-metric {
+    flex-basis: calc((100% - 16px) / 5);
+    min-width: 0;
+  }
+
+  .game-page-classic .roster-mode-mixed .achievement-strip {
+    gap: 4px;
+  }
+
+  .game-page-classic .roster-mode-mixed .achievement-stat {
+    flex-basis: calc((100% - 12px) / 4);
+    min-width: 0;
+  }
+
+  .game-page-classic .roster-player-card .achievement-value,
+  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+    font-size: 0.88rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-label,
+  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+    font-size: 0.48rem;
+  }
+
+  .game-page-classic .roster-mode-awards .achievement-strip {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 390px) {
+  .game-page-classic .roster-player-card {
+    gap: 7px;
+    grid-template-columns: minmax(92px, 0.5fr) minmax(0, 1.5fr);
+    padding: 10px 9px 10px 12px;
+  }
+
+  .game-page-classic .player-card-name {
+    font-size: 0.82rem;
+  }
+
+  .game-page-classic .player-card-positions {
+    font-size: 0.58rem;
+  }
+
+  .game-page-classic .player-card-team {
+    font-size: 0.54rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-strip {
+    gap: 5px;
+  }
+
+  .game-page-classic .roster-mode-stats .achievement-strip,
+  .game-page-classic .roster-mode-mixed .achievement-strip {
+    gap: 3px;
+  }
+
+  .game-page-classic .roster-mode-stats .achievement-stat-metric {
+    flex-basis: calc((100% - 12px) / 5);
+    min-width: 0;
+  }
+
+  .game-page-classic .roster-mode-mixed .achievement-stat {
+    flex-basis: calc((100% - 9px) / 4);
+    min-width: 0;
+  }
+
+  .game-page-classic .roster-player-card .achievement-value,
+  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+    font-size: 0.82rem;
+  }
+
+  .game-page-classic .roster-player-card .achievement-label,
+  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+    font-size: 0.44rem;
+  }
+}
+
+.game-page-light {
+  background:
+    radial-gradient(circle at 50% -8%, rgba(255, 111, 19, 0.14), transparent 28rem),
+    linear-gradient(180deg, #eef2f7 0%, #e1e7ef 55%, #d2d9e3 100%);
+  color: #19202b;
+}
+
+.game-page-light .game-header,
+.game-page-light .game-roster-panel,
+.game-page-light .game-score-panel,
+.game-page-light .mobile-game-footer,
+.game-page-light .mobile-menu-panel,
+.game-page-light .game-auth-panel {
+  background: rgba(246, 248, 252, 0.96);
+  border-color: rgba(37, 45, 61, 0.16);
+  color: #19202b;
+}
+
+.game-page-light .game-brand-copy h1,
+.game-page-light .player-card-name,
+.game-page-light .game-score-panel p:last-child,
+.game-page-light .mobile-menu-header h2,
+.game-page-light .mobile-menu-item,
+.game-page-light .mobile-bottom-nav-item,
+.game-page-light .mobile-header-button {
+  color: #19202b;
+}
+
+.game-page-light .game-brand-copy p,
+.game-page-light .player-card-team,
+.game-page-light .player-card-positions,
+.game-page-light .achievement-label,
+.game-page-light .mobile-lineup-label,
+.game-page-light .mobile-bottom-nav-item span {
+  color: #596272;
+}
+
+.game-page-light .roster-player-card,
+.game-page-light .mobile-header-button,
+.game-page-light .mobile-menu-item,
+.game-page-light input,
+.game-page-light select {
+  background: rgba(226, 232, 242, 0.92);
+  border-color: rgba(37, 45, 61, 0.14);
+  color: #19202b;
+}
+
+.game-page-light .mobile-bottom-nav-item-active {
+  color: #ffffff;
+}
+
+@media (max-width: 760px) {
+  .game-page {
+    padding-bottom: calc(178px + env(safe-area-inset-bottom));
+  }
+
+  .game-header {
+    padding: 12px 14px;
+  }
+
+  .game-header-inner {
+    gap: 12px;
+    max-width: 560px;
+  }
+
+  .game-brand {
+    flex: 1 1 auto;
+    gap: 10px;
+  }
+
+  .game-brand-copy h1 {
+    font-size: 1.03rem;
+  }
+
+  .game-public-controls,
+  .game-admin-controls {
+    display: none;
+  }
+
+  .mobile-header-actions {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 7px;
+  }
+
+  .mobile-header-button {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: #cfd3df;
+    display: grid;
+    height: 42px;
+    justify-items: center;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease;
+    width: 42px;
+  }
+
+  .mobile-header-button:hover,
+  .mobile-header-button:focus-visible,
+  .mobile-header-button[aria-pressed="true"] {
+    background: rgba(255, 111, 19, 0.15);
+    border-color: rgba(255, 111, 19, 0.5);
+    color: #ffffff;
+    outline: none;
+  }
+
+  .mobile-header-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .game-auth-panel-desktop {
+    display: none;
+  }
+
+  .game-auth-panel-mobile {
+    bottom: calc(154px + env(safe-area-inset-bottom));
+    display: grid;
+    left: 16px;
+    max-width: none;
+    position: fixed;
+    right: 16px;
+    width: auto;
+    z-index: 95;
+  }
+
+  .game-shell {
+    gap: 0;
+    padding-top: 0;
+  }
+
+  .game-roster-panel {
+    border-left: 0;
+    border-radius: 0;
+    border-right: 0;
+    height: calc(100svh - 196px);
+    max-height: none;
+    min-height: 0;
+  }
+
+  .game-roster-panel > .border-b {
+    padding: 14px 18px 13px;
+  }
+
+  .roster-feed-title {
+    display: none;
+  }
+
+  .roster-draw-desktop {
+    display: none !important;
+  }
+
+  .mobile-draw-row {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: 12px;
+  }
+
+  .mobile-draw-chips {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .mobile-draw-chip {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--spin-accent) 22%, transparent), transparent 62%),
+      color-mix(in srgb, var(--spin-primary) 82%, #151923);
+    border: 1px solid color-mix(in srgb, var(--spin-accent) 76%, rgba(255, 255, 255, 0.18));
+    border-radius: 999px;
+    color: var(--spin-number);
+    display: inline-grid;
+    font-size: 1rem;
+    font-weight: 950;
+    min-width: 72px;
+    padding: 11px 18px;
+    place-items: center;
+    pointer-events: none;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.34);
+  }
+
+  .mobile-draw-chip-team {
+    --spin-accent: #ff6f13 !important;
+  }
+
+  .mobile-draw-chip-era {
+    --spin-accent: #b86cff !important;
+  }
+
+  .mobile-draw-actions {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 14px;
+  }
+
+  .mobile-draw-spin {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: #c88aff;
+    display: inline-flex;
+    font-size: 0.86rem;
+    font-weight: 850;
+    gap: 4px;
+    padding: 6px 0;
+  }
+
+  .mobile-draw-spin-team {
+    color: #d8a11d;
+  }
+
+  .mobile-draw-spin:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .mobile-draw-spin .mobile-icon {
+    height: 1em;
+    width: 1em;
+  }
+
+  .roster-sort-direction-button {
+    display: none;
+  }
+
+  .roster-sort-control {
+    min-width: 118px;
+  }
+
+  .mobile-menu-layer {
+    display: block;
+    inset: 0;
+    position: fixed;
+    z-index: 120;
+  }
+
+  .mobile-menu-backdrop {
+    background: rgba(6, 8, 12, 0.62);
+    border: 0;
+    inset: 0;
+    position: absolute;
+  }
+
+  .mobile-menu-panel {
+    background: #1a1f2b;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    bottom: 0;
+    box-shadow: 22px 0 44px rgba(0, 0, 0, 0.32);
+    color: #f4f2ec;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    left: 0;
+    max-width: 420px;
+    position: absolute;
+    top: 0;
+    width: min(75vw, 420px);
+  }
+
+  .mobile-menu-header {
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    min-height: 88px;
+    padding: 0 28px;
+  }
+
+  .mobile-menu-header h2 {
+    font-size: 1.28rem;
+    font-weight: 950;
+    letter-spacing: 0;
+  }
+
+  .mobile-menu-close {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: #cfd3df;
+    display: grid;
+    height: 40px;
+    justify-items: center;
+    width: 40px;
+  }
+
+  .mobile-menu-list {
+    display: grid;
+    align-content: start;
+    gap: 20px;
+    padding: 48px 30px;
+  }
+
+  .mobile-menu-item {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: #f4f2ec;
+    display: flex;
+    font-size: 1.04rem;
+    font-weight: 950;
+    gap: 18px;
+    padding: 7px 0;
+    text-align: left;
+  }
+
+  .mobile-menu-item .mobile-icon {
+    color: #c8cbd4;
+    font-size: 1.12rem;
+  }
+
+  .mobile-game-footer {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 50%),
+      #1a1f2b;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    bottom: 0;
+    box-shadow: 0 -18px 30px rgba(0, 0, 0, 0.28);
+    display: grid;
+    gap: 10px;
+    left: 50%;
+    max-width: 560px;
+    padding: 14px 14px calc(10px + env(safe-area-inset-bottom));
+    position: fixed;
+    transform: translateX(-50%);
+    width: 100%;
+    z-index: 60;
+  }
+
+  .mobile-game-footer .mobile-lineup-rail {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    left: auto;
+    max-width: none;
+    padding: 0;
+    position: static;
+    transform: none;
+    width: 100%;
+  }
+
+  .mobile-bottom-nav {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .mobile-bottom-nav-item {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 12px;
+    color: #aeb4c2;
+    display: grid;
+    gap: 4px;
+    justify-items: center;
+    min-height: 54px;
+    min-width: 0;
+    padding: 6px 3px;
+  }
+
+  .mobile-bottom-nav-item .mobile-icon {
+    font-size: 1.1rem;
+  }
+
+  .mobile-bottom-nav-item span {
+    color: #aeb4c2;
+    font-size: 0.66rem;
+    font-weight: 950;
+    line-height: 1;
+  }
+
+  .mobile-bottom-nav-item-active {
+    background: #ff6f13;
+    color: #ffffff;
+  }
+
+  .mobile-bottom-nav-item-active span {
+    color: #ffffff;
+  }
+}
+
+@media (max-width: 390px) {
+  .mobile-header-actions {
+    gap: 5px;
+  }
+
+  .mobile-header-button {
+    height: 38px;
+    width: 38px;
+  }
+
+  .game-logo-mark {
+    height: 40px;
+    width: 44px;
+  }
+
+  .game-brand-copy h1 {
+    font-size: 0.94rem;
+  }
+
+  .mobile-draw-row {
+    gap: 8px;
+  }
+
+  .mobile-draw-chip {
+    font-size: 0.92rem;
+    min-width: 63px;
+    padding: 10px 14px;
+  }
+
+  .mobile-draw-actions {
+    gap: 9px;
+  }
+
+  .mobile-menu-panel {
+    width: min(78vw, 390px);
+  }
+
+  .mobile-game-footer {
+    gap: 8px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .mobile-game-footer .mobile-lineup-rail {
+    gap: 9px;
+  }
+
+  .mobile-bottom-nav {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 760px) {
+  .game-page-classic .game-header-inner,
+  .game-page-classic .game-shell,
+  .game-page-classic .mobile-game-footer {
+    max-width: 560px;
+  }
+
+  .game-page-classic .game-shell {
+    padding: 0 2px 0;
+    width: 100%;
+  }
+
+  .game-page-classic .game-roster-panel {
+    border-left: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 8px;
+    border-right: 1px solid rgba(255, 255, 255, 0.11);
+  }
+
+  .game-page-classic .game-roster-panel > .border-b {
+    padding: 12px 24px 14px;
+  }
+
+  .game-page-classic .mobile-draw-row {
+    margin-top: 0;
+  }
+
+  .game-page-classic .roster-selection-summary {
+    display: none;
+  }
+
+  .game-page-classic .roster-filter-row {
+    gap: 12px;
+    grid-template-columns: 150px minmax(128px, 1fr) minmax(110px, 120px);
+    margin-top: 26px;
+  }
+
+  .game-page-classic .position-filter-group {
+    display: grid;
+    gap: 2px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 150px;
+  }
+
+  .game-page-classic .position-filter-group button {
+    min-width: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .game-page-classic .roster-filter-row input,
+  .game-page-classic .roster-filter-row select,
+  .game-page-classic .roster-sort-control {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .game-page-classic .roster-list-scroll {
+    padding-left: 24px;
+    padding-right: 22px;
+  }
+
+  .mobile-menu-toggle-item {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    width: 100%;
+  }
+
+  .mobile-menu-toggle-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .mobile-menu-toggle-copy small {
+    color: #aeb4c2;
+    font-size: 0.7rem;
+    font-weight: 950;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .mobile-menu-toggle-switch {
+    align-self: center;
+  }
+
+  .mobile-menu-toggle-item[aria-pressed="true"] .stats-toggle-switch {
+    background: #31d6a1;
+    border-color: rgba(137, 240, 205, 0.72);
+  }
+
+  .mobile-menu-toggle-item[aria-pressed="true"] .stats-toggle-knob {
+    background: #15171f;
+    transform: translateX(20px);
+  }
+
+  .game-page-light.game-page-classic {
+    background:
+      radial-gradient(circle at 18% -12%, rgba(255, 111, 19, 0.13), transparent 24rem),
+      radial-gradient(circle at 92% 14%, rgba(79, 120, 196, 0.12), transparent 22rem),
+      linear-gradient(180deg, #f2f5fa 0%, #e6ecf4 58%, #dbe3ee 100%);
+  }
+
+  .game-page-light .game-header,
+  .game-page-light .game-roster-panel,
+  .game-page-light .mobile-game-footer,
+  .game-page-light .mobile-menu-panel,
+  .game-page-light .game-auth-panel {
+    background: rgba(244, 247, 252, 0.98);
+    border-color: rgba(40, 49, 67, 0.16);
+    color: #1c2431;
+  }
+
+  .game-page-light.game-page-classic .game-roster-panel {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(241, 245, 251, 0.94) 36%),
+      #edf2f8;
+    box-shadow: 0 16px 30px rgba(54, 68, 92, 0.15);
+  }
+
+  .game-page-light.game-page-classic .game-roster-panel > .border-b {
+    border-color: rgba(40, 49, 67, 0.13);
+  }
+
+  .game-page-light .mobile-header-button,
+  .game-page-light .position-filter-group,
+  .game-page-light input,
+  .game-page-light select {
+    background: #e5ebf4;
+    border-color: rgba(43, 53, 72, 0.14);
+    color: #1c2431;
+  }
+
+  .game-page-light .mobile-header-button:hover,
+  .game-page-light .mobile-header-button:focus-visible,
+  .game-page-light .mobile-header-button[aria-pressed="true"] {
+    background: #fff1e8;
+    border-color: rgba(255, 111, 19, 0.48);
+    color: #1c2431;
+  }
+
+  .game-page-light .mobile-draw-spin-team {
+    color: #a47306;
+  }
+
+  .game-page-light .mobile-draw-spin-era {
+    color: #944fe0;
+  }
+
+  .game-page-light .roster-player-card {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(223, 231, 243, 0.88)),
+      #dfe7f2;
+    border-color: rgba(51, 63, 86, 0.14);
+    box-shadow: 0 8px 18px rgba(54, 68, 92, 0.1);
+  }
+
+  .game-page-light .roster-player-card:hover:not(:disabled) {
+    background:
+      radial-gradient(circle at 0% 50%, color-mix(in srgb, var(--team-secondary) 18%, transparent), transparent 52%),
+      linear-gradient(180deg, #eef3fa, #dfe7f2);
+    border-color: color-mix(in srgb, var(--team-readable-primary) 36%, rgba(51, 63, 86, 0.2));
+  }
+
+  .game-page-light .player-card-name,
+  .game-page-light .roster-player-card .achievement-value {
+    color: #202938;
+    text-shadow: none;
+  }
+
+  .game-page-light .roster-count,
+  .game-page-light .mobile-menu-toggle-copy small {
+    color: #405066;
+    text-shadow: none;
+  }
+
+  .game-page-light.game-page-classic .roster-player-card .player-card-team,
+  .game-page-light.game-page-classic .roster-player-card .player-card-positions,
+  .game-page-light.game-page-classic .roster-player-card .achievement-label {
+    color: #2f3d51 !important;
+    text-shadow: none;
+  }
+
+  .game-page-light .position-filter-group button[aria-pressed="false"] {
+    color: #4a586c;
+  }
+
+  .game-page-light .position-filter-group button[aria-pressed="false"]:hover {
+    background: rgba(43, 53, 72, 0.08);
+    color: #202938;
+  }
+
+  .game-page-light .position-filter-group button[aria-pressed="true"] {
+    color: #ffffff;
+  }
+
+  .game-page-light .mobile-menu-header,
+  .game-page-light .mobile-menu-list {
+    border-color: rgba(40, 49, 67, 0.13);
+  }
+
+  .game-page-light .mobile-menu-close,
+  .game-page-light .mobile-menu-item .mobile-icon {
+    color: #5f6b7d;
+  }
+
+  .game-page-light .mobile-menu-toggle-item[aria-pressed="true"] .stats-toggle-knob {
+    background: #ffffff;
+  }
+
+  .game-page-light .mobile-lineup-token {
+    background: #d9e1ec;
+    border-color: rgba(94, 106, 127, 0.5);
+    color: #5a6576;
+  }
+
+  .game-page-light .mobile-bottom-nav-item:not(.mobile-bottom-nav-item-active) {
+    color: #5a6576;
+  }
+}
+
+@media (max-width: 430px) {
+  .game-page-classic .game-roster-panel > .border-b {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .game-page-classic .roster-filter-row {
+    gap: 8px;
+    grid-template-columns: 136px minmax(0, 1fr) 104px;
+  }
+
+  .game-page-classic .position-filter-group {
+    width: 136px;
+  }
+
+  .game-page-classic .roster-list-scroll {
+    padding-left: 18px;
+    padding-right: 16px;
+  }
+
+  .game-page-classic .mobile-bottom-nav-item span {
+    font-size: 0.5rem;
+  }
+}
+
+.game-page-light {
+  background:
+    radial-gradient(circle at 18% -12%, rgba(255, 111, 19, 0.12), transparent 25rem),
+    radial-gradient(circle at 88% 10%, rgba(49, 111, 184, 0.12), transparent 26rem),
+    linear-gradient(180deg, #d8e0ea 0%, #ccd6e2 54%, #c1ccd9 100%);
+  color: #17202d;
+}
+
+.game-page-light .game-header {
+  background: rgba(225, 232, 242, 0.96);
+  border-color: rgba(35, 47, 66, 0.14);
+}
+
+.game-page-light .game-brand-copy h1 {
+  color: #1d2634;
+}
+
+.game-page-light .game-brand-copy p {
+  color: #526177;
+}
+
+.game-page-light .game-roster-panel,
+.game-page-light .game-score-panel,
+.game-page-light .game-auth-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(222, 230, 240, 0.92) 42%),
+    #dce4ee;
+  border-color: rgba(40, 52, 72, 0.16);
+  color: #17202d;
+}
+
+.game-page-light .game-roster-panel > .border-b,
+.game-page-light .game-score-panel {
+  border-color: rgba(40, 52, 72, 0.14);
+}
+
+.game-page-light .roster-feed-title {
+  color: #0b9f78;
+}
+
+.game-page-light .roster-selection-summary,
+.game-page-light .roster-count,
+.game-page-light .roster-list-scroll > p {
+  color: #344257 !important;
+}
+
+.game-page-light .roster-list-scroll > p {
+  background: #d2dce8 !important;
+  border-color: rgba(42, 55, 76, 0.16) !important;
+}
+
+.game-page-light input,
+.game-page-light select,
+.game-page-light .position-filter-group {
+  background: #d7e0eb !important;
+  border-color: rgba(38, 50, 70, 0.16) !important;
+  color: #182334 !important;
+}
+
+.game-page-light input::placeholder {
+  color: #647287;
+}
+
+.game-page-light .position-filter-group button[aria-pressed="false"] {
+  color: #344257 !important;
+}
+
+.game-page-light .position-filter-group button[aria-pressed="false"]:hover {
+  background: rgba(38, 50, 70, 0.08);
+  color: #162132 !important;
+}
+
+.game-page-light .position-filter-group button[aria-pressed="true"] {
+  color: #ffffff !important;
+}
+
+.game-page-light .game-control-button,
+.game-page-light .stats-toggle-button,
+.game-page-light .game-round-pill {
+  background: #d7e0eb;
+  border-color: rgba(38, 50, 70, 0.18);
+  color: #1c2737;
+}
+
+.game-page-light .stats-toggle-button:hover,
+.game-page-light .game-control-button:hover,
+.game-page-light .mobile-header-button:hover {
+  background: #e1e8f1;
+  border-color: rgba(255, 111, 19, 0.42);
+  color: #17202d;
+}
+
+.game-page-light .stats-toggle-label,
+.game-page-light .game-round-pill span:last-child,
+.game-page-light .game-score-panel p:last-child {
+  color: #182334;
+}
+
+.game-page-light .stats-toggle-state,
+.game-page-light .game-round-pill span:first-child {
+  color: #56657a;
+}
+
+.game-page-light .stats-toggle-button[aria-pressed="true"] {
+  background: #d8efe8;
+  border-color: rgba(25, 145, 108, 0.44);
+}
+
+.game-page-light .stats-toggle-button[aria-pressed="true"] .stats-toggle-state {
+  color: #0b7e60;
+}
+
+.game-page-light .game-spin-button,
+.game-page-light .big-spin-button {
+  background: #d6f0e7;
+  border-color: rgba(18, 151, 111, 0.46);
+  color: #0a6d52;
+}
+
+.game-page-light .game-spin-button:hover,
+.game-page-light .big-spin-button:hover {
+  background: #c3eadc;
+  border-color: rgba(18, 151, 111, 0.68);
+  color: #064f3d;
+}
+
+.game-page-light .game-spin-button:disabled,
+.game-page-light .game-control-button:disabled {
+  background: #cbd5e2;
+  border-color: rgba(38, 50, 70, 0.12);
+  color: #6d7b8f;
+}
+
+.game-page-light .game-admin-button,
+.game-page-light .game-reset-button,
+.game-page-light .game-clear-button {
+  background: #d7e0eb;
+  border-color: rgba(38, 50, 70, 0.18);
+  color: #1c2737;
+}
+
+.game-page-light .game-logout-button {
+  background: #f2dfd3;
+  border-color: rgba(195, 88, 35, 0.32);
+  color: #8d3d15;
+}
+
+.game-page-light .roster-player-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(211, 221, 234, 0.9)),
+    #d6e0eb;
+  border-color: rgba(44, 58, 80, 0.18);
+  box-shadow: 0 8px 18px rgba(54, 68, 92, 0.1);
+}
+
+.game-page-light .player-card-name,
+.game-page-light .roster-player-card .achievement-value {
+  color: #162132;
+  text-shadow: none;
+}
+
+.game-page-light .player-card-team,
+.game-page-light .player-card-positions,
+.game-page-light .roster-player-card .achievement-label {
+  color: #2f3d51 !important;
+  text-shadow: none;
+}
+
+.game-page-light .spin-tile-reel {
+  border-color: color-mix(in srgb, var(--spin-accent) 46%, rgba(25, 34, 48, 0.22));
+}
+
+.game-page-light .mobile-lineup-slot-filled .mobile-lineup-token {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--team-primary) 88%, #0f121b), color-mix(in srgb, var(--team-secondary) 40%, #10131c)),
+    var(--team-primary);
+  border-color: color-mix(in srgb, var(--team-accent) 82%, #ffffff);
+  border-style: solid;
+  color: var(--team-number);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.38);
+}
+
+.game-page-light .mobile-lineup-slot-filled .mobile-lineup-label {
+  color: color-mix(in srgb, var(--team-accent) 72%, #263348);
+}
+
+.game-page-light .mobile-lineup-slot-filled.mobile-lineup-slot-selected .mobile-lineup-token {
+  border-color: color-mix(in srgb, var(--team-accent) 32%, #ffffff);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--team-accent) 24%, transparent),
+    0 0 16px color-mix(in srgb, var(--team-accent) 22%, transparent);
+}
+
+.game-page-light .next-draw-card {
+  background:
+    linear-gradient(135deg, rgba(61, 209, 178, 0.22), rgba(73, 129, 184, 0.1)),
+    #d8e7e7;
+  border-color: rgba(19, 160, 124, 0.48);
+}
+
+.game-page-light .next-draw-card > span > span:first-child {
+  color: #0b9f78;
+}
+
+.game-page-light .next-draw-card > span > span:last-child {
+  color: #173148;
+}
+
+.game-page-light .next-draw-card .big-spin-button {
+  background: #dcebe1;
+  border-color: rgba(19, 160, 124, 0.44);
+  color: #006f55;
+}
+
+.game-page-light .next-draw-card .big-spin-button:hover {
+  background: #cce4d8;
+  color: #064f3d;
+}
+
+@media (max-width: 760px) {
+  .season-result-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 560px;
+    padding: 16px 14px 24px;
+  }
+
+  .season-result-header {
+    display: none;
+  }
+
+  .season-result-card {
+    display: contents;
+  }
+
+  .season-result-hero {
+    align-items: stretch;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(47, 134, 255, 0.18), transparent 18rem),
+      linear-gradient(180deg, #111827 0%, #151b2b 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.2);
+    justify-items: stretch;
+    order: 1;
+    padding: 18px 20px 16px;
+    text-align: left;
+  }
+
+  .season-result-hero-top {
+    align-items: start;
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+  }
+
+  .season-result-record-block {
+    justify-items: start;
+    min-width: 0;
+  }
+
+  .season-result-score-summary {
+    display: grid;
+    flex: 0 0 auto;
+    gap: 8px;
+    justify-items: end;
+    padding-top: 2px;
+    text-align: right;
+  }
+
+  .season-result-score-summary span {
+    color: #8d96aa;
+    font-size: 0.62rem;
+    font-weight: 950;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .season-result-score-summary strong {
+    color: #f4f2ec;
+    font-size: clamp(1.7rem, 9vw, 2.6rem);
+    font-weight: 950;
+    line-height: 0.88;
+  }
+
+  .season-result-mode {
+    margin-top: 12px;
+    order: 3;
+  }
+
+  .season-result-kicker {
+    font-size: 0.64rem;
+    margin-top: 0;
+  }
+
+  .season-result-record {
+    font-size: clamp(3.6rem, 16vw, 5.4rem);
+    margin-top: 8px;
+  }
+
+  .season-result-tier {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 1rem;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .season-result-tier span {
+    margin-left: 0;
+  }
+
+  .season-result-board {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    margin-top: 0;
+    order: 2;
+    padding: 0;
+  }
+
+  .season-result-board > .grid {
+    gap: 10px;
+  }
+
+  .result-player-row {
+    background:
+      radial-gradient(circle at 0% 50%, color-mix(in srgb, var(--team-secondary) 18%, transparent), transparent 48%),
+      linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 36%, #1c2334), color-mix(in srgb, var(--team-primary) 14%, #161d2d) 54%, color-mix(in srgb, var(--team-secondary) 16%, #121827)),
+      #171d2d;
+    border-color: color-mix(in srgb, var(--team-accent) 32%, rgba(255, 255, 255, 0.1));
+    gap: 9px;
+    grid-template-columns: 1fr;
+    min-height: 0;
+    padding: 13px 13px 12px 16px;
+  }
+
+  .result-player-row::before {
+    bottom: 12px;
+    top: 12px;
+    width: 5px;
+  }
+
+  .result-player-row > .grid {
+    gap: 12px;
+    grid-template-columns: 56px minmax(0, 1fr);
+    padding-right: 104px;
+  }
+
+  .result-player-row .text-lg {
+    font-size: clamp(1.02rem, 4.5vw, 1.3rem);
+    line-height: 1.05;
+  }
+
+  .result-player-token {
+    min-width: 56px;
+    padding: 9px 7px;
+  }
+
+  .result-player-token span:first-child {
+    font-size: 0.9rem;
+  }
+
+  .result-player-token span:last-child {
+    font-size: 0.6rem;
+  }
+
+  .result-player-meta {
+    font-size: 0.78rem;
+  }
+
+  .result-accolade-badges {
+    gap: 5px;
+    left: auto;
+    max-width: 108px;
+    overflow: visible;
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    white-space: nowrap;
+  }
+
+  .result-award-badge:nth-of-type(n + 4) {
+    display: none;
+  }
+
+  .result-badge-score {
+    height: 24px;
+    padding: 5px 8px 4px;
+  }
+
+  .result-player-row .achievement-strip {
+    gap: 8px;
+    padding-left: 68px;
+    padding-bottom: 0;
+  }
+
+  .result-player-row .achievement-stat {
+    min-width: 42px;
+  }
+
+  .result-player-row .achievement-value {
+    font-size: 0.82rem;
+  }
+
+  .result-player-row .achievement-label {
+    font-size: 0.48rem;
+  }
+
+  .result-player-score {
+    margin-top: 5px;
+  }
+
+  .result-position-boost {
+    right: 12px;
+    top: 42px;
+  }
+
+  .result-totals {
+    background: rgba(21, 27, 43, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    margin-top: 10px;
+    padding: 12px;
+  }
+
+  .result-totals .achievement-strip {
+    gap: 12px;
+  }
+
+  .season-result-description {
+    background: rgba(21, 27, 43, 0.74);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #d4d8e3;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    margin-top: 0;
+    max-width: none;
+    order: 3;
+    padding: 14px 16px;
+  }
+
+  .season-result-actions {
+    gap: 10px;
+    grid-template-columns: 1fr;
+    margin: 0;
+    order: 4;
+  }
+
+  .season-result-page-light .season-result-hero {
+    background:
+      radial-gradient(circle at 14% 8%, rgba(47, 134, 255, 0.13), transparent 18rem),
+      linear-gradient(180deg, #e2e9f2 0%, #d7e0eb 100%);
+    border-color: rgba(40, 52, 72, 0.15);
+    box-shadow: 0 12px 24px rgba(54, 68, 92, 0.14);
+  }
+
+  .season-result-page-light .season-result-score-summary span {
+    color: #617087;
+  }
+
+  .season-result-page-light .season-result-score-summary strong {
+    color: #17202d;
+  }
+
+  .season-result-page-light .season-result-board {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .season-result-page-light .result-totals,
+  .season-result-page-light .season-result-description {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(218, 228, 241, 0.9)),
+      #d7e0eb;
+    border-color: rgba(40, 52, 72, 0.16);
+    color: #26364b;
+  }
+}
+
+@media (max-width: 430px) {
+  .season-result-shell {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .season-result-hero {
+    padding: 16px;
+  }
+
+  .result-player-row > .grid {
+    padding-right: 92px;
+  }
+
+  .result-accolade-badges {
+    max-width: 96px;
+    right: 10px;
+  }
+}
+
+.game-page-all-time .roster-player-card {
+  align-items: center;
+  gap: 16px;
+  grid-template-columns: minmax(170px, 0.8fr) minmax(0, 1.2fr);
+  min-height: 88px;
+  padding: 12px 16px 12px 18px;
+}
+
+.game-page-all-time .player-card-info {
+  display: grid;
+  gap: 4px;
+}
+
+.game-page-all-time .player-card-name {
+  font-size: 1rem;
+}
+
+.game-page-all-time .player-card-positions {
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.game-page-all-time .player-card-team {
+  color: color-mix(in srgb, var(--team-readable-secondary) 64%, #cfd3df);
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.game-page-all-time .roster-player-card .achievement-strip {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 22px;
+  justify-content: flex-start;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 3px 2px 7px;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+.game-page-all-time .roster-player-card .achievement-stat {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 4px;
+  min-height: 36px;
+  min-width: 54px;
+}
+
+.game-page-all-time .roster-player-card .achievement-value {
+  color: #f4f2ec;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.game-page-all-time .roster-player-card .achievement-label {
+  color: rgba(207, 211, 223, 0.78);
+  font-size: 0.56rem;
+  line-height: 1;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.game-page-light.game-page-all-time .roster-player-card .achievement-value {
+  color: #162132;
+}
+
+.game-page-light.game-page-all-time .roster-player-card .achievement-label {
+  color: #2f3d51;
+}
+
+@media (max-width: 760px) {
+  .game-page {
+    padding-bottom: calc(132px + env(safe-area-inset-bottom));
+  }
+
+  .game-page .game-shell,
+  .game-page-classic .game-shell,
+  .game-page-all-time .game-shell {
+    max-width: 560px;
+    padding: 8px 10px 12px;
+  }
+
+  .game-page .game-roster-panel,
+  .game-page-classic .game-roster-panel,
+  .game-page-all-time .game-roster-panel {
+    height: calc(100svh - var(--site-topbar-height) - 140px);
+    min-height: 0;
+  }
+
+  .game-page .mobile-draw-row {
+    align-items: center;
+    display: flex !important;
+    gap: 10px;
+    justify-content: space-between;
+    margin-top: 0;
+  }
+
+  .game-page .mobile-draw-chips {
+    flex: 1 1 auto;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .game-page .mobile-draw-chip {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 112px;
+    overflow: hidden;
+    padding: 10px 15px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .game-page .mobile-draw-actions {
+    gap: 7px;
+  }
+
+  .game-page .mobile-draw-spin {
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    min-height: 34px;
+    padding: 7px 10px;
+  }
+
+  .game-page-all-time .roster-player-card {
+    grid-template-columns: 1fr;
+  }
+
+  .game-page-all-time .roster-player-card .achievement-strip {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 430px) {
+  .game-page .mobile-draw-chip {
+    max-width: 92px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .game-page .mobile-draw-spin span {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .season-result-board > .grid {
+    gap: 20px;
+    padding-top: 6px;
+  }
+
+  .season-result-page .result-player-row {
+    padding-top: 36px !important;
+  }
+
+  .season-result-page .result-player-row > .grid {
+    padding-right: 0 !important;
+  }
+
+  .season-result-page .result-accolade-badges {
+    gap: 4px !important;
+    left: 14px !important;
+    max-width: calc(100% - 28px) !important;
+    overflow: visible !important;
+    padding: 0;
+    right: auto !important;
+    scrollbar-width: none;
+    top: 6px !important;
+    width: max-content !important;
+    z-index: 40;
+  }
+
+  .season-result-page .result-accolade-badges::-webkit-scrollbar {
+    display: none;
+  }
+
+  .season-result-page .result-award-badge,
+  .season-result-page .result-award-badge:nth-of-type(n + 4),
+  .season-result-page .result-award-badge:nth-of-type(n + 5),
+  .season-result-page .result-award-badge:nth-of-type(n + 7) {
+    display: inline-grid !important;
+  }
+
+  .season-result-page .result-badge-score {
+    height: 26px;
+    padding: 6px 9px 5px;
+  }
+
+  .season-result-page .result-award-badge .court-achievement-badge-count {
+    right: -3px;
+    top: -4px;
+  }
+
+  .result-position-boost {
+    right: 12px;
+    top: 50px;
+  }
+}
+
+@media (max-width: 430px) {
+  .season-result-page .result-player-row > .grid {
+    padding-right: 0 !important;
+  }
+
+  .season-result-page .result-accolade-badges {
+    left: 12px !important;
+    max-width: calc(100% - 24px) !important;
+    right: auto !important;
+    top: 6px !important;
   }
 }

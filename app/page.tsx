@@ -1,6 +1,4 @@
 import Link from "next/link";
-import HowToOverlay from "./HowToOverlay";
-import { HOME_HOW_TO, HOW_TO_STORAGE_KEYS } from "./howToContent";
 
 const GAME_MODES = [
   {
@@ -33,9 +31,10 @@ const GAME_MODES = [
   },
   {
     title: "You Know Ball",
-    status: "Coming Soon",
+    status: "Playable",
+    href: "/classic/you-know-ball",
     description: "Classic mode with the accolade clues hidden.",
-    enabled: false,
+    enabled: true,
   },
 ] as const;
 
@@ -70,7 +69,6 @@ export default function LandingPage() {
           )}
         </div>
       </section>
-      <HowToOverlay content={HOME_HOW_TO} storageKey={HOW_TO_STORAGE_KEYS.home} />
     </main>
   );
 }

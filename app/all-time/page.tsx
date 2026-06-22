@@ -42,7 +42,7 @@ const ACCOLADE_WEIGHTS = {
   all_rookie_1st: 1,
   all_rookie_2nd: 0.75,
   seasons_played: 0.25,
-  // games_started: 0.01,
+  games_started: 0.01,
 } satisfies Partial<Record<keyof Accolades, number>>;
 type WeightedAccoladeKey = keyof typeof ACCOLADE_WEIGHTS;
 
@@ -125,13 +125,18 @@ const ACHIEVEMENT_DISPLAY_ORDER = sortAchievementsByWeight([
     count: (player) => player.accolades.all_rookie_2nd ?? 0,
     weight: ACCOLADE_WEIGHTS.all_rookie_2nd,
   },
-  { id: "seasons", label: "YRS", count: (player) => player.accolades.seasons_played, weight: ACCOLADE_WEIGHTS.seasons_played },
-  // {
-  //   id: "games-started",
-  //   label: "Starts",
-  //   count: (player) => player.accolades.games_started ?? 0,
-  //   weight: ACCOLADE_WEIGHTS.games_started,
-  // },
+  {
+    id: "seasons",
+    label: "YRS",
+    count: (player) => player.accolades.seasons_played ?? 0,
+    weight: ACCOLADE_WEIGHTS.seasons_played,
+  },
+  {
+    id: "games-started",
+    label: "GS",
+    count: (player) => player.accolades.games_started ?? 0,
+    weight: ACCOLADE_WEIGHTS.games_started,
+  },
 ]);
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
 const ROSTER_ACCOLADE_SORT_LABELS: Partial<Record<string, string>> = {
@@ -471,7 +476,7 @@ const allTimeCourtConfig = {
   rosterSortOptions: ALL_TIME_ROSTER_SORT_OPTIONS,
   defaultRosterSortMode: "mvp",
   defaultRosterSortDirection: "desc",
-  courtAchievementLimit: 4,
+  courtAchievementLimit: 3,
   buildAchievementTotals: (slots) => buildAchievementTotals(slots.map((slot) => slot.player)),
   buildPlayerAchievements: (player) => buildAchievements(player),
   buildRosterFeedAchievements: (player) => buildAchievements(player),
