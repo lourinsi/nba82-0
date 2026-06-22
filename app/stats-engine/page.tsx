@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { API_BASE_URL } from "../apiConfig";
+import { getCachedPlayers, loadApiJson, loadPlayers as loadCachedPlayers } from "../apiClient";
 
 const TEST_PLAYER_NAME = "Michael Jordan";
 const FALLBACK_SCALING_FACTOR = 250;
@@ -807,13 +807,7 @@ export default function StatsEnginePage() {
 
     async function loadConfig() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/stats-engine-config`, { cache: "no-store" });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const config = (await response.json()) as StatsEngineConfigPayload;
+        const config = await loadApiJson<StatsEngineConfigPayload>("/api/stats-engine-config");
         const nextWeights = mergeWeights(config.statWeights);
 
         if (!active) {
@@ -842,16 +836,12 @@ export default function StatsEnginePage() {
 
     async function loadPlayers() {
       try {
-        setPlayersLoading(true);
+        const cachedPlayers = getCachedPlayers<Player>();
+
+        setPlayersLoading(!cachedPlayers);
         setPlayersError(null);
 
-        const response = await fetch(`${API_BASE_URL}/api/players`, { cache: "no-store" });
-
-        if (!response.ok) {
-          throw new Error(`API returned ${response.status}`);
-        }
-
-        const playerRows = ((await response.json()) as Player[]).filter((player) => player.name);
+        const playerRows = (cachedPlayers ?? (await loadCachedPlayers<Player>())).filter((player) => player.name);
 
         if (!active) {
           return;

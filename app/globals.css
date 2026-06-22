@@ -2814,6 +2814,102 @@ select {
   border-radius: 999px;
 }
 
+.roster-loading-card,
+.roster-tip-card {
+  background:
+    linear-gradient(135deg, rgba(49, 214, 161, 0.13), rgba(255, 111, 19, 0.08)),
+    rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #cfd3df;
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+  padding: 16px;
+  position: relative;
+}
+
+.roster-loading-card::before {
+  animation: roster-loading-sweep 2.8s linear infinite;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
+.roster-loading-card > *,
+.roster-tip-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.roster-tip-content {
+  animation: roster-tip-enter 280ms ease both;
+  display: grid;
+  gap: 6px;
+}
+
+.roster-loading-kicker,
+.roster-tip-kicker {
+  color: #31d6a1;
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.roster-loading-card strong {
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.roster-loading-card p,
+.roster-tip-card p,
+.roster-tip-copy {
+  color: #cfd3df;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.42;
+  margin: 0;
+}
+
+.roster-tip-copy {
+  display: block;
+}
+
+.roster-tip-card {
+  min-height: 78px;
+}
+
+@keyframes roster-loading-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes roster-tip-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roster-loading-card::before,
+  .roster-tip-content,
+  .court-tip-content {
+    animation: none;
+  }
+}
+
 .roster-sort-control {
   max-width: 100%;
 }
@@ -3920,6 +4016,28 @@ select {
   width: 100%;
 }
 
+.court-tip-tooltip {
+  overflow: hidden;
+}
+
+.court-tip-content {
+  animation: roster-tip-enter 280ms ease both;
+  display: grid;
+  gap: 4px;
+}
+
+.court-tip-kicker {
+  color: #89f0cd;
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.court-tip-copy {
+  display: block;
+}
+
 .court-slot-placement-mode {
   opacity: 0.42;
 }
@@ -4011,6 +4129,10 @@ select {
     #d8e4ee;
   border-color: rgba(20, 153, 116, 0.38);
   color: #163348;
+}
+
+.game-page-light .court-tip-kicker {
+  color: #0b7e60;
 }
 
 .court-slot-position {
@@ -6579,6 +6701,30 @@ select {
 .game-page-light .roster-list-scroll > p {
   background: #d2dce8 !important;
   border-color: rgba(42, 55, 76, 0.16) !important;
+}
+
+.game-page-light .roster-loading-card,
+.game-page-light .roster-tip-card {
+  background:
+    linear-gradient(135deg, rgba(18, 151, 111, 0.12), rgba(255, 111, 19, 0.1)),
+    #d2dce8;
+  border-color: rgba(42, 55, 76, 0.16);
+  color: #344257;
+}
+
+.game-page-light .roster-loading-kicker,
+.game-page-light .roster-tip-kicker {
+  color: #0b7e60;
+}
+
+.game-page-light .roster-loading-card strong {
+  color: #17202d;
+}
+
+.game-page-light .roster-loading-card p,
+.game-page-light .roster-tip-card p,
+.game-page-light .roster-tip-copy {
+  color: #344257;
 }
 
 .game-page-light input,

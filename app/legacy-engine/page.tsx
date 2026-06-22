@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { API_BASE_URL } from "../apiConfig";
+import { getCachedPlayers, loadApiJson, loadPlayers } from "../apiClient";
 
 const ACCOLADE_WEIGHTS = {
   mvp_count: 8,
@@ -81,6 +81,16 @@ const FALLBACK_ENGINE_PARAMS: EngineParams = {
   ascentMultiplier: 0.0035,
   densityBonusMultiplier: 0.1,
 };
+
+function sortHistoryPlayers(players: HistoryPlayer[]) {
+  return [...players]
+    .filter((historyPlayer) => historyPlayer.name)
+    .sort(
+      (a, b) =>
+        numberValue(b.legacy_points) - numberValue(a.legacy_points) ||
+        a.name.localeCompare(b.name),
+    );
+}
 
 const ACCOLADE_FIELDS: AccoladeField[] = [
   { key: "mvp_count", label: "MVP", countDefault: 1, maxCount: 8, weightMax: 16 },
@@ -446,13 +456,7 @@ export default function LegacyEnginePage() {
 
     async function loadLegacyEngineConfig() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/legacy-engine-config`, { cache: "no-store" });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const config = (await response.json()) as LegacyEngineConfigPayload;
+        const config = await loadApiJson<LegacyEngineConfigPayload>("/api/legacy-engine-config");
         const nextWeights = mergeAccoladeWeights(config.accoladeWeights);
         const nextEngineDefaults = mergeEngineFactors(config.legacyEngineFactors);
 
@@ -481,23 +485,13 @@ export default function LegacyEnginePage() {
 
     async function loadHistoryPlayers() {
       try {
-        setPlayersLoading(true);
+        const cachedPlayers = getCachedPlayers<HistoryPlayer>();
+
+        setPlayersLoading(!cachedPlayers);
         setPlayersError(null);
 
-        const response = await fetch(`${API_BASE_URL}/api/players`, { cache: "no-store" });
-
-        if (!response.ok) {
-          throw new Error(`API returned ${response.status}`);
-        }
-
-        const players = (await response.json()) as HistoryPlayer[];
-        const sortedPlayers = players
-          .filter((historyPlayer) => historyPlayer.name)
-          .sort(
-            (a, b) =>
-              numberValue(b.legacy_points) - numberValue(a.legacy_points) ||
-              a.name.localeCompare(b.name),
-          );
+        const players = cachedPlayers ?? (await loadPlayers<HistoryPlayer>());
+        const sortedPlayers = sortHistoryPlayers(players);
 
         if (!active) {
           return;

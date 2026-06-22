@@ -206,11 +206,9 @@ export default function SeasonResultsView({ config }: { config: SeasonResultsCon
     router.push(payload?.returnPath ?? config.defaultReturnPath);
   }
 
-  function buildAnother() {
-    const nextPath = payload?.returnPath ?? config.defaultReturnPath;
-
+  function goHome() {
     sessionStorage.removeItem(config.storageKey);
-    router.push(nextPath);
+    router.push("/");
   }
 
   if (!loaded) {
@@ -298,9 +296,9 @@ export default function SeasonResultsView({ config }: { config: SeasonResultsCon
           <button
             className="h-11 rounded-lg border border-[#ff8a2a]/45 bg-[#ff8a2a] px-4 text-sm font-black text-[#15171f] transition hover:bg-[#ffb13d]"
             type="button"
-            onClick={buildAnother}
+            onClick={goHome}
           >
-            Build Another
+            Go Home
           </button>
         </div>
 

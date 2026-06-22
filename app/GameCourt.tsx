@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, DragEvent, FormEvent } from "react";
-import { API_BASE_URL } from "./apiConfig";
+import { getCachedPlayers, loadApiJson, loadPlayers as loadCachedPlayers } from "./apiClient";
 import { teamThemeStyle } from "./all-time/teamStyles";
 import {
   ADMIN_SESSION_CHANGE_EVENT,
@@ -18,6 +18,7 @@ import {
   subscribeToGameHeaderAction,
   type GameHeaderAction,
 } from "./clientPreferences";
+import { GAME_TIPS, randomGameTipIndex, type GameTip } from "./gameTips";
 import type { HowToOverlayContent } from "./howToContent";
 
 export type Position = "PG" | "SG" | "SF" | "PF" | "C";
@@ -354,6 +355,7 @@ type SpinTileStyle = CSSProperties & {
   "--spin-number": string;
 };
 type SpinTarget = "all" | "team" | "era";
+type PublicSpinRoundBehavior = "advance" | "start-first-round" | "free-reroll";
 const UNKNOWN_SPIN_TILE_STYLE: SpinTileStyle = {
   "--spin-primary": "#202637",
   "--spin-accent": "#aeb4c2",
@@ -720,8 +722,9 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const courtRef = useRef<HTMLDivElement | null>(null);
   const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openingAutoSpinStartedAtRef = useRef<number | null>(null);
   const gameHeaderActionRef = useRef<(action: GameHeaderAction) => void>(() => {});
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [players, setPlayers] = useState<Player[]>(() => getCachedPlayers<Player>() ?? []);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [authPanelOpen, setAuthPanelOpen] = useState(false);
@@ -747,6 +750,9 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const [awaitingPublicPick, setAwaitingPublicPick] = useState(false);
   const [publicTeamSwapUsed, setPublicTeamSwapUsed] = useState(false);
   const [publicEraSwapUsed, setPublicEraSwapUsed] = useState(false);
+  const [openingAutoSpinActive, setOpeningAutoSpinActive] = useState(false);
+  const [openingAutoSpinComplete, setOpeningAutoSpinComplete] = useState(false);
+  const [openingRerollAvailable, setOpeningRerollAvailable] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
   const toggleLightMode = useCallback(() => setStoredLightMode(!lightMode), [lightMode]);
@@ -754,44 +760,52 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const showAdjustedStats = supportsAdjustedStats && adjustedStatsEnabled;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [, setStatus] = useState("Ready");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !getCachedPlayers<Player>());
   const [error, setError] = useState<string | null>(null);
+  const [activeTipIndex, setActiveTipIndex] = useState(0);
+  const activeTip = GAME_TIPS[activeTipIndex] ?? GAME_TIPS[0];
   const [spinningTarget, setSpinningTarget] = useState<SpinTarget | null>(null);
   const isSpinning = spinningTarget !== null;
   const spinStatusLabel =
-    spinningTarget === "team" ? "TEAM SPINNING..." : spinningTarget === "era" ? "ERA SPINNING..." : "SPINNING...";
+    openingAutoSpinActive
+      ? "WARMING ROSTERS..."
+      : spinningTarget === "team"
+        ? "TEAM SPINNING..."
+        : spinningTarget === "era"
+          ? "ERA SPINNING..."
+          : "SPINNING...";
+
+  const resetRosterFeedControls = useCallback(() => {
+    setPositionFilter("All");
+    setRosterSearch("");
+    setRosterSortMode(initialRosterSortMode);
+    setRosterSortDirection(defaultRosterSortDirection);
+  }, [defaultRosterSortDirection, initialRosterSortMode]);
 
   useEffect(() => {
-    const controller = new AbortController();
     let active = true;
 
     async function loadPlayers() {
       try {
+        const cachedPlayers = getCachedPlayers<Player>();
+
+        if (cachedPlayers) {
+          setPlayers(cachedPlayers);
+          setError(null);
+          setLoading(false);
+          return;
+        }
+
         if (active) {
           setLoading(true);
         }
-        const response = await fetch(`${API_BASE_URL}/api/players`, {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-store",
-          },
-          signal: controller.signal,
-        });
 
-        if (!response.ok) {
-          throw new Error(`API returned ${response.status}`);
-        }
-
-        const data = (await response.json()) as Player[];
+        const data = await loadCachedPlayers<Player>();
         if (active) {
           setPlayers(data);
           setError(null);
         }
       } catch (fetchError) {
-        if (fetchError instanceof DOMException && fetchError.name === "AbortError") {
-          return;
-        }
-
         if (active) {
           setError(fetchError instanceof Error ? fetchError.message : "Unable to fetch players");
         }
@@ -806,7 +820,6 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
     return () => {
       active = false;
-      controller.abort();
     };
   }, []);
 
@@ -815,21 +828,16 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       return;
     }
 
-    const controller = new AbortController();
+    let active = true;
 
     async function loadStatsEngineConfig() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/stats-engine-config`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
+        const config = await loadApiJson<Partial<StatsEngineConfig>>("/api/stats-engine-config");
+        const tsBlendWeights = config.tsBlendWeights ?? DEFAULT_STATS_ENGINE_CONFIG.tsBlendWeights;
 
-        if (!response.ok) {
+        if (!active) {
           return;
         }
-
-        const config = (await response.json()) as Partial<StatsEngineConfig>;
-        const tsBlendWeights = config.tsBlendWeights ?? DEFAULT_STATS_ENGINE_CONFIG.tsBlendWeights;
 
         setStatsEngineConfig({
           allTimeTsBaseline: positiveNumberValue(
@@ -846,16 +854,16 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
             era: positiveNumberValue(tsBlendWeights.era, DEFAULT_STATS_ENGINE_CONFIG.tsBlendWeights.era),
           },
         });
-      } catch (fetchError) {
-        if (fetchError instanceof DOMException && fetchError.name === "AbortError") {
-          return;
-        }
+      } catch {
+        // Fall back to the baked-in values if the API is unavailable.
       }
     }
 
     loadStatsEngineConfig();
 
-    return () => controller.abort();
+    return () => {
+      active = false;
+    };
   }, [usesStatsEngineConfig]);
 
   useEffect(() => {
@@ -918,6 +926,21 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   );
 
   useEffect(() => {
+    const initialTipTimeout = window.setTimeout(() => {
+      setActiveTipIndex(randomGameTipIndex());
+    }, 0);
+
+    const tipInterval = window.setInterval(() => {
+      setActiveTipIndex((currentIndex) => (currentIndex + 1) % GAME_TIPS.length);
+    }, 10000);
+
+    return () => {
+      window.clearTimeout(initialTipTimeout);
+      window.clearInterval(tipInterval);
+    };
+  }, []);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 760px)");
     const syncViewport = () => setIsMobileViewport(mediaQuery.matches);
 
@@ -977,6 +1000,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     !error &&
     !isAdmin &&
     !isSpinning &&
+    openingAutoSpinComplete &&
     !awaitingPublicPick &&
     publicRoundsSpent < PUBLIC_ROUND_COUNT;
   const publicTeamSwapAllowed =
@@ -1004,6 +1028,16 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     PUBLIC_ROUND_COUNT,
   );
   const showPublicRosterSpinCta = publicSpinAllowed;
+  const showOpeningRerollCta =
+    authChecked &&
+    !loading &&
+    !error &&
+    !isAdmin &&
+    !isSpinning &&
+    openingRerollAvailable &&
+    awaitingPublicPick &&
+    hasActiveDraftSelection &&
+    publicRoundsSpent === 1;
   const gameHeaderTitle = isAdmin ? "Admin Workspace" : `Round ${publicDisplayRound}/${PUBLIC_ROUND_COUNT}`;
   const gameHeaderEyebrow = isAdmin ? "Admin Mode" : resultModeLabel;
 
@@ -1033,6 +1067,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       ),
     [lineup],
   );
+  const selectedPlayerCount = selectedPlayerIds.size;
   const normalizedRosterSearch = useMemo(() => normalizeName(rosterSearch), [rosterSearch]);
 
   const filteredPlayers = useMemo(
@@ -1290,6 +1325,9 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     setPublicRoundsSpent(0);
     setPublicTeamSwapUsed(false);
     setPublicEraSwapUsed(false);
+    setOpeningAutoSpinActive(false);
+    setOpeningAutoSpinComplete(true);
+    setOpeningRerollAvailable(false);
   }
 
   function resetPublicGame() {
@@ -1305,6 +1343,10 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     setAwaitingPublicPick(false);
     setPublicTeamSwapUsed(false);
     setPublicEraSwapUsed(false);
+    setOpeningAutoSpinActive(false);
+    setOpeningAutoSpinComplete(false);
+    setOpeningRerollAvailable(false);
+    setActiveTipIndex(randomGameTipIndex());
   }
 
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
@@ -1617,6 +1659,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     );
     if (!isAdmin && !source) {
       setAwaitingPublicPick(false);
+      setOpeningRerollAvailable(false);
     }
     return true;
   }
@@ -1771,6 +1814,10 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       setAwaitingPublicPick(false);
       setPublicTeamSwapUsed(false);
       setPublicEraSwapUsed(false);
+      setOpeningAutoSpinActive(false);
+      setOpeningAutoSpinComplete(false);
+      setOpeningRerollAvailable(false);
+      setActiveTipIndex(randomGameTipIndex());
       setAuthPanelOpen(false);
       setLoginError(null);
       setStatus("Public draft reset.");
@@ -1833,16 +1880,34 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     }
   }
 
-  function spinTeamEra(target: SpinTarget = "all") {
+  const selectionForSpinTargetRef = useRef(selectionForSpinTarget);
+  const applySpinSelectionRef = useRef(applySpinSelection);
+
+  useEffect(() => {
+    selectionForSpinTargetRef.current = selectionForSpinTarget;
+    applySpinSelectionRef.current = applySpinSelection;
+  });
+
+  function spinTeamEra(
+    target: SpinTarget = "all",
+    options: { publicRoundBehavior?: PublicSpinRoundBehavior } = {},
+  ) {
     if (isSpinning) {
       return;
     }
 
     setPositionPickerPlayer(null);
+    const publicRoundBehavior = options.publicRoundBehavior ?? "advance";
+    const isOpeningFreeReroll = publicRoundBehavior === "free-reroll";
 
     if (!isAdmin) {
-      if (target === "all" && !publicSpinAllowed) {
+      if (target === "all" && !publicSpinAllowed && !isOpeningFreeReroll) {
         setStatus(publicGameComplete ? "All public rounds are complete." : "Choose a player before spinning again.");
+        return;
+      }
+
+      if (target === "all" && isOpeningFreeReroll && !showOpeningRerollCta) {
+        setStatus("The free opening reroll is no longer available.");
         return;
       }
 
@@ -1869,11 +1934,13 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
     setSelectedSlot(null);
     setMobileMoveSource(null);
-    setRosterSearch("");
+    resetRosterFeedControls();
     setDraggedPlayerId(null);
     setDraggedFromPosition(null);
     setSpinningTarget(target);
+    setOpeningRerollAvailable(false);
     setStatus("Spinning...");
+    setActiveTipIndex(randomGameTipIndex());
 
     spinIntervalRef.current = setInterval(() => {
       const previewSelection = selectionForSpinTarget(target);
@@ -1891,10 +1958,16 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       applySpinSelection(finalSelection, target);
       setSpinningTarget(null);
       setStatus(`Spun ${finalSelection.team} ${finalSelection.eraLabel}.`);
+      setActiveTipIndex(randomGameTipIndex());
 
       if (!isAdmin) {
         if (target === "all") {
-          setPublicRoundsSpent((roundsSpent) => Math.min(roundsSpent + 1, PUBLIC_ROUND_COUNT));
+          if (publicRoundBehavior === "advance") {
+            setPublicRoundsSpent((roundsSpent) => Math.min(roundsSpent + 1, PUBLIC_ROUND_COUNT));
+          } else if (publicRoundBehavior === "start-first-round") {
+            setPublicRoundsSpent((roundsSpent) => Math.max(roundsSpent, 1));
+          }
+
           setAwaitingPublicPick(true);
         } else if (target === "team") {
           setPublicTeamSwapUsed(true);
@@ -1905,11 +1978,115 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     }, SPIN_DURATION_MS);
   }
 
+  useEffect(() => {
+    const openingGameStarted = publicRoundsSpent > 0 || awaitingPublicPick || selectedPlayerCount > 0;
+
+    if (openingAutoSpinActive && (isAdmin || error || openingAutoSpinComplete)) {
+      const stopOpeningSpin = window.setTimeout(() => {
+        if (spinIntervalRef.current) {
+          clearInterval(spinIntervalRef.current);
+          spinIntervalRef.current = null;
+        }
+
+        if (spinTimeoutRef.current) {
+          clearTimeout(spinTimeoutRef.current);
+          spinTimeoutRef.current = null;
+        }
+
+        openingAutoSpinStartedAtRef.current = null;
+        setOpeningAutoSpinActive(false);
+        setSpinningTarget(null);
+      }, 0);
+
+      return () => window.clearTimeout(stopOpeningSpin);
+    }
+
+    if (!authChecked || isAdmin || openingAutoSpinComplete || openingGameStarted || error) {
+      return;
+    }
+
+    if (!openingAutoSpinActive) {
+      const startOpeningSpin = window.setTimeout(() => {
+        if (spinIntervalRef.current) {
+          clearInterval(spinIntervalRef.current);
+        }
+
+        if (spinTimeoutRef.current) {
+          clearTimeout(spinTimeoutRef.current);
+          spinTimeoutRef.current = null;
+        }
+
+        setPositionPickerPlayer(null);
+        setSelectedSlot(null);
+        setMobileMoveSource(null);
+        resetRosterFeedControls();
+        setDraggedPlayerId(null);
+        setDraggedFromPosition(null);
+        setOpeningRerollAvailable(false);
+        openingAutoSpinStartedAtRef.current = Date.now();
+        setOpeningAutoSpinActive(true);
+        setSpinningTarget("all");
+        setStatus("Spinning while the roster warms...");
+
+        spinIntervalRef.current = setInterval(() => {
+          applySpinSelectionRef.current(selectionForSpinTargetRef.current("all"), "all");
+        }, SPIN_TICK_MS);
+      }, 0);
+
+      return () => window.clearTimeout(startOpeningSpin);
+    }
+
+    if (loading || !players.length) {
+      return;
+    }
+
+    const openingSpinStartedAt = openingAutoSpinStartedAtRef.current ?? Date.now();
+    const remainingSpinMs = Math.max(SPIN_DURATION_MS - (Date.now() - openingSpinStartedAt), 0);
+    const finishOpeningSpin = window.setTimeout(() => {
+      if (spinIntervalRef.current) {
+        clearInterval(spinIntervalRef.current);
+        spinIntervalRef.current = null;
+      }
+
+      if (spinTimeoutRef.current) {
+        clearTimeout(spinTimeoutRef.current);
+        spinTimeoutRef.current = null;
+      }
+
+      const finalSelection = selectionForSpinTargetRef.current("all", true);
+      applySpinSelectionRef.current(finalSelection, "all");
+      openingAutoSpinStartedAtRef.current = null;
+      setPublicRoundsSpent(1);
+      setAwaitingPublicPick(true);
+      setOpeningAutoSpinActive(false);
+      setOpeningAutoSpinComplete(true);
+      setOpeningRerollAvailable(true);
+      setSpinningTarget(null);
+      setActiveTipIndex(randomGameTipIndex());
+      setStatus(`Spun ${finalSelection.team} ${finalSelection.eraLabel}. One free reroll is available.`);
+    }, remainingSpinMs);
+
+    return () => window.clearTimeout(finishOpeningSpin);
+  }, [
+    authChecked,
+    awaitingPublicPick,
+    error,
+    isAdmin,
+    loading,
+    openingAutoSpinActive,
+    openingAutoSpinComplete,
+    players.length,
+    publicRoundsSpent,
+    resetRosterFeedControls,
+    selectedPlayerCount,
+  ]);
+
   const positionPickerAssignablePositions = positionPickerPlayer ? rosterAssignablePositions(positionPickerPlayer) : [];
   const desktopPositionPickerPlayer = !isMobileViewport ? positionPickerPlayer : null;
   const desktopPositionPickerTooltip = desktopPositionPickerPlayer
     ? `Select a position for ${desktopPositionPickerPlayer.name}. True-position picks score higher.`
     : null;
+  const desktopCourtTip = !desktopPositionPickerPlayer && hasActiveDraftSelection && !isSpinning ? activeTip : null;
   const renderAuthPanel = (className = "") => (
     <form
       className={`game-auth-panel ${className} grid w-[280px] max-w-[calc(100vw-2rem)] gap-3 rounded-lg border border-white/12 bg-[#202431] p-4 shadow-2xl shadow-black/35`}
@@ -1997,6 +2174,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
               </div>
 
               <p className="mt-5 text-center text-base font-black uppercase text-[#cfd3df]">{spinStatusLabel}</p>
+              <RosterTipCard tip={activeTip} className="spin-stage-tip mt-5" />
             </div>
           ) : (
             <>
@@ -2135,7 +2313,24 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                   {loading ? "Loading players..." : `${filteredPlayers.length} players available`}
                 </p>
 
-                {showPublicRosterSpinCta ? (
+                {showOpeningRerollCta ? (
+                  <div className="next-draw-card opening-reroll-card mt-3 flex flex-col gap-3 rounded-lg border border-[#ff8a2a]/45 bg-[#ff8a2a]/[0.13] p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="grid gap-1">
+                      <span className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[#ffbf86]">
+                        Free Reroll
+                      </span>
+                      <span className="text-lg font-black leading-none text-white">One opening spin</span>
+                    </span>
+                    <button
+                      aria-label="Use free opening reroll"
+                      className="big-spin-button h-12 rounded-lg border border-[#ff8a2a]/50 bg-[#ff8a2a] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#ffbf86]"
+                      type="button"
+                      onClick={() => spinTeamEra("all", { publicRoundBehavior: "free-reroll" })}
+                    >
+                      Free Spin
+                    </button>
+                  </div>
+                ) : showPublicRosterSpinCta ? (
                   <div className="next-draw-card mt-3 flex flex-col gap-3 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] p-3 sm:flex-row sm:items-center sm:justify-between">
                     <span className="grid gap-1">
                       <span className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[#89f0cd]">
@@ -2159,20 +2354,22 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
               <div className="roster-list-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
                 {loading ? (
-                  <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-[#cfd3df]">
-                    Loading player accolades...
-                  </p>
+                  <div className="roster-loading-card" role="status" aria-live="polite">
+                    <strong>Loading player accolades...</strong>
+                    <span className="roster-tip-content" key={`${activeTip.eyebrow}-${activeTip.text}`}>
+                      <span className="roster-tip-kicker">{activeTip.eyebrow}</span>
+                      <span className="roster-tip-copy">{activeTip.text}</span>
+                    </span>
+                  </div>
                 ) : error ? (
                   <p className="rounded-lg border border-[#ff8a2a]/30 bg-[#ff8a2a]/10 p-4 text-sm font-semibold text-[#ffd5b4]">
                     {error}
                   </p>
+                ) : !hasActiveDraftSelection ? (
+                  <RosterTipCard tip={activeTip} />
                 ) : filteredPlayers.length === 0 ? (
                   <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-[#cfd3df]">
-                    {!hasActiveDraftSelection
-                      ? "Spin to reveal a roster."
-                      : rosterSearch.trim()
-                        ? "No players match that search."
-                        : "No players found for this team and era."}
+                    {rosterSearch.trim() ? "No players match that search." : "No players found for this team and era."}
                   </p>
                 ) : (
                   <div className="grid gap-2">
@@ -2282,6 +2479,13 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
           {desktopPositionPickerTooltip ? (
             <div className="court-placement-tooltip" role="status">
               {desktopPositionPickerTooltip}
+            </div>
+          ) : desktopCourtTip ? (
+            <div className="court-placement-tooltip court-tip-tooltip" role="note">
+              <span className="court-tip-content" key={`${desktopCourtTip.eyebrow}-${desktopCourtTip.text}`}>
+                <span className="court-tip-kicker">{desktopCourtTip.eyebrow}</span>
+                <span className="court-tip-copy">{desktopCourtTip.text}</span>
+              </span>
             </div>
           ) : null}
 
@@ -2750,6 +2954,17 @@ function selectCourtBadgeAchievements(
 
 function courtBadgeTooltip(achievement: Achievement) {
   return `${achievement.value} ${COURT_BADGE_META_BY_ID[achievement.id]?.description ?? achievement.label}`;
+}
+
+function RosterTipCard({ className = "", tip }: { className?: string; tip: GameTip }) {
+  return (
+    <div className={`roster-tip-card ${className}`.trim()} role="note">
+      <span className="roster-tip-content" key={`${tip.eyebrow}-${tip.text}`}>
+        <span className="roster-tip-kicker">{tip.eyebrow}</span>
+        <span className="roster-tip-copy">{tip.text}</span>
+      </span>
+    </div>
+  );
 }
 
 function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
