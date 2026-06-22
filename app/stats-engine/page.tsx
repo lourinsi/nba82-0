@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { API_BASE_URL } from "../apiConfig";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const TEST_PLAYER_NAME = "Michael Jordan";
 const FALLBACK_SCALING_FACTOR = 250;
 const FALLBACK_WS_48_BASELINE = 0.1;
