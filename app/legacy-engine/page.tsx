@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { API_BASE_URL } from "../apiConfig";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const ACCOLADE_WEIGHTS = {
   mvp_count: 8,
   finals_mvp_count: 7,

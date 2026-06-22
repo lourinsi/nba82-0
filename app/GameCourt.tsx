@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, DragEvent, FormEvent } from "react";
+import { API_BASE_URL } from "./apiConfig";
 import { teamThemeStyle } from "./all-time/teamStyles";
 import {
   ADMIN_SESSION_CHANGE_EVENT,
@@ -255,7 +256,6 @@ export type GameCourtConfig = {
   ) => PositionBonus | undefined;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const FALLBACK_ALL_TIME_TS_BASELINE = 0.54;
 const DEFAULT_STATS_ENGINE_CONFIG: StatsEngineConfig = {
   allTimeTsBaseline: FALLBACK_ALL_TIME_TS_BASELINE,
