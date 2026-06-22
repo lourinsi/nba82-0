@@ -146,7 +146,7 @@ export default function SeasonResultsView({ config }: { config: SeasonResultsCon
   const [payload, setPayload] = useState<ResultPayload | null>(null);
   const [loaded, setLoaded] = useState(false);
   const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
-  const adjustedStatsEnabled = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => true);
+  const adjustedStatsEnabled = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => false);
   const pageClassName = `season-result-page ${lightMode ? "season-result-page-light" : "season-result-page-dark"}`;
   const hiddenAchievementIds = new Set(config.hiddenAchievementIds ?? []);
   const resultBadgeMetaById = config.resultBadgeMetaById ?? {};

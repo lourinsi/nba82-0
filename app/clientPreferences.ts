@@ -70,9 +70,9 @@ export function subscribeToAdjustedStats(onStoreChange: () => void) {
 
 export function adjustedStatsSnapshot() {
   try {
-    return window.localStorage.getItem(ADJUSTED_STATS_STORAGE_KEY) !== "off";
+    return window.localStorage.getItem(ADJUSTED_STATS_STORAGE_KEY) === "on";
   } catch {
-    return true;
+    return false;
   }
 }
 

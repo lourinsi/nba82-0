@@ -28,12 +28,12 @@ const DEFAULT_ERAS = ["60's", "90's", "00's", "10's", "20's"];
 
 const ACCOLADE_WEIGHTS = {
   mvp_count: 8,
-  finals_mvp_count: 7,
+  finals_mvp_count: 7.1,
   all_nba_1st: 7,
   all_nba_2nd: 5.5,
   all_nba_3rd: 4,
-  championship_rings: 2.5,
   dpoy_count: 2.5,
+  championship_rings: 2.4,
   all_def_1st: 2,
   all_def_2nd: 1.5,
   scoring_titles: 3,
@@ -42,11 +42,11 @@ const ACCOLADE_WEIGHTS = {
   steal_titles: 1.5,
   block_titles: 1.5,
   // no more olympics point value
-  all_star_mvp_count: 1,
+  all_star_mvp_count: 1.1,
   all_star_selections: 1,
   "6moy": 1,
   most_improved: 1,
-  roy_won: 1,
+  roy_won: 1.1,
   all_rookie_1st: 1,
   all_rookie_2nd: 0.75,
   seasons_played: 0.25,
