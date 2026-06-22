@@ -1,333 +1,96 @@
-"use client";
-
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { teamThemeStyle } from "../../all-time/teamStyles";
-
-type Position = "PG" | "SG" | "SF" | "PF" | "C";
-type Achievement = { id: string; value: string; label: string; title?: string };
-type SeasonProjection = {
-  score: number;
-  wins: number;
-  losses: number;
-  tier: string;
-  description: string;
-};
-type DraftSelection = {
-  team: string;
-  era?: string;
-  eraLabel: string;
-};
-type PositionBonus = {
-  multiplier: number;
-  points: number;
-};
-type ResultPlayer = {
-  position: Position;
-  player: {
-    id: string;
-    name: string;
-  };
-  selection?: DraftSelection;
-  scoreContribution?: number;
-  achievements: Achievement[];
-  positionBonus?: PositionBonus;
-};
-type ClassicResultPayload = {
-  mode: "classic";
-  selectedTeam: string;
-  selectedEraLabel: string;
-  simulationResult: SeasonProjection;
-  lineup: ResultPlayer[];
-  totals: Achievement[];
-};
+import SeasonResultsView from "../../results/SeasonResultsView";
 
 const CLASSIC_RESULT_STORAGE_KEY = "nba82_classic_result";
+
 const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
-  "all-defense": "All-Defense teams",
-  "all-nba": "All-NBA teams",
-  "all-rookie-1st": "All-Rookie 1st team",
-  "all-rookie-2nd": "All-Rookie 2nd team",
-  "all-star": "All-Star selections",
-  "all-star-mvp": "All-Star MVPs",
-  assists: "Assist Champions",
+  "all-defense": "All-DEF",
+  "all-nba": "All-NBA",
+  "all-rookie-1st": "All-Rookie 1st",
+  "all-rookie-2nd": "All-Rookie 2nd",
+  "all-star": "AS",
+  "all-star-mvp": "AS MVP",
+  assists: "AST Champ",
+  "avg-ts-pct": "Avg true shooting",
   "avg-ts-star": "Avg TS+ & TS% combined",
   "avg-ws-48": "Avg win shares per 48",
-  blocks: "Block Champions",
-  dpoy: "Defensive Player of the Year",
-  "sixth-man": "Sixth Man of the Year",
-  fmvp: "Finals MVP",
-  mvp: "Most Valuable Player",
-  "most-improved": "MIP - Most Improved Player",
+  blocks: "BLK Champ",
+  dpoy: "DPOY",
+  "sixth-man": "6MOY",
+  fmvp: "FMVP",
+  mvp: "MVP",
+  "most-improved": "MIP",
   pra: "Pts + Rebs + Asts",
-  rebounds: "Rebound Champions",
+  rebounds: "REB Champ",
   rings: "Championships",
-  roy: "Rookie of the Year",
-  scoring: "Scoring Champions",
-  seasons: "Seasons played",
-  steals: "Steal Champions",
+  roy: "ROY",
+  scoring: "PTS Champ",
+  seasons: "YRS",
+  steals: "STL Champ",
   stocks: "Stocks - Stls + Blks",
+  "ts-pct": "True shooting",
   "ts-plus": "Era-adjusted TS%",
   "ts-star": "TS+ & TS% combined",
   "ws-48": "Win shares per 48",
 };
 
-function achievementTitle(achievement: Achievement) {
-  return achievement.title || ACHIEVEMENT_TITLE_BY_ID[achievement.id] || `${achievement.label}: ${achievement.value}`;
-}
+const RESULT_BADGE_META_BY_ID = {
+  "all-defense": { symbol: "DEF", variant: "defense", description: "All-DEF" },
+  "all-nba": { symbol: "NBA", variant: "nba", description: "All-NBA" },
+  "all-rookie-1st": { symbol: "R1", variant: "rookie", description: "All-Rookie 1st" },
+  "all-rookie-2nd": { symbol: "R2", variant: "rookie", description: "All-Rookie 2nd" },
+  "all-star": { symbol: "AS", variant: "all-star-logo", description: "AS" },
+  "all-star-mvp": { symbol: "★", variant: "all-star-mvp", description: "AS MVP" },
+  assists: { symbol: "AST", variant: "assist", description: "AST Champ" },
+  blocks: { symbol: "BLK", variant: "defense", description: "BLK Champ" },
+  dpoy: { symbol: "DPOY", variant: "dpoy", description: "DPOY" },
+  fmvp: { symbol: "F", variant: "fmvp", description: "FMVP" },
+  mvp: { symbol: "M", variant: "mvp", description: "MVP" },
+  "most-improved": { symbol: "MIP", variant: "rise", description: "MIP" },
+  rebounds: { symbol: "REB", variant: "rebound", description: "REB Champ" },
+  rings: { symbol: "💍", variant: "ring", description: "Rings" },
+  roy: { symbol: "ROY", variant: "roy", description: "ROY" },
+  scoring: { symbol: "PTS", variant: "points", description: "PTS Champ" },
+  "sixth-man": { symbol: "6th", variant: "sixth", description: "6MOY" },
+  steals: { symbol: "STL", variant: "defense", description: "STL Champ" },
+};
 
-function playerInitials(name: string) {
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-
-  if (initials.length >= 2) {
-    return initials.slice(0, 2);
-  }
-
-  const fallback = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-
-  return fallback.slice(0, 2).padEnd(2, fallback[0] ?? "?");
-}
-
-function formatLegacyScore(score: number) {
-  return Number.isInteger(score) ? String(score) : score.toFixed(1);
-}
-
-function formatBoostPercent(multiplier: number) {
-  return `${Math.round((multiplier - 1) * 100)}%`;
-}
-
-function readStoredResult() {
-  try {
-    const raw = sessionStorage.getItem(CLASSIC_RESULT_STORAGE_KEY);
-
-    if (!raw) {
-      return null;
-    }
-
-    const payload = JSON.parse(raw) as ClassicResultPayload;
-
-    return payload.mode === "classic" && payload.simulationResult && Array.isArray(payload.lineup) ? payload : null;
-  } catch {
-    return null;
-  }
-}
+const RESULT_BADGE_SCORE_WEIGHT_BY_ID: Record<string, number> = {
+  mvp: 8,
+  fmvp: 7,
+  "all-nba": 7,
+  scoring: 3,
+  assists: 3,
+  rings: 2.5,
+  dpoy: 2.5,
+  rebounds: 2,
+  "all-defense": 2,
+  steals: 1.5,
+  blocks: 1.5,
+  "all-star-mvp": 1,
+  "all-star": 1,
+  roy: 1,
+  "sixth-man": 1,
+  "most-improved": 1,
+  "all-rookie-1st": 1,
+  "all-rookie-2nd": 0.75,
+};
 
 export default function ClassicResultsPage() {
-  const router = useRouter();
-  const [payload, setPayload] = useState<ClassicResultPayload | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setPayload(readStoredResult());
-      setLoaded(true);
-    }, 0);
-
-    return () => window.clearTimeout(timeout);
-  }, []);
-
-  function goToClassic() {
-    router.push("/classic");
-  }
-
-  function buildAnother() {
-    sessionStorage.removeItem(CLASSIC_RESULT_STORAGE_KEY);
-    router.push("/classic");
-  }
-
-  if (!loaded) {
-    return <main className="season-result-page" />;
-  }
-
-  if (!payload) {
-    return (
-      <main className="season-result-page">
-        <div className="season-result-shell">
-          <header className="season-result-header">
-            <Link className="season-result-logo" href="/" aria-label="Go to home">
-              82-0
-            </Link>
-            <h1>Classic Results</h1>
-          </header>
-
-          <section className="season-result-empty">
-            <p>No simulated season found.</p>
-            <button type="button" onClick={goToClassic}>
-              Build Classic Team
-            </button>
-          </section>
-        </div>
-      </main>
-    );
-  }
-
-  const { lineup, selectedEraLabel, selectedTeam, simulationResult, totals } = payload;
-
   return (
-    <main className="season-result-page">
-      <div className="season-result-shell">
-        <header className="season-result-header">
-          <Link className="season-result-logo" href="/" aria-label="Go to home">
-            82-0
-          </Link>
-          <h1>Can you go 82-0?</h1>
-        </header>
-
-        <section className="season-result-card">
-          <div className="season-result-hero">
-            <p className="season-result-mode">Classic Mode</p>
-            <p className="season-result-kicker">Projected Record</p>
-            <p className="season-result-record">
-              {simulationResult.wins}
-              <span>-</span>
-              {simulationResult.losses}
-            </p>
-            <p className="season-result-tier">
-              {simulationResult.tier} <span>{formatLegacyScore(simulationResult.score)} pts</span>
-            </p>
-          </div>
-
-          <p className="season-result-description">{simulationResult.description}</p>
-        </section>
-
-        <div className="season-result-actions">
-          <button
-            className="h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1]"
-            type="button"
-            onClick={goToClassic}
-          >
-            Back to Court
-          </button>
-          <button
-            className="h-11 rounded-lg border border-[#ff8a2a]/45 bg-[#ff8a2a] px-4 text-sm font-black text-[#15171f] transition hover:bg-[#ffb13d]"
-            type="button"
-            onClick={buildAnother}
-          >
-            Build Another
-          </button>
-        </div>
-
-        <section className="season-result-board">
-          <div className="grid gap-3">
-            {lineup.map((entry) => (
-              <ResultPlayerRow
-                key={entry.position}
-                achievements={entry.achievements}
-                fallbackEraLabel={selectedEraLabel}
-                fallbackTeam={selectedTeam}
-                player={entry.player}
-                position={entry.position}
-                positionBonus={entry.positionBonus}
-                scoreContribution={entry.scoreContribution}
-                selection={entry.selection}
-              />
-            ))}
-          </div>
-
-          <div className="result-totals">
-            <div className="result-totals-label">
-              <span>Lineup Totals</span>
-              <span>{totals.length} categories</span>
-            </div>
-            <AchievementStrip achievements={totals} />
-          </div>
-        </section>
-      </div>
-    </main>
-  );
-}
-
-function ResultPlayerRow({
-  achievements,
-  fallbackEraLabel,
-  fallbackTeam,
-  player,
-  position,
-  positionBonus,
-  scoreContribution,
-  selection,
-}: {
-  achievements: Achievement[];
-  fallbackEraLabel: string;
-  fallbackTeam: string;
-  player: { id: string; name: string };
-  position: Position;
-  positionBonus?: PositionBonus;
-  scoreContribution?: number;
-  selection?: DraftSelection;
-}) {
-  const displaySelection = {
-    team: selection?.team ?? fallbackTeam,
-    eraLabel: selection?.eraLabel ?? fallbackEraLabel,
-  };
-  const positionBoost = positionBonus && positionBonus.points > 0 ? positionBonus : null;
-  const contribution =
-    typeof scoreContribution === "number" && Number.isFinite(scoreContribution) ? scoreContribution : null;
-
-  return (
-    <div className="result-player-row" style={teamThemeStyle(displaySelection.team)}>
-      {positionBoost ? (
-        <span
-          aria-label="This player plays his primary position."
-          className="result-position-boost"
-          tabIndex={0}
-        >
-          {formatBoostPercent(positionBoost.multiplier)} boost
-          <span className="result-position-boost-tooltip" role="tooltip">
-            This player plays his primary position.
-          </span>
-        </span>
-      ) : null}
-
-      <div className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] items-center gap-4">
-        <span className="result-player-token" aria-hidden="true">
-          <span>{playerInitials(player.name)}</span>
-          <span>{position}</span>
-        </span>
-        <span className="min-w-0">
-          <span className="block truncate text-lg font-black text-white">{player.name}</span>
-          <span className="result-player-meta mt-1 block truncate text-sm font-semibold">
-            {displaySelection.team} - {displaySelection.eraLabel}
-          </span>
-          {contribution !== null ? (
-            <span className="result-player-score">
-              <span>{formatLegacyScore(contribution)}</span>
-              <span>pts</span>
-            </span>
-          ) : null}
-        </span>
-      </div>
-
-      <AchievementStrip achievements={achievements} />
-    </div>
-  );
-}
-
-function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
-  if (achievements.length === 0) {
-    return <span className="achievement-strip achievement-strip-empty" aria-hidden="true" />;
-  }
-
-  return (
-    <span className="achievement-strip flex overflow-x-auto whitespace-nowrap pb-1 min-w-0" aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}>
-      {achievements.map((achievement) => (
-        <span
-          aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
-          className={`achievement-stat achievement-stat-${achievement.id} flex-shrink-0`}
-          data-tooltip={achievementTitle(achievement)}
-          key={achievement.id}
-          title={achievementTitle(achievement)}
-        >
-          <span className="achievement-value">{achievement.value}</span>
-          <span className="achievement-label">{achievement.label}</span>
-        </span>
-      ))}
-    </span>
+    <SeasonResultsView
+      config={{
+        achievementTitleById: ACHIEVEMENT_TITLE_BY_ID,
+        defaultModeLabel: "Classic Mode",
+        defaultReturnPath: "/classic",
+        emptyButtonLabel: "Build Classic Team",
+        emptyTitle: "Classic Results",
+        expectedMode: "classic",
+        hiddenAchievementIds: ["seasons"],
+        resultBadgeMetaById: RESULT_BADGE_META_BY_ID,
+        resultBadgeScoreWeightById: RESULT_BADGE_SCORE_WEIGHT_BY_ID,
+        showAdjustedStats: true,
+        storageKey: CLASSIC_RESULT_STORAGE_KEY,
+      }}
+    />
   );
 }

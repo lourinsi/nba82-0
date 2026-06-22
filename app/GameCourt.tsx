@@ -1,11 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, DragEvent, FormEvent } from "react";
-import HowToOverlay from "./HowToOverlay";
 import { teamThemeStyle } from "./all-time/teamStyles";
+import {
+  ADMIN_SESSION_CHANGE_EVENT,
+  adjustedStatsSnapshot,
+  colorModeSnapshot,
+  dispatchAdminSessionChanged,
+  requestHowToOpen,
+  setGameHeaderState,
+  setStoredLightMode,
+  subscribeToAdjustedStats,
+  subscribeToColorMode,
+  subscribeToGameHeaderAction,
+  type GameHeaderAction,
+} from "./clientPreferences";
 import type { HowToOverlayContent } from "./howToContent";
 
 export type Position = "PG" | "SG" | "SF" | "PF" | "C";
@@ -57,6 +68,12 @@ export type CareerSeason = Partial<TeamEra> & {
   ws_48?: number | string | null;
   ws_per_48?: number | string | null;
 };
+export type AwardRow = {
+  season?: string | number | null;
+  team?: string | null;
+  description?: string | null;
+  all_nba_team_number?: string | number | null;
+};
 
 export type Player = {
   id: string;
@@ -64,6 +81,7 @@ export type Player = {
   legacy_points?: number; // Career all-time score.
   classic_points_by_team_era?: ClassicPointBlock[];
   career_seasons?: CareerSeason[];
+  awards_raw?: AwardRow[];
   goat_rank?: number | null; // Bleacher Report GOAT ranking (1-100)
   goat_score?: number; // Bleacher Report GOAT score (101-rank)
   positions: Position[];
@@ -88,7 +106,7 @@ export type LineupSlot = {
   selection: DraftSelection;
 };
 type Lineup = Partial<Record<Position, LineupSlot>>;
-export type Achievement = { id: string; value: string; label: string; title?: string };
+export type Achievement = { id: string; value: string; label: string; title?: string; scoreValue?: number };
 export type AchievementDisplay = {
   id: string;
   label: string;
@@ -126,6 +144,8 @@ type ResultPlayer = {
   selection: DraftSelection;
   scoreContribution: number;
   achievements: Achievement[];
+  originalAchievements?: Achievement[];
+  adjustedAchievements?: Achievement[];
   positionBonus?: PositionBonus;
 };
 export type PositionBonus = {
@@ -136,9 +156,14 @@ type GameResultPayload = {
   mode: GameMode;
   selectedTeam: string;
   selectedEraLabel: string;
+  resultModeLabel?: string;
+  returnPath?: string;
   simulationResult: SeasonProjection;
   lineup: ResultPlayer[];
   totals: Achievement[];
+  originalTotals?: Achievement[];
+  adjustedTotals?: Achievement[];
+  showAdjustedStats?: boolean;
 };
 
 export type GameMode = "classic" | "all-time";
@@ -173,27 +198,46 @@ export type GameCourtConfig = {
   scoreLabel: string;
   resultStorageKey: string;
   resultsPath: string;
+  returnPath?: string;
+  resultModeLabel?: string;
   howTo?: {
     content: HowToOverlayContent;
     storageKey: string;
   };
   seasonTiers: SeasonTier[];
   usesStatsEngineConfig?: boolean;
+  supportsAdjustedStats?: boolean;
+  showAdjustedStatsControl?: boolean;
+  showRosterSortControls?: boolean;
+  useRosterScoreTiebreaker?: boolean;
+  badgeScoreWeights?: Record<string, number>;
   rosterSortOptions?: readonly RosterSortOption[];
   defaultRosterSortMode?: RosterSortMode;
   defaultRosterSortDirection?: RosterSortDirection;
   courtAchievementLimit: number;
-  buildAchievementTotals: (slots: LineupSlot[], statsEngineConfig: StatsEngineConfig) => Achievement[];
-  buildPlayerAchievements: (player: Player, selection: DraftSelection) => Achievement[];
+  buildAchievementTotals: (
+    slots: LineupSlot[],
+    statsEngineConfig: StatsEngineConfig,
+    showAdjustedStats: boolean,
+  ) => Achievement[];
+  buildPlayerAchievements: (
+    player: Player,
+    selection: DraftSelection,
+    statsEngineConfig: StatsEngineConfig,
+    showAdjustedStats: boolean,
+  ) => Achievement[];
   buildResultAchievements?: (
     player: Player,
     selection: DraftSelection,
     statsEngineConfig: StatsEngineConfig,
+    showAdjustedStats: boolean,
   ) => Achievement[];
   buildRosterFeedAchievements: (
     player: Player,
     selection: DraftSelection,
     statsEngineConfig: StatsEngineConfig,
+    showAdjustedStats: boolean,
+    rosterSortMode?: RosterSortMode,
   ) => Achievement[];
   rosterSortScores: RosterSortScores;
   eraOptionsForTeam: (players: Player[], team: string) => string[];
@@ -646,9 +690,15 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     scoreLabel,
     resultStorageKey,
     resultsPath,
+    returnPath,
+    resultModeLabel = logoLabel,
     howTo,
     seasonTiers,
     usesStatsEngineConfig = false,
+    supportsAdjustedStats = false,
+    showRosterSortControls = true,
+    useRosterScoreTiebreaker = true,
+    badgeScoreWeights = {},
     rosterSortOptions = DEFAULT_ROSTER_SORT_OPTIONS,
     defaultRosterSortMode,
     defaultRosterSortDirection = "desc",
@@ -670,6 +720,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const courtRef = useRef<HTMLDivElement | null>(null);
   const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gameHeaderActionRef = useRef<(action: GameHeaderAction) => void>(() => {});
   const [players, setPlayers] = useState<Player[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -696,6 +747,12 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const [awaitingPublicPick, setAwaitingPublicPick] = useState(false);
   const [publicTeamSwapUsed, setPublicTeamSwapUsed] = useState(false);
   const [publicEraSwapUsed, setPublicEraSwapUsed] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
+  const toggleLightMode = useCallback(() => setStoredLightMode(!lightMode), [lightMode]);
+  const adjustedStatsEnabled = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => true);
+  const showAdjustedStats = supportsAdjustedStats && adjustedStatsEnabled;
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -822,10 +879,16 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       }
     }
 
+    function handleAdminSessionChange() {
+      void checkAdminSession();
+    }
+
     checkAdminSession();
+    window.addEventListener(ADMIN_SESSION_CHANGE_EVENT, handleAdminSessionChange);
 
     return () => {
       active = false;
+      window.removeEventListener(ADMIN_SESSION_CHANGE_EVENT, handleAdminSessionChange);
     };
   }, []);
 
@@ -841,6 +904,45 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     },
     [],
   );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 760px)");
+    const syncViewport = () => setIsMobileViewport(mediaQuery.matches);
+
+    syncViewport();
+    mediaQuery.addEventListener("change", syncViewport);
+
+    return () => mediaQuery.removeEventListener("change", syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(
+    () => subscribeToGameHeaderAction((action) => gameHeaderActionRef.current(action)),
+    [],
+  );
+
+  useEffect(() => () => setGameHeaderState(null), []);
 
   const teamOptions = CURRENT_NBA_TEAMS;
   const hasSelectedTeam = selectedTeam !== PUBLIC_TEAM_PLACEHOLDER;
@@ -890,6 +992,27 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     PUBLIC_ROUND_COUNT,
   );
   const showPublicRosterSpinCta = publicSpinAllowed;
+  const gameHeaderTitle = isAdmin ? "Admin Workspace" : `Round ${publicDisplayRound}/${PUBLIC_ROUND_COUNT}`;
+  const gameHeaderEyebrow = isAdmin ? "Admin Mode" : resultModeLabel;
+
+  useEffect(() => {
+    setGameHeaderState({
+      eyebrow: gameHeaderEyebrow,
+      resetDisabled: !authChecked || isSpinning,
+      resetLabel: isAdmin ? "Clear lineup" : "Reset draft",
+      showAdjustedStatsToggle: supportsAdjustedStats && mode === "classic",
+      showReset: true,
+      title: gameHeaderTitle,
+    });
+  }, [
+    authChecked,
+    gameHeaderEyebrow,
+    gameHeaderTitle,
+    isAdmin,
+    isSpinning,
+    mode,
+    supportsAdjustedStats,
+  ]);
 
   const selectedPlayerIds = useMemo(
     () =>
@@ -951,20 +1074,28 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
           const aScores = scoresForPlayer(a);
           const bScores = scoresForPlayer(b);
           const rawPriorityDelta = bScores.priority - aScores.priority;
-          const priorityDelta = rosterSortDirection === "desc" ? rawPriorityDelta : -rawPriorityDelta;
+          const effectiveRosterSortDirection = isMobileViewport ? "desc" : rosterSortDirection;
+          const priorityDelta = effectiveRosterSortDirection === "desc" ? rawPriorityDelta : -rawPriorityDelta;
 
           if (priorityDelta) {
             return priorityDelta;
           }
 
-          const legacyDelta = bScores.legacy - aScores.legacy;
+          if (useRosterScoreTiebreaker) {
+            const legacyDelta = bScores.legacy - aScores.legacy;
 
-          return legacyDelta || a.name.localeCompare(b.name);
+            if (legacyDelta) {
+              return legacyDelta;
+            }
+          }
+
+          return a.name.localeCompare(b.name);
         });
     },
     [
       activeEra,
       hasActiveDraftSelection,
+      isMobileViewport,
       normalizedRosterSearch,
       playerHasRecordedTeamEra,
       playerScore,
@@ -977,6 +1108,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       selectedPlayerIds,
       selectedTeam,
       statsEngineConfig,
+      useRosterScoreTiebreaker,
     ],
   );
 
@@ -1016,10 +1148,23 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       }),
     [lineup],
   );
-  const lineupAchievementTotals = useMemo(
-    () => buildAchievementTotals(lineupEntries.map(({ player, selection }) => ({ player, selection })), statsEngineConfig),
-    [buildAchievementTotals, lineupEntries, statsEngineConfig],
+  const lineupSlots = useMemo(
+    () => lineupEntries.map(({ player, selection }) => ({ player, selection })),
+    [lineupEntries],
   );
+  const originalLineupAchievementTotals = useMemo(
+    () => buildAchievementTotals(lineupSlots, statsEngineConfig, false),
+    [buildAchievementTotals, lineupSlots, statsEngineConfig],
+  );
+  const adjustedLineupAchievementTotals = useMemo(
+    () =>
+      supportsAdjustedStats
+        ? buildAchievementTotals(lineupSlots, statsEngineConfig, true)
+        : originalLineupAchievementTotals,
+    [buildAchievementTotals, lineupSlots, originalLineupAchievementTotals, statsEngineConfig, supportsAdjustedStats],
+  );
+  const lineupAchievementTotals =
+    supportsAdjustedStats && showAdjustedStats ? adjustedLineupAchievementTotals : originalLineupAchievementTotals;
   const teamLegacyScore = Number(
     POSITIONS.reduce(
       (sum, position) => sum + lineupSlotScore(lineup[position], position, statsEngineConfig),
@@ -1045,21 +1190,36 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       mode,
       selectedTeam,
       selectedEraLabel: fullEraLabel(activeEra),
+      resultModeLabel,
+      returnPath,
       simulationResult: result,
-      lineup: lineupEntries.map(({ position, player, selection }) => ({
-        position,
-        player: {
-          id: player.id,
-          name: player.name,
-        },
-        selection,
-        scoreContribution: lineupSlotScore(lineup[position], position, statsEngineConfig),
-        achievements: buildResultAchievements
-          ? buildResultAchievements(player, selection, statsEngineConfig)
-          : buildPlayerAchievements(player, selection),
-        positionBonus: positionBonusForSlot(lineup[position], position, statsEngineConfig),
-      })),
+      lineup: lineupEntries.map(({ position, player, selection }) => {
+        const resultAchievements = (adjusted: boolean) =>
+          buildResultAchievements
+            ? buildResultAchievements(player, selection, statsEngineConfig, adjusted)
+            : buildPlayerAchievements(player, selection, statsEngineConfig, adjusted);
+        const originalAchievements = resultAchievements(false);
+        const adjustedAchievements = supportsAdjustedStats ? resultAchievements(true) : originalAchievements;
+
+        return {
+          position,
+          player: {
+            id: player.id,
+            name: player.name,
+          },
+          selection,
+          scoreContribution: lineupSlotScore(lineup[position], position, statsEngineConfig),
+          achievements:
+            supportsAdjustedStats && showAdjustedStats ? adjustedAchievements : originalAchievements,
+          originalAchievements: supportsAdjustedStats ? originalAchievements : undefined,
+          adjustedAchievements: supportsAdjustedStats ? adjustedAchievements : undefined,
+          positionBonus: positionBonusForSlot(lineup[position], position, statsEngineConfig),
+        };
+      }),
       totals: lineupAchievementTotals,
+      originalTotals: supportsAdjustedStats ? originalLineupAchievementTotals : undefined,
+      adjustedTotals: supportsAdjustedStats ? adjustedLineupAchievementTotals : undefined,
+      showAdjustedStats: supportsAdjustedStats ? showAdjustedStats : undefined,
     };
 
     sessionStorage.setItem(resultStorageKey, JSON.stringify(payload));
@@ -1067,6 +1227,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     router.push(resultsPath);
   }, [
     activeEra,
+    adjustedLineupAchievementTotals,
     buildPlayerAchievements,
     buildResultAchievements,
     lineup,
@@ -1076,13 +1237,18 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     lineupHasStephCurry,
     lineupSlotScore,
     mode,
+    originalLineupAchievementTotals,
     positionBonusForSlot,
+    resultModeLabel,
     resultStorageKey,
     resultsPath,
+    returnPath,
     router,
     selectedTeam,
     seasonTiers,
+    showAdjustedStats,
     statsEngineConfig,
+    supportsAdjustedStats,
     teamLegacyScore,
   ]);
 
@@ -1129,13 +1295,6 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     setPublicEraSwapUsed(false);
   }
 
-  function handlePublicReset() {
-    resetPublicGame();
-    setAuthPanelOpen(false);
-    setLoginError(null);
-    setStatus("Public draft reset.");
-  }
-
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoginPending(true);
@@ -1160,6 +1319,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       }
 
       enterAdminMode();
+      dispatchAdminSessionChanged();
     } catch {
       setLoginError("Unable to sign in right now.");
     } finally {
@@ -1173,6 +1333,29 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     setAuthPanelOpen(false);
     resetPublicGame();
     setStatus("Returned to public mode.");
+    dispatchAdminSessionChanged();
+  }
+
+  function openHowToFromMenu() {
+    if (!howTo) {
+      setMobileMenuOpen(false);
+      return;
+    }
+
+    requestHowToOpen(howTo.storageKey);
+    setMobileMenuOpen(false);
+  }
+
+  function handleMobileProfileClick() {
+    setMobileMenuOpen(false);
+    setLoginError(null);
+
+    if (isAdmin) {
+      void handleAdminLogout();
+      return;
+    }
+
+    setAuthPanelOpen((open) => !open);
   }
 
   function handleCourtSlotSelect(position: Position) {
@@ -1278,8 +1461,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
     const assignablePositions = rosterAssignablePositions(player);
 
-    if (selectedSlot || assignablePositions.length <= 1) {
-      assignPlayer(player, selectedSlot ?? assignablePositions[0]);
+    if (!assignablePositions.length) {
       return;
     }
 
@@ -1523,19 +1705,40 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     setDraggedFromPosition(null);
   }
 
-  function clearLineup() {
-    if (!isAdmin) {
-      return;
-    }
+  useEffect(() => {
+    gameHeaderActionRef.current = (action) => {
+      if (action !== "reset" || !authChecked || isSpinning) {
+        return;
+      }
 
-    setLineup({});
-    setSelectedSlot(null);
-    setMobileMoveSource(null);
-    setPositionPickerPlayer(null);
-    setDraggedPlayerId(null);
-    setDraggedFromPosition(null);
-    setStatus("Lineup cleared.");
-  }
+      if (isAdmin) {
+        setLineup({});
+        setSelectedSlot(null);
+        setMobileMoveSource(null);
+        setPositionPickerPlayer(null);
+        setDraggedPlayerId(null);
+        setDraggedFromPosition(null);
+        setStatus("Lineup cleared.");
+        return;
+      }
+
+      setSelectedTeam(PUBLIC_TEAM_PLACEHOLDER);
+      setSelectedEra(PUBLIC_ERA_PLACEHOLDER);
+      setLineup({});
+      setSelectedSlot(null);
+      setMobileMoveSource(null);
+      setPositionPickerPlayer(null);
+      setDraggedPlayerId(null);
+      setDraggedFromPosition(null);
+      setPublicRoundsSpent(0);
+      setAwaitingPublicPick(false);
+      setPublicTeamSwapUsed(false);
+      setPublicEraSwapUsed(false);
+      setAuthPanelOpen(false);
+      setLoginError(null);
+      setStatus("Public draft reset.");
+    };
+  }, [authChecked, isAdmin, isSpinning]);
 
   function draftSelectionHasPublicEligiblePlayer(selection: DraftSelection) {
     const canonicalEra = getCanonicalEra(selection.era);
@@ -1665,176 +1868,50 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   }
 
   const positionPickerAssignablePositions = positionPickerPlayer ? rosterAssignablePositions(positionPickerPlayer) : [];
+  const renderAuthPanel = (className = "") => (
+    <form
+      className={`game-auth-panel ${className} grid w-[280px] max-w-[calc(100vw-2rem)] gap-3 rounded-lg border border-white/12 bg-[#202431] p-4 shadow-2xl shadow-black/35`}
+      onSubmit={handleAdminLogin}
+    >
+      <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-[#cfd3df]">
+        Username
+        <input
+          autoComplete="username"
+          className="h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-semibold normal-case tracking-normal text-white outline-none transition focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
+          value={loginUsername}
+          onChange={(event) => setLoginUsername(event.target.value)}
+        />
+      </label>
+
+      <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-[#cfd3df]">
+        Password
+        <input
+          autoComplete="current-password"
+          className="h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-semibold normal-case tracking-normal text-white outline-none transition focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
+          type="password"
+          value={loginPassword}
+          onChange={(event) => setLoginPassword(event.target.value)}
+        />
+      </label>
+
+      {loginError ? <p className="text-xs font-semibold text-[#ffbf86]">{loginError}</p> : null}
+
+      <button
+        className="h-10 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-4 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf] disabled:cursor-wait disabled:border-white/10 disabled:bg-white/[0.08] disabled:text-[#8f96a7]"
+        disabled={loginPending}
+        type="submit"
+      >
+        {loginPending ? "Signing In..." : "Sign In"}
+      </button>
+    </form>
+  );
 
   return (
-    <main className="game-page min-h-screen bg-[#15171f] text-[#f4f2ec]">
-      <header className="game-header border-b border-white/10 bg-[#1c1f29]/95 px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.04)] sm:px-6 lg:px-8">
-        <div className="game-header-inner mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="game-brand">
-            <Link className="game-logo-mark" href="/" aria-label="Go to home">
-              <span>82-0</span>
-              <small>{logoLabel}</small>
-            </Link>
-            <div className="game-brand-copy">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#ff8a2a]">
-              {isAdmin ? "Admin Mode" : "Public Mode"}
-            </p>
-            <h1 className="mt-1 text-2xl font-black tracking-normal text-white sm:text-3xl">
-              {isAdmin ? "Admin Workspace" : `Round ${publicDisplayRound}/${PUBLIC_ROUND_COUNT}`}
-            </h1>
-            </div>
-          </div>
-
-          {isAdmin ? (
-            <div className="game-admin-controls grid gap-3 sm:grid-cols-[160px_160px_92px_auto_auto] sm:items-end">
-              <label className="grid gap-1 text-sm font-semibold text-[#cfd3df]">
-                Team
-                <select
-                  className={`h-11 rounded-lg border border-[#ff8a2a]/45 bg-[#242938] px-3 text-base font-black text-white outline-none transition focus:border-[#ffb13d] focus:ring-2 focus:ring-[#ff8a2a]/25 disabled:cursor-wait disabled:opacity-100 ${
-                    isSpinning ? "animate-pulse shadow-[0_0_22px_rgba(255,138,42,0.22)]" : ""
-                  }`}
-                  disabled={isSpinning}
-                  value={selectedTeam}
-                  onChange={(event) => setSelectedTeam(event.target.value)}
-                >
-                  {teamOptions.map((team) => (
-                    <option key={team} value={team}>
-                      {team}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="grid gap-1 text-sm font-semibold text-[#cfd3df]">
-                Era
-                <select
-                  className={`h-11 rounded-lg border border-[#b86cff]/45 bg-[#242938] px-3 text-base font-black text-white outline-none transition focus:border-[#d998ff] focus:ring-2 focus:ring-[#b86cff]/25 disabled:cursor-wait disabled:opacity-100 ${
-                    isSpinning ? "animate-pulse shadow-[0_0_22px_rgba(184,108,255,0.22)]" : ""
-                  }`}
-                  disabled={isSpinning}
-                  value={activeEra}
-                  onChange={(event) => setSelectedEra(event.target.value)}
-                >
-                  {eraOptions.map((era) => (
-                    <option key={era} value={era}>
-                      {era}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <button
-                aria-label="Spin random roster feed"
-                aria-busy={isSpinning}
-                className="game-control-button game-spin-button h-11 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] px-4 text-sm font-black text-[#89f0cd] transition hover:border-[#31d6a1]/70 hover:bg-[#31d6a1]/[0.22] disabled:cursor-wait disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#aeb4c2]"
-                disabled={isSpinning}
-                type="button"
-                onClick={() => spinTeamEra("all")}
-              >
-                {isSpinning ? "SPINNING..." : "Spin"}
-              </button>
-
-              <button
-                className="game-control-button game-clear-button h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1] disabled:cursor-wait disabled:text-[#8f96a7]"
-                disabled={isSpinning}
-                type="button"
-                onClick={clearLineup}
-              >
-                Clear Lineup
-              </button>
-
-              <button
-                className="game-control-button game-logout-button h-11 rounded-lg border border-[#ff8a2a]/35 bg-[#ff8a2a]/10 px-4 text-sm font-black text-[#ffbf86] transition hover:border-[#ff8a2a]/60 hover:bg-[#ff8a2a]/20"
-                type="button"
-                onClick={handleAdminLogout}
-              >
-                Logout
-              </button>
-            </div>
-          ) : (
-            <div className="game-public-controls relative flex flex-wrap items-end gap-3 lg:justify-end">
-              <div className="game-round-pill grid h-11 content-center rounded-lg border border-white/12 bg-white/[0.05] px-4">
-                <span className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[#aeb4c2]">Round</span>
-                <span className="text-sm font-black text-white">
-                  {publicDisplayRound}/{PUBLIC_ROUND_COUNT}
-                </span>
-              </div>
-
-              <button
-                aria-label="Reset public draft"
-                className="game-control-button game-reset-button h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-[#ff8a2a]/45 hover:bg-[#ff8a2a]/10 hover:text-[#ffbf86] disabled:cursor-not-allowed disabled:text-[#8f96a7]"
-                disabled={!authChecked || isSpinning}
-                type="button"
-                onClick={handlePublicReset}
-              >
-                Reset
-              </button>
-
-              <button
-                aria-label="Spin random roster feed"
-                aria-busy={isSpinning}
-                className="game-control-button game-spin-button h-11 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] px-6 text-sm font-black text-[#89f0cd] transition hover:border-[#31d6a1]/70 hover:bg-[#31d6a1]/[0.22] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.06] disabled:text-[#aeb4c2]"
-                disabled={!publicSpinAllowed}
-                type="button"
-                onClick={() => spinTeamEra("all")}
-              >
-                {isSpinning ? "SPINNING..." : "Spin"}
-              </button>
-
-              <button
-                className="game-control-button game-admin-button h-11 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-sm font-black text-white transition hover:border-white/25 hover:bg-white/[0.1] disabled:cursor-wait disabled:text-[#8f96a7]"
-                disabled={!authChecked}
-                type="button"
-                onClick={() => {
-                  setAuthPanelOpen((open) => !open);
-                  setLoginError(null);
-                }}
-              >
-                Admin Login
-              </button>
-
-              {authPanelOpen ? (
-                <form
-                  className="game-auth-panel absolute right-0 top-[calc(100%+0.75rem)] z-20 grid w-[280px] max-w-[calc(100vw-2rem)] gap-3 rounded-lg border border-white/12 bg-[#202431] p-4 shadow-2xl shadow-black/35"
-                  onSubmit={handleAdminLogin}
-                >
-                  <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-[#cfd3df]">
-                    Username
-                    <input
-                      autoComplete="username"
-                      className="h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-semibold normal-case tracking-normal text-white outline-none transition focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
-                      value={loginUsername}
-                      onChange={(event) => setLoginUsername(event.target.value)}
-                    />
-                  </label>
-
-                  <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-[#cfd3df]">
-                    Password
-                    <input
-                      autoComplete="current-password"
-                      className="h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-semibold normal-case tracking-normal text-white outline-none transition focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
-                      type="password"
-                      value={loginPassword}
-                      onChange={(event) => setLoginPassword(event.target.value)}
-                    />
-                  </label>
-
-                  {loginError ? <p className="text-xs font-semibold text-[#ffbf86]">{loginError}</p> : null}
-
-                  <button
-                    className="h-10 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-4 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf] disabled:cursor-wait disabled:border-white/10 disabled:bg-white/[0.08] disabled:text-[#8f96a7]"
-                    disabled={loginPending}
-                    type="submit"
-                  >
-                    {loginPending ? "Signing In..." : "Sign In"}
-                  </button>
-                </form>
-              ) : null}
-            </div>
-          )}
-        </div>
-      </header>
-
+    <main
+      className={`game-page game-page-${mode} ${
+        lightMode ? "game-page-light" : "game-page-dark"
+      } min-h-screen bg-[#15171f] text-[#f4f2ec]`}
+    >
       <section className="game-shell mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(420px,520px)_1fr] lg:px-8">
         <aside className="game-roster-panel flex max-h-[720px] min-h-[560px] flex-col overflow-hidden rounded-lg border border-white/10 bg-[#202431] lg:sticky lg:top-5 lg:h-[calc(100vh-132px)] lg:max-h-[calc(100vh-132px)] lg:min-h-0">
           {isSpinning ? (
@@ -1883,8 +1960,13 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
             <>
               <div className="border-b border-white/10 px-4 py-4">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#31d6a1]">Roster Feed</p>
-                  <div className="game-spin-grid mt-2 grid grid-cols-2 gap-3" aria-live="polite">
+                  <p className="roster-feed-title text-xs font-bold uppercase tracking-[0.16em] text-[#31d6a1]">
+                    Roster Feed
+                  </p>
+                  <div
+                    className="roster-draw-desktop roster-draw-grid game-spin-grid mt-2 grid grid-cols-2 gap-3"
+                    aria-live="polite"
+                  >
                     <SpinTile
                       label="Team"
                       onSpin={() => spinTeamEra("team")}
@@ -1904,9 +1986,39 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                       spinning={eraTileSpinning}
                     />
                   </div>
+                  <div className="mobile-draw-row" aria-live="polite">
+                    <div className="mobile-draw-chips" aria-label="Current team and era">
+                      <span className="mobile-draw-chip mobile-draw-chip-team" style={teamSpinTileStyle(selectedTeam)}>
+                        {selectedTeam}
+                      </span>
+                      <span className="mobile-draw-chip mobile-draw-chip-era" style={eraSpinTileStyle(activeEra)}>
+                        {activeEra}
+                      </span>
+                    </div>
+                    <div className="mobile-draw-actions" aria-label="Spin team or era">
+                      <button
+                        className="mobile-draw-spin mobile-draw-spin-team"
+                        disabled={isAdmin ? isSpinning : !publicTeamSwapAllowed}
+                        type="button"
+                        onClick={() => spinTeamEra("team")}
+                      >
+                        <IconRefresh />
+                        <span>Team</span>
+                      </button>
+                      <button
+                        className="mobile-draw-spin mobile-draw-spin-era"
+                        disabled={isAdmin ? isSpinning : !publicEraSwapAllowed}
+                        type="button"
+                        onClick={() => spinTeamEra("era")}
+                      >
+                        <IconRefresh />
+                        <span>Era</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <p className="mt-3 text-xs font-semibold text-[#aeb4c2]">
+                <p className="roster-selection-summary mt-3 text-xs font-semibold text-[#aeb4c2]">
                   {hasActiveDraftSelection
                     ? `Showing players with an actual ${selectedTeam} season during the ${fullEraLabel(activeEra)}.`
                     : "No roster drawn yet."}
@@ -1921,6 +2033,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                     {POSITION_FILTER_OPTIONS.map((filter) => (
                       <button
                         key={filter}
+                        aria-pressed={positionFilter === filter}
                         className={`h-8 rounded-md px-3 text-sm font-black transition ${
                           positionFilter === filter
                             ? "bg-[#ff6f13] text-white"
@@ -1943,38 +2056,42 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                     onChange={(event) => setRosterSearch(event.target.value)}
                   />
 
-                  <span className="roster-sort-control flex min-w-[150px] items-center gap-2">
-                    <select
-                      aria-label="Roster sort filter"
-                      className={`${ROSTER_SORT_CONTROL_CLASS} min-w-0 flex-1`}
-                      value={rosterSortMode}
-                      onChange={(event) => setRosterSortMode(event.target.value)}
-                    >
-                      {rosterSortOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      aria-label={
-                        rosterSortDirection === "desc"
-                          ? "Sort direction descending"
-                          : "Sort direction ascending"
-                      }
-                      className="h-10 w-10 rounded-lg border border-white/12 bg-[#242938] text-lg font-black leading-none tracking-normal text-white outline-none transition hover:border-[#31d6a1]/50 hover:bg-white/[0.07] focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
-                      title={rosterSortDirection === "desc" ? "Descending" : "Ascending"}
-                      type="button"
-                      onClick={() =>
-                        setRosterSortDirection((current) => (current === "desc" ? "asc" : "desc"))
-                      }
-                    >
-                      {rosterSortDirection === "desc" ? "↓" : "↑"}
-                    </button>
-                  </span>
+                  {showRosterSortControls ? (
+                    <span className="roster-sort-control flex min-w-[150px] items-center gap-2">
+                      <select
+                        aria-label="Roster sort filter"
+                        className={`${ROSTER_SORT_CONTROL_CLASS} min-w-0 flex-1`}
+                        value={rosterSortMode}
+                        onChange={(event) => setRosterSortMode(event.target.value)}
+                      >
+                        {rosterSortOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        aria-label={
+                          rosterSortDirection === "desc"
+                            ? "Sort direction descending"
+                            : "Sort direction ascending"
+                        }
+                        className="roster-sort-direction-button h-10 w-10 rounded-lg border border-white/12 bg-[#242938] text-lg font-black leading-none tracking-normal text-white outline-none transition hover:border-[#31d6a1]/50 hover:bg-white/[0.07] focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20"
+                        title={rosterSortDirection === "desc" ? "Descending" : "Ascending"}
+                        type="button"
+                        onClick={() =>
+                          setRosterSortDirection((current) => (current === "desc" ? "asc" : "desc"))
+                        }
+                      >
+                        {rosterSortDirection === "desc" ? "↓" : "↑"}
+                      </button>
+                    </span>
+                  ) : null}
                 </div>
 
-                <p className="mt-3 text-sm font-semibold text-[#cfd3df]">{filteredPlayers.length} players available</p>
+                <p className="roster-count mt-3 text-sm font-semibold text-[#cfd3df]">
+                  {filteredPlayers.length} players available
+                </p>
 
                 {showPublicRosterSpinCta ? (
                   <div className="next-draw-card mt-3 flex flex-col gap-3 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -2021,12 +2138,29 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                       const canRosterSwap = rosterDropAllowed(player);
                       const canSelectPlayer = rosterPlayerSelectable(player);
                       const playerSelection = buildDraftSelection(selectedTeam, activeEra);
+                      const rosterFeedAchievements = buildRosterFeedAchievements(
+                        player,
+                        playerSelection,
+                        statsEngineConfig,
+                        supportsAdjustedStats && showAdjustedStats,
+                        rosterSortMode,
+                      );
+                      const showRosterFeedBadges = mode === "classic" && rosterSortMode === "mixed";
+                      const rosterFeedBadgeAchievements = showRosterFeedBadges
+                        ? sortBadgeAchievementsByScore(
+                            rosterFeedAchievements.filter((achievement) => COURT_BADGE_META_BY_ID[achievement.id]),
+                            badgeScoreWeights,
+                          )
+                        : [];
+                      const rosterFeedStripAchievements = showRosterFeedBadges
+                        ? rosterFeedAchievements.filter((achievement) => !COURT_BADGE_META_BY_ID[achievement.id])
+                        : rosterFeedAchievements;
 
                       return (
                         <button
                           key={player.id}
                           aria-grabbed={draggedPlayerId === player.id}
-                          className={`roster-player-card player-card grid min-h-[82px] grid-cols-1 gap-3 rounded-lg border px-3 py-3 text-left transition focus:outline-none focus:ring-2 sm:grid-cols-[minmax(150px,0.85fr)_minmax(0,1.15fr)] sm:items-center ${
+                          className={`roster-player-card roster-mode-${rosterSortMode} player-card grid min-h-[82px] grid-cols-1 gap-3 rounded-lg border px-3 py-3 text-left transition focus:outline-none focus:ring-2 sm:grid-cols-[minmax(150px,0.85fr)_minmax(0,1.15fr)] sm:items-center ${
                             draggedPlayerId === player.id ? "player-card-dragging" : ""
                           } ${canRosterSwap ? "player-card-roster-drop" : ""} ${
                             canSelectPlayer ? "" : "player-card-disabled"
@@ -2035,17 +2169,14 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                           draggable={true}
                           type="button"
                           onClick={() => handleRosterPlayerClick(player)}
-                          onDoubleClick={() => {
-                            setPositionPickerPlayer(null);
-                            assignPlayer(player);
-                          }}
+                          onDoubleClick={() => handleRosterPlayerClick(player)}
                           onDragEnd={handleDragEnd}
                           onDragOver={(event) => handleRosterDragOver(event, player)}
                           onDragStart={(event) => handleDragStart(event, player)}
                           onDrop={(event) => handleRosterDrop(event, player)}
                           style={teamThemeStyle(selectedTeam)}
                         >
-                          <span className="min-w-0">
+                          <span className="player-card-info min-w-0">
                             <span className="player-card-name block truncate text-base font-black leading-tight">
                               {player.name}
                             </span>
@@ -2056,13 +2187,10 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                               {selectedTeam} - {fullEraLabel(activeEra)}
                             </span>
                           </span>
-                          <AchievementStrip
-                            achievements={buildRosterFeedAchievements(
-                              player,
-                              playerSelection,
-                              statsEngineConfig,
-                            )}
-                          />
+                          {rosterFeedBadgeAchievements.length ? (
+                            <RosterFeedBadges achievements={rosterFeedBadgeAchievements} />
+                          ) : null}
+                          <AchievementStrip achievements={rosterFeedStripAchievements} />
                         </button>
                       );
                     })}
@@ -2093,8 +2221,11 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                 blocked={Boolean(draggedPlayer && dropStatuses[position] === "blocked")}
                 swapTarget={dropStatuses[position] === "swap"}
                 achievementLimit={courtAchievementLimit}
+                badgeScoreWeights={badgeScoreWeights}
                 buildPlayerAchievements={buildPlayerAchievements}
-                showAchievements={isAdmin}
+                statsEngineConfig={statsEngineConfig}
+                showAdjustedStats={supportsAdjustedStats && showAdjustedStats}
+                showAchievements={true}
                 onSelect={() => handleCourtSlotSelect(position)}
                 onPlayerDragEnd={handleDragEnd}
                 onPlayerDragStart={(event, player) => handleDragStart(event, player, position)}
@@ -2134,7 +2265,13 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
             aria-label="Close position picker"
             className="position-picker-backdrop"
             type="button"
-            onClick={() => setPositionPickerPlayer(null)}
+            onClick={(event) => {
+              if (event.detail > 1) {
+                return;
+              }
+
+              setPositionPickerPlayer(null);
+            }}
           />
           <div className="position-picker-panel">
             <div className="position-picker-heading">
@@ -2172,38 +2309,220 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
         </div>
       ) : null}
 
-      {howTo ? <HowToOverlay content={howTo.content} storageKey={howTo.storageKey} /> : null}
+      {mobileMenuOpen ? (
+        <div className="mobile-menu-layer" id="mobile-game-menu">
+          <button
+            aria-label="Close menu"
+            className="mobile-menu-backdrop"
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <aside aria-label="Menu" className="mobile-menu-panel">
+            <header className="mobile-menu-header">
+              <h2>Menu</h2>
+              <button
+                aria-label="Close menu"
+                className="mobile-menu-close"
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <IconClose />
+              </button>
+            </header>
+            <div className="mobile-menu-list">
+              <button className="mobile-menu-item" type="button" onClick={openHowToFromMenu}>
+                <IconBook />
+                <span>How to Play</span>
+              </button>
+              <button
+                aria-pressed={lightMode}
+                className="mobile-menu-item mobile-menu-toggle-item"
+                type="button"
+                onClick={toggleLightMode}
+              >
+                <IconSettings />
+                <span className="mobile-menu-toggle-copy">
+                  <span>Light Mode</span>
+                  <small>{lightMode ? "On" : "Off"}</small>
+                </span>
+                <span className="stats-toggle-switch mobile-menu-toggle-switch" aria-hidden="true">
+                  <span className="stats-toggle-knob" />
+                </span>
+              </button>
+              <button className="mobile-menu-item" type="button" onClick={() => setMobileMenuOpen(false)}>
+                <IconShield />
+                <span>Privacy Policy</span>
+              </button>
+            </div>
+          </aside>
+        </div>
+      ) : null}
 
-      <nav className="mobile-lineup-rail" aria-label="Lineup positions">
-        {POSITIONS.map((position) => {
-          const slot = lineup[position];
-          const mobileSourceSlot = mobileMoveSource ? lineup[mobileMoveSource] : undefined;
-          const canReceiveMobileMove = Boolean(
-            mobileSourceSlot &&
-              mobileMoveSource !== position &&
-              placementStatus(lineup, mobileSourceSlot.player, position) !== "blocked",
-          );
+      {authPanelOpen ? renderAuthPanel("game-auth-panel-mobile") : null}
 
-          return (
-            <button
-              key={position}
-              aria-label={slot ? `${slot.player.name}, ${position}` : `${position} slot`}
-              className={`mobile-lineup-slot ${
-                selectedSlot === position || mobileMoveSource === position ? "mobile-lineup-slot-selected" : ""
-              } ${canReceiveMobileMove ? "mobile-lineup-slot-can-move" : ""} ${
-                slot ? "mobile-lineup-slot-filled" : ""
-              }`}
-              style={slot ? teamThemeStyle(slot.selection.team) : undefined}
-              type="button"
-              onClick={() => handleMobileLineupSlotSelect(position)}
-            >
-              <span className="mobile-lineup-token">{slot ? playerInitials(slot.player.name) : position}</span>
-              <span className="mobile-lineup-label">{position}</span>
-            </button>
-          );
-        })}
-      </nav>
+      <footer className="mobile-game-footer" aria-label="Mobile game navigation">
+        <nav className="mobile-lineup-rail" aria-label="Lineup positions">
+          {POSITIONS.map((position) => {
+            const slot = lineup[position];
+            const mobileSourceSlot = mobileMoveSource ? lineup[mobileMoveSource] : undefined;
+            const canReceiveMobileMove = Boolean(
+              mobileSourceSlot &&
+                mobileMoveSource !== position &&
+                placementStatus(lineup, mobileSourceSlot.player, position) !== "blocked",
+            );
+            const isMobileLineupSlotSelected = selectedSlot === position || mobileMoveSource === position;
+            const mobileLineupBadgeAchievements =
+              mode === "classic" && isMobileLineupSlotSelected && slot
+                ? selectCourtBadgeAchievements(
+                    buildPlayerAchievements(
+                      slot.player,
+                      slot.selection,
+                      statsEngineConfig,
+                      supportsAdjustedStats && showAdjustedStats,
+                    ),
+                    courtAchievementLimit,
+                    badgeScoreWeights,
+                  )
+                : [];
+
+            return (
+              <button
+                key={position}
+                aria-label={slot ? `${slot.player.name}, ${position}` : `${position} slot`}
+                className={`mobile-lineup-slot ${isMobileLineupSlotSelected ? "mobile-lineup-slot-selected" : ""} ${
+                  canReceiveMobileMove ? "mobile-lineup-slot-can-move" : ""
+                } ${
+                  slot ? "mobile-lineup-slot-filled" : ""
+                }`}
+                style={slot ? teamThemeStyle(slot.selection.team) : undefined}
+                type="button"
+                onClick={() => handleMobileLineupSlotSelect(position)}
+              >
+                {mobileLineupBadgeAchievements.length ? (
+                  <CourtAchievementBadges achievements={mobileLineupBadgeAchievements} />
+                ) : null}
+                <span className="mobile-lineup-token">{slot ? playerInitials(slot.player.name) : position}</span>
+                <span className="mobile-lineup-label">{position}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <nav className="mobile-bottom-nav" aria-label="Primary mobile navigation">
+          <button className="mobile-bottom-nav-item mobile-bottom-nav-item-active" type="button">
+            <IconPlay />
+            <span>Play</span>
+          </button>
+          <button className="mobile-bottom-nav-item" type="button" onClick={() => setSelectedSlot(null)}>
+            <IconFeed />
+            <span>Feed</span>
+          </button>
+          <button className="mobile-bottom-nav-item" type="button">
+            <IconLeaderboard />
+            <span>Leaderboard</span>
+          </button>
+          <button className="mobile-bottom-nav-item" type="button">
+            <IconChallenges />
+            <span>Challenges</span>
+          </button>
+          <button className="mobile-bottom-nav-item" type="button" onClick={handleMobileProfileClick}>
+            <IconProfile />
+            <span>{isAdmin ? "Logout" : "Profile"}</span>
+          </button>
+        </nav>
+      </footer>
     </main>
+  );
+}
+
+function IconProfile() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <circle cx="12" cy="8" r="3.2" />
+      <path d="M5.2 20a6.8 6.8 0 0 1 13.6 0" />
+    </svg>
+  );
+}
+
+function IconClose() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
+function IconRefresh() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <path d="M20 6v5h-5" />
+      <path d="M4 18v-5h5" />
+      <path d="M18.5 10.5A6.8 6.8 0 0 0 6.4 7.2L4 10" />
+      <path d="M5.5 13.5a6.8 6.8 0 0 0 12.1 3.3L20 14" />
+    </svg>
+  );
+}
+
+function IconBook() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" />
+      <path d="M4 5.5v16M8 7h8" />
+    </svg>
+  );
+}
+
+function IconSettings() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <path d="M4 8h9M17 8h3M4 16h3M11 16h9" />
+      <circle cx="15" cy="8" r="2" />
+      <circle cx="9" cy="16" r="2" />
+    </svg>
+  );
+}
+
+function IconShield() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <path d="M12 3 5 6v5.5c0 4.1 2.7 7.7 7 9.5 4.3-1.8 7-5.4 7-9.5V6z" />
+    </svg>
+  );
+}
+
+function IconPlay() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 4v16M4 12h16M6.3 7.2c3.4 1.7 8 1.7 11.4 0M6.3 16.8c3.4-1.7 8-1.7 11.4 0" />
+    </svg>
+  );
+}
+
+function IconFeed() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <path d="M5 4h11l3 3v13H5z" />
+      <path d="M16 4v4h4M8 11h8M8 15h8M8 19h5" />
+    </svg>
+  );
+}
+
+function IconLeaderboard() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <path d="M5 20V10M12 20V4M19 20v-7" />
+      <path d="M3 20h18" />
+    </svg>
+  );
+}
+
+function IconChallenges() {
+  return (
+    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
+      <path d="M6 4l14 14M14 4l6 6M4 14l6 6" />
+      <path d="M14 4h6v6M4 14v6h6" />
+    </svg>
   );
 }
 
@@ -2257,44 +2576,130 @@ function SpinTile({
 
 const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
   apg: "AST - Assists per game",
-  "all-defense": "All-Defense teams",
-  "all-nba": "All-NBA teams",
-  "all-rookie-1st": "All-Rookie 1st team",
-  "all-rookie-2nd": "All-Rookie 2nd team",
-  "all-star": "All-Star selections",
-  "all-star-mvp": "All-Star MVPs",
-  assists: "Assist Champions",
+  "all-defense": "All-DEF",
+  "all-nba": "All-NBA",
+  "all-rookie-1st": "All-Rookie 1st",
+  "all-rookie-2nd": "All-Rookie 2nd",
+  "all-star": "AS",
+  "all-star-mvp": "AS MVP",
+  assists: "AST Champ",
   "avg-ts-pct": "Average true shooting",
   "avg-ts-star": "Average TS+ & TS% combined",
   "avg-ws-48": "Average win shares per 48",
   bpg: "Blocks per game",
-  blocks: "Block Champions",
+  blocks: "BLK Champ",
   championship_rings: "Championships",
-  dpoy: "Defensive Player of the Year",
-  "sixth-man": "Sixth Man of the Year",
-  fmvp: "Finals MVP",
+  dpoy: "DPOY",
+  "sixth-man": "6MOY",
+  fmvp: "FMVP",
+  "games-started": "GS - Games started",
   goat: "GOAT rank",
-  mvp: "Most Valuable Player",
-  "most-improved": "Most Improved Player",
+  mvp: "MVP",
+  "most-improved": "MIP",
   pra: "Pts + Rebs + Asts",
-  rebs: "Rebound Champions",
-  rebounds: "Rebound Champions",
+  rebs: "REB Champ",
+  rebounds: "REB Champ",
   rings: "Championships",
-  roy: "Rookie of the Year",
+  roy: "ROY",
   rpg: "Rebounds per game",
-  scoring: "Scoring Champions",
-  seasons: "Seasons played",
+  scoring: "PTS Champ",
+  seasons: "YRS",
   spg: "Steals per game",
-  steals: "Steal Champions",
+  steals: "STL Champ",
   stocks: "Stls + Blks",
+  "ts-pct": "True shooting",
   "ts-plus": "era-adjusted TS%",
   "ts-star": "TS+ & TS% combined",
   ts_pct: "True shooting",
   "ws-48": "Win shares per 48",
 };
 
+const COURT_BADGE_LIMIT = 3;
+const COURT_BADGE_META_BY_ID: Record<string, { symbol: string; variant: string; description: string }> = {
+  "all-defense": { symbol: "DEF", variant: "defense", description: "All-DEF" },
+  // 🛡️
+  "all-nba": { symbol: "NBA", variant: "nba", description: "All-NBA" },
+  "all-rookie-1st": { symbol: "R1", variant: "rookie", description: "All-Rookie 1st" },
+  "all-rookie-2nd": { symbol: "R2", variant: "rookie", description: "All-Rookie 2nd" },
+  "all-star": { symbol: "AS", variant: "all-star-logo", description: "AS" },
+  "all-star-mvp": { symbol: "★", variant: "all-star-mvp", description: "AS MVP" },
+  assists: { symbol: "AST", variant: "assist", description: "AST Champ" },
+  blocks: { symbol: "BLK", variant: "defense", description: "BLK Champ" },
+  dpoy: { symbol: "DPOY", variant: "dpoy", description: "DPOY" },
+  fmvp: { symbol: "F", variant: "fmvp", description: "FMVP" },
+  mvp: { symbol: "M", variant: "mvp", description: "MVP" },
+  "most-improved": { symbol: "↗", variant: "rise", description: "MIP" },
+  rebounds: { symbol: "REB", variant: "rebound", description: "REB Champ" },
+  rings: { symbol: "💍", variant: "ring", description: "Rings" },
+  roy: { symbol: "ROY", variant: "roy", description: "ROY" },
+  scoring: { symbol: "PTS", variant: "points", description: "PTS Champ" },
+  "sixth-man": { symbol: "6th", variant: "sixth", description: "6MOY" },
+  steals: { symbol: "STL", variant: "defense", description: "STL Champ" },
+};
+
 function achievementTitle(achievement: Achievement) {
   return achievement.title || ACHIEVEMENT_TITLE_BY_ID[achievement.id] || `${achievement.label}: ${achievement.value}`;
+}
+
+function achievementBadgeCount(value: string) {
+  const trimmedValue = value.trim();
+  const countMatch = /^(\d+(?:\.\d+)?)x$/i.exec(trimmedValue);
+
+  if (!countMatch || Number(countMatch[1]) <= 1) {
+    return null;
+  }
+
+  return trimmedValue;
+}
+
+function achievementBadgeCountNumber(value: string) {
+  const trimmedValue = value.trim();
+  const countMatch = /^(\d+(?:\.\d+)?)x$/i.exec(trimmedValue);
+
+  return countMatch ? Number(countMatch[1]) : 1;
+}
+
+function achievementBadgeScore(achievement: Achievement, badgeScoreWeights: Record<string, number>) {
+  return typeof achievement.scoreValue === "number" && Number.isFinite(achievement.scoreValue)
+    ? achievement.scoreValue
+    : achievementBadgeCountNumber(achievement.value) * (badgeScoreWeights[achievement.id] ?? 0);
+}
+
+function sortBadgeAchievementsByScore(
+  achievements: Achievement[],
+  badgeScoreWeights: Record<string, number>,
+) {
+  return [...achievements].sort((first, second) => {
+    const scoreDelta =
+      achievementBadgeScore(second, badgeScoreWeights) - achievementBadgeScore(first, badgeScoreWeights);
+
+    if (scoreDelta) {
+      return scoreDelta;
+    }
+
+    const countDelta = achievementBadgeCountNumber(second.value) - achievementBadgeCountNumber(first.value);
+
+    if (countDelta) {
+      return countDelta;
+    }
+
+    return achievementTitle(first).localeCompare(achievementTitle(second));
+  });
+}
+
+function selectCourtBadgeAchievements(
+  achievements: Achievement[],
+  limit: number,
+  badgeScoreWeights: Record<string, number>,
+) {
+  return sortBadgeAchievementsByScore(
+    achievements.filter((achievement) => COURT_BADGE_META_BY_ID[achievement.id]),
+    badgeScoreWeights,
+  ).slice(0, Math.min(limit, COURT_BADGE_LIMIT));
+}
+
+function courtBadgeTooltip(achievement: Achievement) {
+  return `${achievement.value} ${COURT_BADGE_META_BY_ID[achievement.id]?.description ?? achievement.label}`;
 }
 
 function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
@@ -2307,29 +2712,85 @@ function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
       className="achievement-strip flex overflow-x-auto whitespace-nowrap pb-1 min-w-0"
       aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}
     >
-      {achievements.map((achievement) => (
-        <span
-          aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
-          className={`achievement-stat achievement-stat-${achievement.id} flex-shrink-0`}
-          data-tooltip={achievementTitle(achievement)}
-          key={achievement.id}
-          title={achievementTitle(achievement)}
-        >
-          <span className="achievement-value">{achievement.value}</span>
-          <span className="achievement-label">{achievement.label}</span>
-        </span>
-      ))}
+      {achievements.map((achievement) => {
+        const badge = COURT_BADGE_META_BY_ID[achievement.id];
+        const count = achievementBadgeCount(achievement.value);
+        const achievementKindClass = badge
+          ? "achievement-stat-award"
+          : "achievement-stat-metric";
+
+        return (
+          <span
+            aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
+            className={`achievement-stat achievement-stat-${achievement.id} ${achievementKindClass} flex-shrink-0`}
+            data-tooltip={achievementTitle(achievement)}
+            key={achievement.id}
+            title={achievementTitle(achievement)}
+          >
+            {badge ? (
+              <span
+                className={`achievement-badge-face court-achievement-badge-${badge.variant}`}
+                aria-hidden="true"
+              >
+                <span className="achievement-badge-symbol">{badge.symbol}</span>
+                {count ? <span className="achievement-badge-count">{count}</span> : null}
+              </span>
+            ) : null}
+            <span className="achievement-value">{achievement.value}</span>
+            <span className="achievement-label">{achievement.label}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function RosterFeedBadges({ achievements }: { achievements: Achievement[] }) {
+  return (
+    <span
+      className="roster-feed-badges"
+      aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}
+    >
+      {achievements.map((achievement) => {
+        const badge = COURT_BADGE_META_BY_ID[achievement.id];
+        const count = achievementBadgeCount(achievement.value);
+
+        if (!badge) {
+          return null;
+        }
+
+        return (
+          <span
+            aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
+            className={`court-achievement-badge court-achievement-badge-${badge.variant}`}
+            data-tooltip={courtBadgeTooltip(achievement)}
+            key={achievement.id}
+          >
+            <span className="court-achievement-badge-symbol" aria-hidden="true">
+              {badge.symbol}
+            </span>
+            {count ? (
+              <span className="court-achievement-badge-count" aria-hidden="true">
+                {count}
+              </span>
+            ) : null}
+          </span>
+        );
+      })}
     </span>
   );
 }
 
 function CourtSlot({
   achievementLimit,
+  badgeScoreWeights,
   buildPlayerAchievements,
   canDragPlayer,
   lineup,
   position,
   selected,
+  statsEngineConfig,
+  showAdjustedStats,
   showAchievements,
   canDrop,
   blocked,
@@ -2341,11 +2802,19 @@ function CourtSlot({
   onDrop,
 }: {
   achievementLimit: number;
-  buildPlayerAchievements: (player: Player, selection: DraftSelection) => Achievement[];
+  buildPlayerAchievements: (
+    player: Player,
+    selection: DraftSelection,
+    statsEngineConfig: StatsEngineConfig,
+    showAdjustedStats: boolean,
+  ) => Achievement[];
+  badgeScoreWeights: Record<string, number>;
   canDragPlayer: boolean;
   lineup: Lineup;
   position: Position;
   selected: boolean;
+  statsEngineConfig: StatsEngineConfig;
+  showAdjustedStats: boolean;
   showAchievements: boolean;
   canDrop: boolean;
   blocked: boolean;
@@ -2359,7 +2828,17 @@ function CourtSlot({
   const slot = lineup[position];
   const player = slot?.player;
   const courtAchievements =
-    showAchievements && player && slot ? buildPlayerAchievements(player, slot.selection).slice(0, achievementLimit) : [];
+    showAchievements && player && slot
+      ? buildPlayerAchievements(player, slot.selection, statsEngineConfig, showAdjustedStats)
+      : [];
+  const courtBadgeAchievements = selectCourtBadgeAchievements(
+    courtAchievements,
+    achievementLimit,
+    badgeScoreWeights,
+  );
+  const courtBadgeSummary = courtBadgeAchievements.length
+    ? `, ${courtBadgeAchievements.map((achievement) => `${achievement.value} ${achievementTitle(achievement)}`).join(", ")}`
+    : "";
 
   return (
     <button
@@ -2370,11 +2849,10 @@ function CourtSlot({
       }`}
       type="button"
       aria-grabbed={player ? undefined : false}
-      aria-label={player ? `${player.name}, ${position}` : `${position} slot`}
+      aria-label={player ? `${player.name}, ${position}${courtBadgeSummary}` : `${position} slot`}
       data-player-name={player?.name}
       draggable={canDragPlayer && Boolean(player)}
       style={slot ? teamThemeStyle(slot.selection.team) : undefined}
-      title={player?.name}
       onClick={onSelect}
       onDragEnd={onPlayerDragEnd}
       onDragOver={onDragOver}
@@ -2388,42 +2866,41 @@ function CourtSlot({
           <span className="court-slot-team">
             {slot.selection.team} - {slot.selection.eraLabel}
           </span>
-          {courtAchievements.length ? <CourtAchievementGrid achievements={courtAchievements} /> : null}
+          {courtBadgeAchievements.length ? <CourtAchievementBadges achievements={courtBadgeAchievements} /> : null}
         </>
       ) : null}
     </button>
   );
 }
 
-function CourtAchievementGrid({ achievements }: { achievements: Achievement[] }) {
-  const rows: Achievement[][] = [];
-
-  for (let index = 0; index < achievements.length; index += 2) {
-    rows.push(achievements.slice(index, index + 2));
-  }
-
+function CourtAchievementBadges({ achievements }: { achievements: Achievement[] }) {
   return (
     <span
-      className="court-achievement-grid"
+      className="court-achievement-badges"
       aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}
     >
-      {rows.map((row) => (
-        <span className="court-achievement-row" key={row.map((achievement) => achievement.id).join("-")}>
-          {row.map((achievement, index) => (
-            <span
-              aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
-              className="court-achievement-item"
-              data-tooltip={achievementTitle(achievement)}
-              key={achievement.id}
-              title={achievementTitle(achievement)}
-            >
-              {index > 0 ? <span className="court-achievement-separator">/</span> : null}
-              <span className="court-achievement-value">{achievement.value}</span>
-              <span className="court-achievement-label">{achievement.label}</span>
+      {achievements.map((achievement) => {
+        const badge = COURT_BADGE_META_BY_ID[achievement.id];
+        const count = achievementBadgeCount(achievement.value);
+
+        return (
+          <span
+            aria-label={`${achievement.value} ${achievement.label}. ${achievementTitle(achievement)}`}
+            className={`court-achievement-badge court-achievement-badge-${badge.variant}`}
+            data-tooltip={courtBadgeTooltip(achievement)}
+            key={achievement.id}
+          >
+            <span className="court-achievement-badge-symbol" aria-hidden="true">
+              {badge.symbol}
             </span>
-          ))}
-        </span>
-      ))}
+            {count ? (
+              <span className="court-achievement-badge-count" aria-hidden="true">
+                {count}
+              </span>
+            ) : null}
+          </span>
+        );
+      })}
     </span>
   );
 }

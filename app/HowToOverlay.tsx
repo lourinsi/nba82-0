@@ -1,44 +1,46 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  hasHowToBeenSeenThisPageLoad,
+  isHowToDismissed,
+  markHowToSeenThisPageLoad,
+  setHowToDismissed,
+  subscribeToHowToOpen,
+  subscribeToHowToState,
+} from "./clientPreferences";
 import type { HowToOverlayContent } from "./howToContent";
-
-const DISMISSED_VALUE = "dismissed";
-const STORAGE_CHANGE_EVENT = "nba82-how-to-storage-change";
 
 type HowToOverlayProps = {
   content: HowToOverlayContent;
   storageKey: string;
 };
 
-function subscribeToStorage(onStoreChange: () => void) {
-  window.addEventListener("storage", onStoreChange);
-  window.addEventListener(STORAGE_CHANGE_EVENT, onStoreChange);
-
-  return () => {
-    window.removeEventListener("storage", onStoreChange);
-    window.removeEventListener(STORAGE_CHANGE_EVENT, onStoreChange);
-  };
-}
-
-function dismissedSnapshot(storageKey: string) {
-  try {
-    return window.localStorage.getItem(storageKey) === DISMISSED_VALUE;
-  } catch {
-    return false;
-  }
-}
-
 export default function HowToOverlay({ content, storageKey }: HowToOverlayProps) {
   const [closed, setClosed] = useState(false);
+  const [forcedOpen, setForcedOpen] = useState(false);
   const panelRef = useRef<HTMLElement | null>(null);
   const dismissed = useSyncExternalStore(
-    subscribeToStorage,
-    () => dismissedSnapshot(storageKey),
+    subscribeToHowToState,
+    () => isHowToDismissed(storageKey),
     () => true,
   );
-  const visible = !closed && !dismissed;
+  const seenThisPageLoad = useSyncExternalStore(
+    subscribeToHowToState,
+    () => hasHowToBeenSeenThisPageLoad(storageKey),
+    () => true,
+  );
+  const visible = forcedOpen || (!closed && !dismissed && !seenThisPageLoad);
   const titleId = `${storageKey.replace(/[^a-z0-9_-]/gi, "-")}-title`;
+
+  useEffect(
+    () =>
+      subscribeToHowToOpen(storageKey, () => {
+        setClosed(false);
+        setForcedOpen(true);
+      }),
+    [storageKey],
+  );
 
   useEffect(() => {
     if (!visible) {
@@ -50,6 +52,8 @@ export default function HowToOverlay({ content, storageKey }: HowToOverlayProps)
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        markHowToSeenThisPageLoad(storageKey);
+        setForcedOpen(false);
         setClosed(true);
       }
     }
@@ -62,20 +66,18 @@ export default function HowToOverlay({ content, storageKey }: HowToOverlayProps)
       window.clearTimeout(focusTimer);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [visible]);
+  }, [storageKey, visible]);
 
   function closeOverlay() {
+    markHowToSeenThisPageLoad(storageKey);
+    setForcedOpen(false);
     setClosed(true);
   }
 
   function dismissOverlay() {
-    try {
-      window.localStorage.setItem(storageKey, DISMISSED_VALUE);
-      window.dispatchEvent(new Event(STORAGE_CHANGE_EVENT));
-    } catch {
-      // Private browsing or storage restrictions should not block the guide from closing.
-    }
-
+    setHowToDismissed(storageKey, true);
+    markHowToSeenThisPageLoad(storageKey);
+    setForcedOpen(false);
     setClosed(true);
   }
 
@@ -86,8 +88,9 @@ export default function HowToOverlay({ content, storageKey }: HowToOverlayProps)
   return (
     <div className="how-to-overlay">
       <button
-        aria-label="Close how to play guide"
+        aria-label="Dismiss how to play guide"
         className="how-to-backdrop"
+        tabIndex={-1}
         type="button"
         onClick={closeOverlay}
       />
