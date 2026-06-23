@@ -122,10 +122,30 @@ export const GAME_TIPS = [
   // },
 ] as const satisfies readonly GameTip[];
 
+export const FIRST_GAME_TIP_INDEX = 0;
+
 export function randomGameTip() {
-  return GAME_TIPS[Math.floor(Math.random() * GAME_TIPS.length)];
+  return GAME_TIPS[randomGameTipIndex()];
 }
 
-export function randomGameTipIndex() {
-  return Math.floor(Math.random() * GAME_TIPS.length);
+export function randomGameTipIndex({ includeFirstTip = true }: { includeFirstTip?: boolean } = {}) {
+  if (includeFirstTip || GAME_TIPS.length <= 1) {
+    return Math.floor(Math.random() * GAME_TIPS.length);
+  }
+
+  return 1 + Math.floor(Math.random() * (GAME_TIPS.length - 1));
+}
+
+export function randomRotatingGameTipIndex() {
+  return randomGameTipIndex({ includeFirstTip: false });
+}
+
+export function nextRotatingGameTipIndex(currentIndex: number) {
+  if (GAME_TIPS.length <= 1) {
+    return FIRST_GAME_TIP_INDEX;
+  }
+
+  const nextIndex = currentIndex + 1;
+
+  return nextIndex > FIRST_GAME_TIP_INDEX && nextIndex < GAME_TIPS.length ? nextIndex : FIRST_GAME_TIP_INDEX + 1;
 }

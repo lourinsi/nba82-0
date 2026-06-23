@@ -7513,3 +7513,138 @@ select {
     top: 6px !important;
   }
 }
+
+.court-achievement-badge,
+.achievement-badge-face {
+  box-sizing: border-box;
+  place-items: center;
+}
+
+.court-achievement-badge-symbol,
+.achievement-badge-symbol {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.court-achievement-badge-dpoy .court-achievement-badge-symbol,
+.court-achievement-badge-dpoy .achievement-badge-symbol {
+  font-size: 0.29rem;
+  transform: scaleX(0.94);
+}
+
+.court-achievement-badge-rise .court-achievement-badge-symbol,
+.court-achievement-badge-rise .achievement-badge-symbol,
+.court-achievement-badge-roy .court-achievement-badge-symbol,
+.court-achievement-badge-roy .achievement-badge-symbol {
+  font-size: 0.37rem;
+}
+
+.court-achievement-badge-ring .court-achievement-badge-symbol,
+.court-achievement-badge-ring .achievement-badge-symbol {
+  font-size: 0.62rem;
+}
+
+.court-achievement-badge-all-star-logo .court-achievement-badge-symbol,
+.court-achievement-badge-all-star-logo .achievement-badge-symbol {
+  height: 100%;
+  max-height: 24px;
+  max-width: 24px;
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .roster-filter-row.roster-filter-row-mobile-hidden {
+    display: none !important;
+  }
+
+  .game-page-classic .roster-player-card .achievement-strip {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+
+  .game-page-classic .roster-mode-stats .achievement-stat-metric,
+  .game-page-classic .roster-mode-mixed .achievement-stat {
+    flex: 0 0 56px;
+    min-width: 56px;
+  }
+
+  .game-page-classic .roster-mode-mixed .achievement-stat-pra {
+    flex-basis: 82px;
+    min-width: 82px;
+  }
+
+  .game-page-classic .roster-mode-mixed .achievement-stat-ws-48 {
+    flex-basis: 62px;
+    min-width: 62px;
+  }
+
+  .season-result-page .result-accolade-badges {
+    max-width: calc(100% - 28px) !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 2px 2px 7px;
+    scrollbar-width: thin !important;
+    width: calc(100% - 28px) !important;
+  }
+
+  .season-result-page .result-accolade-badges::-webkit-scrollbar {
+    display: block;
+    height: 5px;
+  }
+
+  .season-result-page .result-player-row .achievement-strip,
+  .season-result-page .result-totals .achievement-strip {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+  }
+
+  .season-result-page .result-player-row .achievement-stat,
+  .season-result-page .result-totals .achievement-stat {
+    flex: 0 0 auto;
+    min-width: 58px;
+  }
+
+  .season-result-page .result-player-row .achievement-stat-pra,
+  .season-result-page .result-totals .achievement-stat-pra {
+    min-width: 86px;
+  }
+
+  .season-result-page .result-player-row .achievement-stat-ws-48,
+  .season-result-page .result-totals .achievement-stat-avg-ws-48 {
+    min-width: 68px;
+  }
+}
+
+@media (max-width: 430px) {
+  .game-page-classic .roster-mode-stats .achievement-stat-metric,
+  .game-page-classic .roster-mode-mixed .achievement-stat {
+    flex-basis: 54px;
+    min-width: 54px;
+  }
+
+  .game-page-classic .roster-mode-mixed .achievement-stat-pra {
+    flex-basis: 80px;
+    min-width: 80px;
+  }
+
+  .season-result-page .result-accolade-badges {
+    max-width: calc(100% - 24px) !important;
+    width: calc(100% - 24px) !important;
+  }
+
+  .season-result-page .result-player-row .achievement-stat,
+  .season-result-page .result-totals .achievement-stat {
+    min-width: 56px;
+  }
+
+  .season-result-page .result-player-row .achievement-stat-pra,
+  .season-result-page .result-totals .achievement-stat-pra {
+    min-width: 82px;
+  }
+}
