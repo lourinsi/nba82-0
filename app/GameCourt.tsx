@@ -18,7 +18,13 @@ import {
   subscribeToGameHeaderAction,
   type GameHeaderAction,
 } from "./clientPreferences";
-import { GAME_TIPS, randomGameTipIndex, type GameTip } from "./gameTips";
+import {
+  FIRST_GAME_TIP_INDEX,
+  GAME_TIPS,
+  nextRotatingGameTipIndex,
+  randomRotatingGameTipIndex,
+  type GameTip,
+} from "./gameTips";
 import type { HowToOverlayContent } from "./howToContent";
 
 export type Position = "PG" | "SG" | "SF" | "PF" | "C";
@@ -765,7 +771,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const [loading, setLoading] = useState(() => !getCachedPlayers<Player>());
   const [calculatingResults, setCalculatingResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTipIndex, setActiveTipIndex] = useState(0);
+  const [activeTipIndex, setActiveTipIndex] = useState(FIRST_GAME_TIP_INDEX);
   const activeTip = GAME_TIPS[activeTipIndex] ?? GAME_TIPS[0];
   const [spinningTarget, setSpinningTarget] = useState<SpinTarget | null>(null);
   const isSpinning = spinningTarget !== null;
@@ -933,16 +939,11 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   );
 
   useEffect(() => {
-    const initialTipTimeout = window.setTimeout(() => {
-      setActiveTipIndex(randomGameTipIndex());
-    }, 0);
-
     const tipInterval = window.setInterval(() => {
-      setActiveTipIndex((currentIndex) => (currentIndex + 1) % GAME_TIPS.length);
+      setActiveTipIndex((currentIndex) => nextRotatingGameTipIndex(currentIndex));
     }, 10000);
 
     return () => {
-      window.clearTimeout(initialTipTimeout);
       window.clearInterval(tipInterval);
     };
   }, []);
@@ -1045,6 +1046,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     awaitingPublicPick &&
     hasActiveDraftSelection &&
     publicRoundsSpent === 1;
+  const rosterSpinCtaVisible = showOpeningRerollCta || showPublicRosterSpinCta;
   const gameHeaderTitle = isAdmin ? "Admin Workspace" : `Round ${publicDisplayRound}/${PUBLIC_ROUND_COUNT}`;
   const gameHeaderEyebrow = isAdmin ? "Admin Mode" : resultModeLabel;
 
@@ -1378,7 +1380,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     setOpeningAutoSpinActive(false);
     setOpeningAutoSpinComplete(false);
     setOpeningRerollAvailable(false);
-    setActiveTipIndex(randomGameTipIndex());
+    setActiveTipIndex(FIRST_GAME_TIP_INDEX);
   }
 
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
@@ -1849,7 +1851,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       setOpeningAutoSpinActive(false);
       setOpeningAutoSpinComplete(false);
       setOpeningRerollAvailable(false);
-      setActiveTipIndex(randomGameTipIndex());
+      setActiveTipIndex(FIRST_GAME_TIP_INDEX);
       setAuthPanelOpen(false);
       setLoginError(null);
       setStatus("Public draft reset.");
@@ -1972,7 +1974,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     setSpinningTarget(target);
     setOpeningRerollAvailable(false);
     setStatus("Spinning...");
-    setActiveTipIndex(randomGameTipIndex());
+    setActiveTipIndex(randomRotatingGameTipIndex());
 
     spinIntervalRef.current = setInterval(() => {
       const previewSelection = selectionForSpinTarget(target);
@@ -1990,7 +1992,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       applySpinSelection(finalSelection, target);
       setSpinningTarget(null);
       setStatus(`Spun ${finalSelection.team} ${finalSelection.eraLabel}.`);
-      setActiveTipIndex(randomGameTipIndex());
+      setActiveTipIndex(randomRotatingGameTipIndex());
 
       if (!isAdmin) {
         if (target === "all") {
@@ -2055,6 +2057,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
         setDraggedPlayerId(null);
         setDraggedFromPosition(null);
         setOpeningRerollAvailable(false);
+        setActiveTipIndex(FIRST_GAME_TIP_INDEX);
         openingAutoSpinStartedAtRef.current = Date.now();
         setOpeningAutoSpinActive(true);
         setSpinningTarget("all");
@@ -2094,7 +2097,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       setOpeningAutoSpinComplete(true);
       setOpeningRerollAvailable(true);
       setSpinningTarget(null);
-      setActiveTipIndex(randomGameTipIndex());
+      setActiveTipIndex(randomRotatingGameTipIndex());
       setStatus(`Spun ${finalSelection.team} ${finalSelection.eraLabel}. One free reroll is available.`);
     }, remainingSpinMs);
 
@@ -2277,7 +2280,11 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                     : "No roster drawn yet."}
                 </p>
 
-                <div className="roster-filter-row mt-4 flex flex-wrap items-center gap-2">
+                <div
+                  className={`roster-filter-row mt-4 flex flex-wrap items-center gap-2 ${
+                    rosterSpinCtaVisible ? "roster-filter-row-mobile-hidden" : ""
+                  }`}
+                >
                   <div
                     aria-label="Position filter"
                     className="position-filter-group flex h-10 items-center gap-1 rounded-lg bg-[#1a1f2b] p-1"
