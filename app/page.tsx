@@ -33,6 +33,15 @@ const GAME_MODES = [
     enabled: true,
   },
   {
+    title: "PER 100",
+    status: "Playable",
+    href: "/per-100",
+    description: "Team-era stint scoring by per-100 production, TS+, and win-share split.",
+    action: "Play Mode",
+    adminOnly: false,
+    enabled: true,
+  },
+  {
     title: "Legacy Engine",
     status: "Admin",
     href: "/legacy-engine",

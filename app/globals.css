@@ -66,6 +66,7 @@ select {
 .site-topbar-main {
   align-items: center;
   display: flex;
+  flex: 1 1 auto;
   gap: 12px;
   min-width: 0;
 }
@@ -110,8 +111,155 @@ select {
   white-space: nowrap;
 }
 
+.site-admin-picker {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  margin-left: 10px;
+  max-width: 340px;
+  min-width: 0;
+}
+
+.site-admin-picker-field {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #d7dbe5;
+  display: flex;
+  flex: 1 1 0;
+  height: 38px;
+  min-width: 0;
+  overflow: visible;
+  position: relative;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+  z-index: 1;
+}
+
+.site-admin-picker-field:focus-within,
+.site-admin-picker-field-open {
+  background: rgba(49, 214, 161, 0.09);
+  border-color: rgba(49, 214, 161, 0.55);
+  z-index: 20;
+}
+
+.site-admin-picker-field::after {
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid #cfd3df;
+  content: "";
+  flex: 0 0 auto;
+  margin-right: 10px;
+  pointer-events: none;
+  transition: transform 160ms ease;
+}
+
+.site-admin-picker-field-open::after {
+  transform: rotate(180deg);
+}
+
+.site-admin-picker-field span {
+  color: #31d6a1;
+  flex: 0 0 auto;
+  font-size: 0.58rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  padding-left: 10px;
+  text-transform: uppercase;
+}
+
+.site-admin-picker-field input {
+  background: transparent;
+  border: 0;
+  color: #f4f2ec;
+  flex: 1 1 auto;
+  font-size: 0.82rem;
+  font-weight: 950;
+  height: 100%;
+  min-width: 0;
+  outline: none;
+  padding: 0 10px 0 8px;
+  text-transform: uppercase;
+}
+
+.site-admin-picker-menu {
+  background: rgba(31, 36, 50, 0.98);
+  border: 1px solid rgba(49, 214, 161, 0.34);
+  border-radius: 8px;
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 6px;
+  left: 0;
+  max-height: min(360px, calc(100vh - var(--site-topbar-height) - 28px));
+  overflow-y: auto;
+  padding: 10px;
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 230;
+}
+
+.site-admin-picker-menu::before {
+  background: rgba(31, 36, 50, 0.98);
+  border-left: 1px solid rgba(49, 214, 161, 0.34);
+  border-top: 1px solid rgba(49, 214, 161, 0.34);
+  content: "";
+  height: 12px;
+  left: 28px;
+  position: absolute;
+  top: -7px;
+  transform: rotate(45deg);
+  width: 12px;
+}
+
+.site-admin-picker-menu-team {
+  grid-template-columns: repeat(5, minmax(44px, 1fr));
+  width: min(360px, calc(100vw - 24px));
+}
+
+.site-admin-picker-menu-era {
+  grid-template-columns: repeat(2, minmax(58px, 1fr));
+  width: 176px;
+}
+
+.site-admin-picker-option {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  color: #f4f2ec;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 950;
+  min-height: 34px;
+  padding: 0 10px;
+  text-align: center;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.site-admin-picker-option:hover,
+.site-admin-picker-option:focus-visible,
+.site-admin-picker-option[aria-selected="true"] {
+  background: rgba(49, 214, 161, 0.18);
+  border-color: rgba(49, 214, 161, 0.58);
+  color: #ffffff;
+  outline: none;
+}
+
+.site-admin-picker-field input:disabled {
+  cursor: wait;
+  opacity: 0.52;
+}
+
 .site-topbar-actions {
   align-items: center;
+  flex: 0 0 auto;
   display: flex;
   gap: 8px;
 }
@@ -472,6 +620,7 @@ select {
 
 .site-light-mode .site-control-button,
 .site-light-mode .site-adjusted-toggle-button,
+.site-light-mode .site-admin-picker-field,
 .site-light-mode .site-menu-item,
 .site-light-mode .site-auth-body input {
   background: #e5ebf4;
@@ -485,6 +634,50 @@ select {
 
 .site-light-mode .site-adjusted-toggle-copy span {
   color: #1c2431;
+}
+
+.site-light-mode .site-admin-picker-field input {
+  color: #1c2431;
+}
+
+.site-light-mode .site-admin-picker-field span {
+  color: #0b7e60;
+}
+
+.site-light-mode .site-admin-picker-field:focus-within {
+  background: #d8efe8;
+  border-color: rgba(25, 145, 108, 0.44);
+}
+
+.site-light-mode .site-admin-picker-field::after {
+  border-top-color: #536078;
+}
+
+.site-light-mode .site-admin-picker-menu {
+  background: rgba(244, 247, 252, 0.99);
+  border-color: rgba(25, 145, 108, 0.28);
+  box-shadow:
+    0 18px 38px rgba(54, 68, 92, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.site-light-mode .site-admin-picker-menu::before {
+  background: rgba(244, 247, 252, 0.99);
+  border-color: rgba(25, 145, 108, 0.28);
+}
+
+.site-light-mode .site-admin-picker-option {
+  background: rgba(36, 48, 67, 0.06);
+  border-color: rgba(36, 48, 67, 0.12);
+  color: #1c2431;
+}
+
+.site-light-mode .site-admin-picker-option:hover,
+.site-light-mode .site-admin-picker-option:focus-visible,
+.site-light-mode .site-admin-picker-option[aria-selected="true"] {
+  background: rgba(25, 145, 108, 0.16);
+  border-color: rgba(25, 145, 108, 0.4);
+  color: #172033;
 }
 
 .site-light-mode .site-menu-close {
@@ -507,6 +700,62 @@ select {
   color: #0b7e60;
 }
 
+@media (max-width: 760px) {
+  .site-admin-picker {
+    gap: 6px;
+    margin-left: 2px;
+    max-width: 220px;
+  }
+
+  .site-admin-picker-field {
+    height: 36px;
+  }
+
+  .site-admin-picker-field span {
+    display: none;
+  }
+
+  .site-admin-picker-field input {
+    padding: 0 9px;
+  }
+
+  .site-admin-picker-menu-team {
+    grid-template-columns: repeat(4, minmax(42px, 1fr));
+    width: min(252px, calc(100vw - 20px));
+  }
+
+  .site-admin-picker-menu-era {
+    grid-template-columns: repeat(2, minmax(52px, 1fr));
+    width: 144px;
+  }
+}
+
+@media (max-width: 560px) {
+  .site-topbar-main {
+    gap: 8px;
+  }
+
+  .site-admin-picker {
+    flex: 0 1 136px;
+    gap: 5px;
+    max-width: 136px;
+  }
+
+  .site-admin-picker-field input {
+    font-size: 0.76rem;
+    padding: 0 7px;
+  }
+
+  .site-admin-picker-field::after {
+    margin-right: 7px;
+  }
+
+  .site-admin-picker-menu-team {
+    grid-template-columns: repeat(3, minmax(40px, 1fr));
+    width: min(174px, calc(100vw - 20px));
+  }
+}
+
 @media (max-width: 460px) {
   .site-topbar-inner {
     padding: 0 10px;
@@ -518,6 +767,11 @@ select {
 
   .site-game-status {
     display: none;
+  }
+
+  .site-admin-picker {
+    flex-basis: 116px;
+    max-width: 116px;
   }
 
   .site-adjusted-toggle-button {
@@ -3043,7 +3297,7 @@ select {
   display: none;
 }
 
-.game-page-classic .roster-player-card {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card {
   align-items: center;
   gap: 16px;
   grid-template-columns: minmax(154px, 0.82fr) minmax(0, 1.18fr);
@@ -3052,27 +3306,27 @@ select {
   padding: 15px 16px 15px 18px;
 }
 
-.game-page-classic .player-card-info {
+:is(.game-page-classic, .game-page-per-100) .player-card-info {
   display: grid;
   gap: 4px;
 }
 
-.game-page-classic .player-card-name {
+:is(.game-page-classic, .game-page-per-100) .player-card-name {
   font-size: 1rem;
 }
 
-.game-page-classic .player-card-positions {
+:is(.game-page-classic, .game-page-per-100) .player-card-positions {
   font-size: 0.72rem;
   line-height: 1;
 }
 
-.game-page-classic .player-card-team {
+:is(.game-page-classic, .game-page-per-100) .player-card-team {
   color: color-mix(in srgb, var(--team-readable-secondary) 64%, #cfd3df);
   font-size: 0.66rem;
   line-height: 1;
 }
 
-.game-page-classic .roster-player-card .achievement-strip {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip {
   display: grid;
   gap: 10px 12px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3083,16 +3337,16 @@ select {
   white-space: normal;
 }
 
-.game-page-classic .roster-player-card .achievement-strip::-webkit-scrollbar {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip::-webkit-scrollbar {
   display: none;
 }
 
-.game-page-classic .roster-player-card .achievement-stat {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat {
   min-width: 0;
   overflow: visible;
 }
 
-.game-page-classic .roster-player-card .achievement-stat-metric {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-metric {
   align-items: center;
   display: grid;
   gap: 4px;
@@ -3100,13 +3354,13 @@ select {
   min-height: 34px;
 }
 
-.game-page-classic .roster-player-card .achievement-value {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-value {
   color: #f4f2ec;
   font-size: 1rem;
   line-height: 1;
 }
 
-.game-page-classic .roster-player-card .achievement-label {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-label {
   color: rgba(207, 211, 223, 0.78);
   font-size: 0.56rem;
   line-height: 1;
@@ -3116,19 +3370,19 @@ select {
   white-space: nowrap;
 }
 
-.game-page-classic .roster-player-card .achievement-stat-award {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-award {
   align-items: center;
   display: grid;
   justify-items: center;
   min-width: 28px;
 }
 
-.game-page-classic .roster-player-card .achievement-stat-award .achievement-value,
-.game-page-classic .roster-player-card .achievement-stat-award .achievement-label {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-award .achievement-value,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-award .achievement-label {
   display: none;
 }
 
-.game-page-classic .roster-player-card .achievement-badge-face {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-badge-face {
   align-items: center;
   background:
     radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.52), transparent 34%),
@@ -3170,27 +3424,27 @@ select {
   white-space: nowrap;
 }
 
-.game-page-classic .roster-player-card .court-achievement-badge-all-star-logo .achievement-badge-symbol,
-.game-page-classic .roster-player-card .court-achievement-badge-nba .achievement-badge-symbol,
-.game-page-classic .roster-player-card .court-achievement-badge-points .achievement-badge-symbol,
-.game-page-classic .roster-player-card .court-achievement-badge-assist .achievement-badge-symbol,
-.game-page-classic .roster-player-card .court-achievement-badge-rebound .achievement-badge-symbol,
-.game-page-classic .roster-player-card .court-achievement-badge-defense .achievement-badge-symbol,
-.game-page-classic .roster-player-card .court-achievement-badge-rookie .achievement-badge-symbol {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-all-star-logo .achievement-badge-symbol,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-nba .achievement-badge-symbol,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-points .achievement-badge-symbol,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-assist .achievement-badge-symbol,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-rebound .achievement-badge-symbol,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-defense .achievement-badge-symbol,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-rookie .achievement-badge-symbol {
   font-size: 0.4rem;
 }
 
-.game-page-classic .roster-mode-awards .achievement-strip {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-strip {
   gap: 10px;
   grid-template-columns: repeat(3, 28px);
   justify-content: end;
 }
 
-.game-page-classic .roster-mode-mixed {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-mixed {
   margin-top: 10px;
 }
 
-.game-page-classic .roster-mode-mixed .achievement-strip {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-strip {
   overflow: visible;
 }
 
@@ -3212,11 +3466,11 @@ select {
   width: 22px;
 }
 
-.game-page-classic .roster-mode-awards {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards {
   min-height: 92px;
 }
 
-.game-page-classic .roster-mode-awards .achievement-strip {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-strip {
   display: flex;
   gap: 20px;
   justify-content: flex-start;
@@ -3226,7 +3480,7 @@ select {
   white-space: nowrap;
 }
 
-.game-page-classic .roster-mode-awards .achievement-stat-award {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award {
   display: grid;
   gap: 2px;
   justify-items: center;
@@ -3234,26 +3488,26 @@ select {
   position: static;
 }
 
-.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-badge-face {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-badge-face {
   display: none;
 }
 
-.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value,
-.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-value,
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-label {
   display: block;
 }
 
-.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-value {
   color: #f4f2ec;
   font-size: 1rem;
 }
 
-.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-label {
   color: rgba(207, 211, 223, 0.78);
   font-size: 0.56rem;
 }
 
-.game-page-classic .roster-player-card {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card {
   align-items: center;
   gap: 16px;
   grid-template-columns: minmax(170px, 0.8fr) minmax(0, 1.2fr);
@@ -3261,12 +3515,12 @@ select {
   padding: 12px 16px 12px 18px;
 }
 
-.game-page-classic .roster-mode-mixed {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-mixed {
   margin-top: 12px;
 }
 
-.game-page-classic .roster-player-card .achievement-strip,
-.game-page-classic .roster-mode-awards .achievement-strip {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip,
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-strip {
   align-items: center;
   display: flex;
   flex-wrap: nowrap;
@@ -3280,34 +3534,34 @@ select {
   white-space: nowrap;
 }
 
-.game-page-classic .roster-player-card .achievement-stat,
-.game-page-classic .roster-player-card .achievement-stat:nth-child(n + 9) {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat:nth-child(n + 9) {
   display: grid;
 }
 
-.game-page-classic .roster-player-card .achievement-stat-metric,
-.game-page-classic .roster-player-card .achievement-stat-award {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-metric,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-award {
   flex: 0 0 auto;
   gap: 4px;
   min-height: 36px;
   min-width: 54px;
 }
 
-.game-page-classic .roster-player-card .achievement-stat-pra {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-pra {
   min-width: 72px;
 }
 
-.game-page-classic .roster-mode-awards .achievement-stat-award {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award {
   min-width: 48px;
 }
 
-.game-page-classic .roster-player-card .achievement-value,
-.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-value,
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-value {
   font-size: 1rem;
 }
 
-.game-page-classic .roster-player-card .achievement-label,
-.game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-label,
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-label {
   font-size: 0.56rem;
 }
 
@@ -4383,6 +4637,102 @@ select {
   white-space: nowrap;
 }
 
+.court-slot {
+  overflow: visible;
+}
+
+.court-slot:hover,
+.court-slot:focus-visible,
+.court-slot:focus-within,
+.court-slot:has(.court-achievement-badge:hover),
+.court-slot:has(.court-achievement-badge:focus-visible) {
+  z-index: 70;
+}
+
+.court-slot-filled {
+  padding-top: 25px;
+}
+
+.court-achievement-badges {
+  gap: 4px;
+  right: 8px;
+  top: 7px;
+  z-index: 40;
+}
+
+.court-achievement-badge {
+  z-index: 1;
+}
+
+.court-achievement-badge::after {
+  bottom: calc(100% + 8px);
+  max-width: 220px;
+  right: -8px;
+  top: auto;
+  transform: translateY(3px);
+  white-space: normal;
+  z-index: 500;
+}
+
+.court-achievement-badge::before {
+  border-color: rgba(10, 12, 18, 0.96) transparent transparent;
+  border-width: 6px 5px 0;
+  bottom: calc(100% + 3px);
+  right: 8px;
+  top: auto;
+  transform: translateY(3px);
+  z-index: 501;
+}
+
+.court-achievement-badge:hover::after,
+.court-achievement-badge:hover::before,
+.court-achievement-badge:focus::after,
+.court-achievement-badge:focus::before,
+.court-achievement-badge:focus-visible::after,
+.court-achievement-badge:focus-visible::before,
+.court-achievement-badge:active::after,
+.court-achievement-badge:active::before {
+  transform: translateY(0);
+}
+
+:is(.game-page-classic, .game-page-per-100) .roster-player-card {
+  padding-top: 28px;
+}
+
+.roster-feed-badges {
+  left: 12px;
+  top: 7px;
+  z-index: 24;
+}
+
+.roster-feed-badges .court-achievement-badge::after {
+  bottom: auto;
+  max-width: 190px;
+  right: auto;
+  top: calc(100% + 8px);
+  transform: translateY(-3px);
+}
+
+.roster-feed-badges .court-achievement-badge::before {
+  border-color: transparent transparent rgba(10, 12, 18, 0.96);
+  border-width: 0 5px 6px;
+  bottom: auto;
+  right: 8px;
+  top: calc(100% + 3px);
+  transform: translateY(-3px);
+}
+
+.roster-feed-badges .court-achievement-badge:hover::after,
+.roster-feed-badges .court-achievement-badge:hover::before,
+.roster-feed-badges .court-achievement-badge:focus::after,
+.roster-feed-badges .court-achievement-badge:focus::before,
+.roster-feed-badges .court-achievement-badge:focus-visible::after,
+.roster-feed-badges .court-achievement-badge:focus-visible::before,
+.roster-feed-badges .court-achievement-badge:active::after,
+.roster-feed-badges .court-achievement-badge:active::before {
+  transform: translateY(0);
+}
+
 .court-achievement-badge-mvp {
   background:
     radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.68), transparent 34%),
@@ -4541,11 +4891,11 @@ select {
   font-weight: 950;
 }
 
-.game-page-classic .roster-player-card .achievement-badge-face.court-achievement-badge-dpoy {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-badge-face.court-achievement-badge-dpoy {
   width: 24px;
 }
 
-.game-page-classic .roster-player-card .achievement-badge-face.court-achievement-badge-roy {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-badge-face.court-achievement-badge-roy {
   width: 24px;
 }
 
@@ -5189,7 +5539,7 @@ select {
     gap: 14px;
   }
 
-  .game-page-classic .roster-draw-grid {
+  :is(.game-page-classic, .game-page-per-100) .roster-draw-grid {
     align-items: center;
     gap: 8px;
     grid-template-columns: max-content max-content;
@@ -5201,7 +5551,7 @@ select {
     min-height: 110px;
   }
 
-  .game-page-classic .roster-draw-grid .spin-tile {
+  :is(.game-page-classic, .game-page-per-100) .roster-draw-grid .spin-tile {
     border-radius: 999px;
     min-height: 42px;
     min-width: 72px;
@@ -5226,7 +5576,7 @@ select {
     padding: 11px;
   }
 
-  .game-page-classic .roster-draw-grid .spin-tile-inner {
+  :is(.game-page-classic, .game-page-per-100) .roster-draw-grid .spin-tile-inner {
     display: block;
     padding: 0;
   }
@@ -5235,7 +5585,7 @@ select {
     justify-content: center;
   }
 
-  .game-page-classic .roster-draw-grid .spin-tile-topline {
+  :is(.game-page-classic, .game-page-per-100) .roster-draw-grid .spin-tile-topline {
     display: none;
   }
 
@@ -5255,7 +5605,7 @@ select {
     padding: 0 8px;
   }
 
-  .game-page-classic .roster-draw-grid .spin-tile-reel {
+  :is(.game-page-classic, .game-page-per-100) .roster-draw-grid .spin-tile-reel {
     border-radius: 999px;
     min-height: 40px;
     padding: 0 15px;
@@ -5266,7 +5616,7 @@ select {
     text-align: center;
   }
 
-  .game-page-classic .roster-draw-grid .spin-tile-value {
+  :is(.game-page-classic, .game-page-per-100) .roster-draw-grid .spin-tile-value {
     font-size: 1.08rem;
     line-height: 1;
     text-shadow: none;
@@ -5387,7 +5737,7 @@ select {
     white-space: nowrap;
   }
 
-  .game-page-classic .roster-player-card {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card {
     align-items: stretch;
     gap: 14px;
     grid-template-columns: minmax(0, 1fr);
@@ -5395,56 +5745,56 @@ select {
     padding: 14px 16px 15px 18px;
   }
 
-  .game-page-classic .player-card-info {
+  :is(.game-page-classic, .game-page-per-100) .player-card-info {
     gap: 5px;
   }
 
-  .game-page-classic .player-card-name {
+  :is(.game-page-classic, .game-page-per-100) .player-card-name {
     font-size: 1.02rem;
     line-height: 1.04;
   }
 
-  .game-page-classic .player-card-positions {
+  :is(.game-page-classic, .game-page-per-100) .player-card-positions {
     font-size: 0.72rem;
   }
 
-  .game-page-classic .player-card-team {
+  :is(.game-page-classic, .game-page-per-100) .player-card-team {
     font-size: 0.62rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip {
     gap: 11px 10px;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .game-page-classic .roster-player-card .achievement-stat {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat {
     overflow: visible;
   }
 
-  .game-page-classic .roster-player-card .achievement-stat:nth-child(n + 9) {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat:nth-child(n + 9) {
     display: grid;
   }
 
-  .game-page-classic .roster-player-card .achievement-stat-metric {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-metric {
     gap: 4px;
     min-height: 38px;
   }
 
-  .game-page-classic .roster-player-card .achievement-value {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-value {
     font-size: 1rem;
     line-height: 1;
   }
 
-  .game-page-classic .roster-player-card .achievement-stat-award {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-award {
     justify-items: center;
   }
 
-  .game-page-classic .roster-player-card .achievement-label {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-label {
     font-size: 0.56rem;
     line-height: 1;
   }
 
-  .game-page-classic .roster-player-card .achievement-badge-face {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-badge-face {
     height: 26px;
     width: 26px;
   }
@@ -5459,16 +5809,16 @@ select {
     width: 20px;
   }
 
-  .game-page-classic .roster-mode-awards {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards {
     min-height: 104px;
   }
 
-  .game-page-classic .roster-mode-awards .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-strip {
     grid-template-columns: repeat(3, 30px);
     justify-content: start;
   }
 
-  .game-page-classic .roster-player-card {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card {
     align-items: center;
     gap: 12px;
     grid-template-columns: minmax(132px, 0.72fr) minmax(0, 1.28fr);
@@ -5476,29 +5826,29 @@ select {
     padding: 12px 12px 12px 16px;
   }
 
-  .game-page-classic .roster-mode-mixed {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed {
     margin-top: 11px;
   }
 
-  .game-page-classic .player-card-info {
+  :is(.game-page-classic, .game-page-per-100) .player-card-info {
     gap: 4px;
   }
 
-  .game-page-classic .player-card-name {
+  :is(.game-page-classic, .game-page-per-100) .player-card-name {
     font-size: 0.98rem;
     line-height: 1.04;
   }
 
-  .game-page-classic .player-card-positions {
+  :is(.game-page-classic, .game-page-per-100) .player-card-positions {
     font-size: 0.7rem;
   }
 
-  .game-page-classic .player-card-team {
+  :is(.game-page-classic, .game-page-per-100) .player-card-team {
     font-size: 0.62rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-strip,
-  .game-page-classic .roster-mode-awards .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-strip {
     display: flex;
     flex-wrap: nowrap;
     gap: 18px;
@@ -5509,23 +5859,23 @@ select {
     white-space: nowrap;
   }
 
-  .game-page-classic .roster-player-card .achievement-stat-metric,
-  .game-page-classic .roster-player-card .achievement-stat-award {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-metric,
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-award {
     min-height: 34px;
     min-width: 48px;
   }
 
-  .game-page-classic .roster-player-card .achievement-stat-pra {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-pra {
     min-width: 68px;
   }
 
-  .game-page-classic .roster-player-card .achievement-value,
-  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-value,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-value {
     font-size: 0.96rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-label,
-  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-label,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-label {
     font-size: 0.52rem;
   }
 
@@ -5812,68 +6162,68 @@ select {
     font-size: 0.46rem;
   }
 
-  .game-page-classic .roster-player-card {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card {
     gap: 12px;
     grid-template-columns: minmax(0, 1fr);
     min-height: 128px;
     padding: 13px 14px 14px 16px;
   }
 
-  .game-page-classic .roster-player-card .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip {
     gap: 10px 8px;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .game-page-classic .roster-player-card .achievement-value {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-value {
     font-size: 0.9rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-label {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-label {
     font-size: 0.5rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-badge-face {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-badge-face {
     height: 24px;
     width: 24px;
   }
 
-  .game-page-classic .roster-mode-awards {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards {
     min-height: 100px;
   }
 
-  .game-page-classic .roster-mode-awards .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-strip {
     grid-template-columns: repeat(3, 28px);
   }
 
-  .game-page-classic .roster-player-card {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card {
     gap: 10px;
     grid-template-columns: minmax(116px, 0.68fr) minmax(0, 1.32fr);
     min-height: 82px;
     padding: 11px 10px 11px 14px;
   }
 
-  .game-page-classic .roster-player-card .achievement-strip,
-  .game-page-classic .roster-mode-awards .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-strip {
     gap: 15px;
     grid-template-columns: none;
   }
 
-  .game-page-classic .roster-player-card .achievement-stat-metric,
-  .game-page-classic .roster-player-card .achievement-stat-award {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-metric,
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-award {
     min-width: 44px;
   }
 
-  .game-page-classic .roster-player-card .achievement-stat-pra {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-pra {
     min-width: 64px;
   }
 
-  .game-page-classic .roster-player-card .achievement-value,
-  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-value,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-value {
     font-size: 0.88rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-label,
-  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-label,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-label {
     font-size: 0.48rem;
   }
 
@@ -5893,163 +6243,163 @@ select {
 }
 
 /* Classic roster feed: keep primary stat lanes visible, let overflow scroll. */
-.game-page-classic .roster-player-card {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card {
   gap: 14px;
   grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1.3fr);
   min-height: 86px;
 }
 
-.game-page-classic .roster-player-card .achievement-strip {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip {
   gap: 10px;
   overscroll-behavior-x: contain;
   padding: 2px 2px 6px;
   scrollbar-width: thin;
 }
 
-.game-page-classic .roster-player-card .achievement-strip::-webkit-scrollbar {
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip::-webkit-scrollbar {
   display: block;
   height: 6px;
 }
 
-.game-page-classic .roster-mode-stats .achievement-strip {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-stats .achievement-strip {
   display: flex;
   gap: 6px;
 }
 
-.game-page-classic .roster-mode-stats .achievement-stat-metric {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-stats .achievement-stat-metric {
   flex: 0 0 calc((100% - 24px) / 5);
   min-width: 0;
   width: auto;
 }
 
-.game-page-classic .roster-mode-mixed .achievement-strip {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-strip {
   display: flex;
   gap: 5px;
 }
 
-.game-page-classic .roster-mode-mixed .achievement-stat {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-stat {
   flex: 0 0 calc((100% - 15px) / 4);
   min-width: 0;
   width: auto;
 }
 
-.game-page-classic .roster-mode-awards .achievement-strip {
+:is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-strip {
   gap: 18px;
 }
 
 @media (max-width: 760px) {
-  .game-page-classic .roster-player-card {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card {
     gap: 8px;
     grid-template-columns: minmax(102px, 0.52fr) minmax(0, 1.48fr);
     min-height: 76px;
     padding: 10px 10px 10px 14px;
   }
 
-  .game-page-classic .player-card-info {
+  :is(.game-page-classic, .game-page-per-100) .player-card-info {
     gap: 3px;
   }
 
-  .game-page-classic .player-card-name {
+  :is(.game-page-classic, .game-page-per-100) .player-card-name {
     font-size: 0.88rem;
     line-height: 1.02;
   }
 
-  .game-page-classic .player-card-positions {
+  :is(.game-page-classic, .game-page-per-100) .player-card-positions {
     font-size: 0.62rem;
   }
 
-  .game-page-classic .player-card-team {
+  :is(.game-page-classic, .game-page-per-100) .player-card-team {
     font-size: 0.58rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip {
     gap: 6px;
     padding: 2px 0 5px;
   }
 
-  .game-page-classic .roster-player-card .achievement-stat-metric,
-  .game-page-classic .roster-player-card .achievement-stat-award {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-metric,
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-stat-award {
     min-height: 31px;
   }
 
-  .game-page-classic .roster-mode-stats .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-stats .achievement-strip {
     gap: 4px;
   }
 
-  .game-page-classic .roster-mode-stats .achievement-stat-metric {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-stats .achievement-stat-metric {
     flex-basis: calc((100% - 16px) / 5);
     min-width: 0;
   }
 
-  .game-page-classic .roster-mode-mixed .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-strip {
     gap: 4px;
   }
 
-  .game-page-classic .roster-mode-mixed .achievement-stat {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-stat {
     flex-basis: calc((100% - 12px) / 4);
     min-width: 0;
   }
 
-  .game-page-classic .roster-player-card .achievement-value,
-  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-value,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-value {
     font-size: 0.88rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-label,
-  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-label,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-label {
     font-size: 0.48rem;
   }
 
-  .game-page-classic .roster-mode-awards .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-strip {
     gap: 14px;
   }
 }
 
 @media (max-width: 390px) {
-  .game-page-classic .roster-player-card {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card {
     gap: 7px;
     grid-template-columns: minmax(92px, 0.5fr) minmax(0, 1.5fr);
     padding: 10px 9px 10px 12px;
   }
 
-  .game-page-classic .player-card-name {
+  :is(.game-page-classic, .game-page-per-100) .player-card-name {
     font-size: 0.82rem;
   }
 
-  .game-page-classic .player-card-positions {
+  :is(.game-page-classic, .game-page-per-100) .player-card-positions {
     font-size: 0.58rem;
   }
 
-  .game-page-classic .player-card-team {
+  :is(.game-page-classic, .game-page-per-100) .player-card-team {
     font-size: 0.54rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip {
     gap: 5px;
   }
 
-  .game-page-classic .roster-mode-stats .achievement-strip,
-  .game-page-classic .roster-mode-mixed .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-stats .achievement-strip,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-strip {
     gap: 3px;
   }
 
-  .game-page-classic .roster-mode-stats .achievement-stat-metric {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-stats .achievement-stat-metric {
     flex-basis: calc((100% - 12px) / 5);
     min-width: 0;
   }
 
-  .game-page-classic .roster-mode-mixed .achievement-stat {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-stat {
     flex-basis: calc((100% - 9px) / 4);
     min-width: 0;
   }
 
-  .game-page-classic .roster-player-card .achievement-value,
-  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-value {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-value,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-value {
     font-size: 0.82rem;
   }
 
-  .game-page-classic .roster-player-card .achievement-label,
-  .game-page-classic .roster-mode-awards .achievement-stat-award .achievement-label {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-label,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-awards .achievement-stat-award .achievement-label {
     font-size: 0.44rem;
   }
 }
@@ -6524,62 +6874,62 @@ select {
 }
 
 @media (max-width: 760px) {
-  .game-page-classic .game-header-inner,
-  .game-page-classic .game-shell,
-  .game-page-classic .mobile-game-footer {
+  :is(.game-page-classic, .game-page-per-100) .game-header-inner,
+  :is(.game-page-classic, .game-page-per-100) .game-shell,
+  :is(.game-page-classic, .game-page-per-100) .mobile-game-footer {
     max-width: 560px;
   }
 
-  .game-page-classic .game-shell {
+  :is(.game-page-classic, .game-page-per-100) .game-shell {
     padding: 0 2px 0;
     width: 100%;
   }
 
-  .game-page-classic .game-roster-panel {
+  :is(.game-page-classic, .game-page-per-100) .game-roster-panel {
     border-left: 1px solid rgba(255, 255, 255, 0.11);
     border-radius: 8px;
     border-right: 1px solid rgba(255, 255, 255, 0.11);
   }
 
-  .game-page-classic .game-roster-panel > .border-b {
+  :is(.game-page-classic, .game-page-per-100) .game-roster-panel > .border-b {
     padding: 12px 24px 14px;
   }
 
-  .game-page-classic .mobile-draw-row {
+  :is(.game-page-classic, .game-page-per-100) .mobile-draw-row {
     margin-top: 0;
   }
 
-  .game-page-classic .roster-selection-summary {
+  :is(.game-page-classic, .game-page-per-100) .roster-selection-summary {
     display: none;
   }
 
-  .game-page-classic .roster-filter-row {
+  :is(.game-page-classic, .game-page-per-100) .roster-filter-row {
     gap: 12px;
     grid-template-columns: 150px minmax(128px, 1fr) minmax(110px, 120px);
     margin-top: 26px;
   }
 
-  .game-page-classic .position-filter-group {
+  :is(.game-page-classic, .game-page-per-100) .position-filter-group {
     display: grid;
     gap: 2px;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     width: 150px;
   }
 
-  .game-page-classic .position-filter-group button {
+  :is(.game-page-classic, .game-page-per-100) .position-filter-group button {
     min-width: 0;
     padding-left: 0;
     padding-right: 0;
   }
 
-  .game-page-classic .roster-filter-row input,
-  .game-page-classic .roster-filter-row select,
-  .game-page-classic .roster-sort-control {
+  :is(.game-page-classic, .game-page-per-100) .roster-filter-row input,
+  :is(.game-page-classic, .game-page-per-100) .roster-filter-row select,
+  :is(.game-page-classic, .game-page-per-100) .roster-sort-control {
     min-width: 0;
     width: 100%;
   }
 
-  .game-page-classic .roster-list-scroll {
+  :is(.game-page-classic, .game-page-per-100) .roster-list-scroll {
     padding-left: 24px;
     padding-right: 22px;
   }
@@ -6619,7 +6969,7 @@ select {
     transform: translateX(20px);
   }
 
-  .game-page-light.game-page-classic {
+  .game-page-light:is(.game-page-classic, .game-page-per-100) {
     background:
       radial-gradient(circle at 18% -12%, rgba(255, 111, 19, 0.13), transparent 24rem),
       radial-gradient(circle at 92% 14%, rgba(79, 120, 196, 0.12), transparent 22rem),
@@ -6636,14 +6986,14 @@ select {
     color: #1c2431;
   }
 
-  .game-page-light.game-page-classic .game-roster-panel {
+  .game-page-light:is(.game-page-classic, .game-page-per-100) .game-roster-panel {
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(241, 245, 251, 0.94) 36%),
       #edf2f8;
     box-shadow: 0 16px 30px rgba(54, 68, 92, 0.15);
   }
 
-  .game-page-light.game-page-classic .game-roster-panel > .border-b {
+  .game-page-light:is(.game-page-classic, .game-page-per-100) .game-roster-panel > .border-b {
     border-color: rgba(40, 49, 67, 0.13);
   }
 
@@ -6699,9 +7049,9 @@ select {
     text-shadow: none;
   }
 
-  .game-page-light.game-page-classic .roster-player-card .player-card-team,
-  .game-page-light.game-page-classic .roster-player-card .player-card-positions,
-  .game-page-light.game-page-classic .roster-player-card .achievement-label {
+  .game-page-light:is(.game-page-classic, .game-page-per-100) .roster-player-card .player-card-team,
+  .game-page-light:is(.game-page-classic, .game-page-per-100) .roster-player-card .player-card-positions,
+  .game-page-light:is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-label {
     color: #2f3d51 !important;
     text-shadow: none;
   }
@@ -6745,26 +7095,26 @@ select {
 }
 
 @media (max-width: 430px) {
-  .game-page-classic .game-roster-panel > .border-b {
+  :is(.game-page-classic, .game-page-per-100) .game-roster-panel > .border-b {
     padding-left: 18px;
     padding-right: 18px;
   }
 
-  .game-page-classic .roster-filter-row {
+  :is(.game-page-classic, .game-page-per-100) .roster-filter-row {
     gap: 8px;
     grid-template-columns: 136px minmax(0, 1fr) 104px;
   }
 
-  .game-page-classic .position-filter-group {
+  :is(.game-page-classic, .game-page-per-100) .position-filter-group {
     width: 136px;
   }
 
-  .game-page-classic .roster-list-scroll {
+  :is(.game-page-classic, .game-page-per-100) .roster-list-scroll {
     padding-left: 18px;
     padding-right: 16px;
   }
 
-  .game-page-classic .mobile-bottom-nav-item span {
+  :is(.game-page-classic, .game-page-per-100) .mobile-bottom-nav-item span {
     font-size: 0.5rem;
   }
 }
@@ -7378,14 +7728,14 @@ select {
   }
 
   .game-page .game-shell,
-  .game-page-classic .game-shell,
+  :is(.game-page-classic, .game-page-per-100) .game-shell,
   .game-page-all-time .game-shell {
     max-width: 560px;
     padding: 8px 10px 12px;
   }
 
   .game-page .game-roster-panel,
-  .game-page-classic .game-roster-panel,
+  :is(.game-page-classic, .game-page-per-100) .game-roster-panel,
   .game-page-all-time .game-roster-panel {
     height: calc(100svh - var(--site-topbar-height) - 140px);
     min-height: 0;
@@ -7555,29 +7905,41 @@ select {
   width: 100%;
 }
 
+.roster-achievement-strip {
+  display: flex;
+}
+
+:is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-strip,
+:is(.game-page-classic, .game-page-per-100) .roster-mode-stats .achievement-strip {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .roster-filter-row.roster-filter-row-mobile-hidden {
     display: none !important;
   }
 
-  .game-page-classic .roster-player-card .achievement-strip {
+  :is(.game-page-classic, .game-page-per-100) .roster-player-card .achievement-strip {
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: thin;
   }
 
-  .game-page-classic .roster-mode-stats .achievement-stat-metric,
-  .game-page-classic .roster-mode-mixed .achievement-stat {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-stats .achievement-stat-metric,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-stat {
     flex: 0 0 56px;
     min-width: 56px;
   }
 
-  .game-page-classic .roster-mode-mixed .achievement-stat-pra {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-stat-pra {
     flex-basis: 82px;
     min-width: 82px;
   }
 
-  .game-page-classic .roster-mode-mixed .achievement-stat-ws-48 {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-stat-ws-48 {
     flex-basis: 62px;
     min-width: 62px;
   }
@@ -7622,13 +7984,13 @@ select {
 }
 
 @media (max-width: 430px) {
-  .game-page-classic .roster-mode-stats .achievement-stat-metric,
-  .game-page-classic .roster-mode-mixed .achievement-stat {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-stats .achievement-stat-metric,
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-stat {
     flex-basis: 54px;
     min-width: 54px;
   }
 
-  .game-page-classic .roster-mode-mixed .achievement-stat-pra {
+  :is(.game-page-classic, .game-page-per-100) .roster-mode-mixed .achievement-stat-pra {
     flex-basis: 80px;
     min-width: 80px;
   }
@@ -7646,5 +8008,35 @@ select {
   .season-result-page .result-player-row .achievement-stat-pra,
   .season-result-page .result-totals .achievement-stat-pra {
     min-width: 82px;
+  }
+}
+
+.court-slot-filled {
+  padding-top: 10px;
+}
+
+.court-slot-filled .court-achievement-badges {
+  right: 8px;
+  top: -13px;
+  z-index: 80;
+}
+
+.court-slot-filled .court-achievement-badge {
+  height: 22px;
+  width: 22px;
+}
+
+@media (max-width: 760px) {
+  :is(.game-page-classic, .game-page-per-100) .roster-feed-header-spin-cta {
+    padding-top: 2px !important;
+  }
+
+  :is(.game-page-classic, .game-page-per-100) .roster-feed-header-spin-cta .roster-count {
+    display: none !important;
+  }
+
+  :is(.game-page-classic, .game-page-per-100) .roster-feed-header-spin-cta .next-draw-card {
+    justify-content: center;
+    margin-top: 10px !important;
   }
 }

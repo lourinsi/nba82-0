@@ -125,18 +125,18 @@ function formatBoostPercent(multiplier: number) {
 
 function achievementBadgeCount(value: string) {
   const trimmedValue = value.trim();
-  const countMatch = /^(\d+(?:\.\d+)?)x$/i.exec(trimmedValue);
+  const countMatch = /^(\d+(?:\.\d+)?)(?:x)?$/i.exec(trimmedValue);
 
   if (!countMatch || Number(countMatch[1]) <= 1) {
     return null;
   }
 
-  return trimmedValue;
+  return `${countMatch[1]}x`;
 }
 
 function achievementBadgeCountNumber(value: string) {
   const trimmedValue = value.trim();
-  const countMatch = /^(\d+(?:\.\d+)?)x$/i.exec(trimmedValue);
+  const countMatch = /^(\d+(?:\.\d+)?)(?:x)?$/i.exec(trimmedValue);
 
   return countMatch ? Number(countMatch[1]) : 1;
 }

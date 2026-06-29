@@ -56,8 +56,10 @@ export type Accolades = {
   scoring_titles: number;
   assist_titles: number;
   rebound_titles: number;
+  three_point_titles?: number;
   steal_titles: number;
   block_titles: number;
+  three_point_contest_wins?: number;
   games_started?: number;
 };
 export type ScoringAccolades = Omit<Accolades, "roy_won"> & { roy_won: boolean | number };
@@ -67,12 +69,24 @@ export type ClassicStatLine = Partial<Record<ClassicStatKey, number | null>>;
 export type CareerSeason = Partial<TeamEra> & {
   season?: string | number | null;
   games_played?: number | string | null;
+  minutes?: number | string | null;
+  mpg?: number | string | null;
   ppg?: number | string | null;
   rpg?: number | string | null;
   apg?: number | string | null;
   spg?: number | string | null;
   bpg?: number | string | null;
+  per100_pts?: number | string | null;
+  per100_reb?: number | string | null;
+  per100_ast?: number | string | null;
+  per100_ppg?: number | string | null;
+  per100_rpg?: number | string | null;
+  per100_apg?: number | string | null;
+  team_pace?: number | string | null;
   ts_pct?: number | string | null;
+  ts_plus?: number | string | null;
+  ows?: number | string | null;
+  dws?: number | string | null;
   ws_48?: number | string | null;
   ws_per_48?: number | string | null;
 };
@@ -174,7 +188,7 @@ type GameResultPayload = {
   showAdjustedStats?: boolean;
 };
 
-export type GameMode = "classic" | "all-time";
+export type GameMode = "classic" | "all-time" | "per-100";
 export type RosterSortMode = string;
 type RosterSortDirection = "desc" | "asc";
 export type RosterSortScores = Record<
@@ -281,6 +295,7 @@ const ROSTER_SORT_CONTROL_CLASS =
   "h-10 rounded-lg border border-white/12 bg-[#242938] px-3 text-sm font-black normal-case tracking-normal text-white outline-none transition focus:border-[#31d6a1] focus:ring-2 focus:ring-[#31d6a1]/20";
 const ADMIN_DEFAULT_TEAM = "LAL";
 const ADMIN_DEFAULT_ERA = "10's";
+const ADMIN_ERA_OPTIONS = ["60's", "70's", "80's", "90's", "00's", "10's", "20's"] as const;
 const PUBLIC_TEAM_PLACEHOLDER = "?";
 const PUBLIC_ERA_PLACEHOLDER = "?";
 const PUBLIC_ROUND_COUNT = 5;
@@ -480,6 +495,26 @@ export function fullEraLabel(era: string) {
     return canonicalEra;
   }
   return `${decade >= 40 ? 1900 + decade : 2000 + decade}s`;
+}
+
+function normalizeAdminEraInput(value: string) {
+  const compactValue = value.trim().toLowerCase().replace(/[^0-9a-z]/g, "");
+
+  if (/^\d{4}s?$/.test(compactValue)) {
+    return `${compactValue.slice(2, 4)}'s`;
+  }
+
+  if (/^\d{2}s?$/.test(compactValue)) {
+    return `${compactValue.slice(0, 2)}'s`;
+  }
+
+  return value.trim().replace(/[’`]/g, "'");
+}
+
+function resolveAdminEraInput(value: string) {
+  const normalizedValue = normalizeAdminEraInput(value).toLowerCase();
+
+  return ADMIN_ERA_OPTIONS.find((era) => era.toLowerCase() === normalizedValue) ?? null;
 }
 
 function buildDraftSelection(team: string, era: string): DraftSelection {
@@ -731,7 +766,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   const resultNavigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const calculatingResultsRef = useRef(false);
   const openingAutoSpinStartedAtRef = useRef<number | null>(null);
-  const gameHeaderActionRef = useRef<(action: GameHeaderAction) => void>(() => {});
+  const gameHeaderActionRef = useRef<(action: GameHeaderAction, value?: string) => void>(() => {});
   const [players, setPlayers] = useState<Player[]>(() => getCachedPlayers<Player>() ?? []);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -981,7 +1016,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   }, [mobileMenuOpen]);
 
   useEffect(
-    () => subscribeToGameHeaderAction((action) => gameHeaderActionRef.current(action)),
+    () => subscribeToGameHeaderAction((action, value) => gameHeaderActionRef.current(action, value)),
     [],
   );
 
@@ -996,7 +1031,9 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     [hasSelectedTeam, players, resolveEraOptionsForTeam, selectedTeam],
   );
   const activeEra = hasSelectedEra
-    ? eraOptions.includes(selectedEra)
+    ? isAdmin
+      ? selectedEra
+      : eraOptions.includes(selectedEra)
       ? selectedEra
       : eraOptions[eraOptions.length - 1] ?? selectedEra
     : PUBLIC_ERA_PLACEHOLDER;
@@ -1052,22 +1089,33 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
   useEffect(() => {
     setGameHeaderState({
+      adminSelection: isAdmin
+        ? {
+            era: activeEra,
+            eraOptions: ADMIN_ERA_OPTIONS,
+            team: selectedTeam,
+            teamOptions,
+          }
+        : undefined,
       eyebrow: gameHeaderEyebrow,
       resetDisabled: !authChecked || isSpinning || calculatingResults,
       resetLabel: isAdmin ? "Clear lineup" : "Reset draft",
-      showAdjustedStatsToggle: supportsAdjustedStats && mode === "classic",
+      showAdjustedStatsToggle: supportsAdjustedStats,
       showReset: true,
       title: gameHeaderTitle,
     });
   }, [
     authChecked,
+    activeEra,
     calculatingResults,
     gameHeaderEyebrow,
     gameHeaderTitle,
     isAdmin,
     isSpinning,
     mode,
+    selectedTeam,
     supportsAdjustedStats,
+    teamOptions,
   ]);
 
   const selectedPlayerIds = useMemo(
@@ -1820,7 +1868,48 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
   }
 
   useEffect(() => {
-    gameHeaderActionRef.current = (action) => {
+    function resetTransientDraftUi() {
+      setSelectedSlot(null);
+      setMobileMoveSource(null);
+      setPositionPickerPlayer(null);
+      setDraggedPlayerId(null);
+      setDraggedFromPosition(null);
+      resetRosterFeedControls();
+    }
+
+    gameHeaderActionRef.current = (action, value) => {
+      if (action === "set-admin-team" || action === "set-admin-era") {
+        if (!authChecked || !isAdmin || isSpinning || calculatingResults || !value) {
+          return;
+        }
+
+        if (action === "set-admin-team") {
+          const team = value.trim().toUpperCase();
+
+          if (!teamOptions.includes(team)) {
+            setStatus(`Unknown team code: ${value}.`);
+            return;
+          }
+
+          resetTransientDraftUi();
+          setSelectedTeam(team);
+          setStatus(`Roster feed set to ${team} ${fullEraLabel(activeEra)}.`);
+          return;
+        }
+
+        const era = resolveAdminEraInput(value);
+
+        if (!era) {
+          setStatus(`Unknown era: ${value}.`);
+          return;
+        }
+
+        resetTransientDraftUi();
+        setSelectedEra(era);
+        setStatus(`Roster feed set to ${selectedTeam} ${fullEraLabel(era)}.`);
+        return;
+      }
+
       if (action !== "reset" || !authChecked || isSpinning) {
         return;
       }
@@ -1856,7 +1945,16 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
       setLoginError(null);
       setStatus("Public draft reset.");
     };
-  }, [authChecked, isAdmin, isSpinning]);
+  }, [
+    activeEra,
+    authChecked,
+    calculatingResults,
+    isAdmin,
+    isSpinning,
+    resetRosterFeedControls,
+    selectedTeam,
+    teamOptions,
+  ]);
 
   function draftSelectionHasPublicEligiblePlayer(selection: DraftSelection) {
     const canonicalEra = getCanonicalEra(selection.era);
@@ -2214,7 +2312,11 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
             </div>
           ) : (
             <>
-              <div className="border-b border-white/10 px-4 py-4">
+              <div
+                className={`roster-feed-header border-b border-white/10 px-4 py-4 ${
+                  rosterSpinCtaVisible ? "roster-feed-header-spin-cta" : ""
+                }`}
+              >
                 <div>
                   <p className="roster-feed-title text-xs font-bold uppercase tracking-[0.16em] text-[#31d6a1]">
                     Roster Feed
@@ -2353,7 +2455,24 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                   {loading ? "Loading players..." : `${filteredPlayers.length} players available`}
                 </p>
 
-                {showOpeningRerollCta ? (
+                {isAdmin ? (
+                  <div className="next-draw-card mt-3 flex flex-col gap-3 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1]/[0.14] p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="grid gap-1">
+                      <span className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[#89f0cd]">
+                        Admin Draw
+                      </span>
+                      <span className="text-lg font-black leading-none text-white">Spin team and era</span>
+                    </span>
+                    <button
+                      aria-label="Spin admin team and era"
+                      className="big-spin-button h-12 rounded-lg border border-[#31d6a1]/45 bg-[#31d6a1] px-5 text-sm font-black text-[#15171f] transition hover:bg-[#65e8bf]"
+                      type="button"
+                      onClick={() => spinTeamEra("all")}
+                    >
+                      Spin
+                    </button>
+                  </div>
+                ) : showOpeningRerollCta ? (
                   <div className="next-draw-card opening-reroll-card mt-3 flex flex-col gap-3 rounded-lg border border-[#ff8a2a]/45 bg-[#ff8a2a]/[0.13] p-3 sm:flex-row sm:items-center sm:justify-between">
                     <span className="grid gap-1">
                       <span className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[#ffbf86]">
@@ -2424,7 +2543,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
                         supportsAdjustedStats && showAdjustedStats,
                         rosterSortMode,
                       );
-                      const showRosterFeedBadges = mode === "classic" && rosterSortMode === "mixed";
+                      const showRosterFeedBadges = (mode === "classic" || mode === "per-100") && rosterSortMode === "mixed";
                       const rosterFeedBadgeAchievements = showRosterFeedBadges
                         ? sortBadgeAchievementsByScore(
                             rosterFeedAchievements.filter((achievement) => COURT_BADGE_META_BY_ID[achievement.id]),
@@ -2668,7 +2787,7 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
             );
             const isMobileLineupSlotSelected = selectedSlot === position || mobileMoveSource === position;
             const mobileLineupBadgeAchievements =
-              mode === "classic" && isMobileLineupSlotSelected && slot
+              (mode === "classic" || mode === "per-100") && isMobileLineupSlotSelected && slot
                 ? selectCourtBadgeAchievements(
                     buildPlayerAchievements(
                       slot.player,
@@ -2902,6 +3021,8 @@ const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
   seasons: "YRS",
   spg: "Steals per game",
   steals: "STL Champ",
+  "three-point-contest": "3-Point Contest",
+  "three-point-title": "3PT Champ",
   stocks: "Stls + Blks",
   "ts-pct": "True shooting",
   "ts-plus": "era-adjusted TS%",
@@ -2931,6 +3052,8 @@ const COURT_BADGE_META_BY_ID: Record<string, { symbol: string; variant: string; 
   scoring: { symbol: "PTS", variant: "points", description: "PTS Champ" },
   "sixth-man": { symbol: "6th", variant: "sixth", description: "6MOY" },
   steals: { symbol: "STL", variant: "defense", description: "STL Champ" },
+  "three-point-contest": { symbol: "3PC", variant: "points", description: "3-Point Contest" },
+  "three-point-title": { symbol: "3PT", variant: "points", description: "3PT Champ" },
 };
 
 function achievementTitle(achievement: Achievement) {
@@ -2939,18 +3062,18 @@ function achievementTitle(achievement: Achievement) {
 
 function achievementBadgeCount(value: string) {
   const trimmedValue = value.trim();
-  const countMatch = /^(\d+(?:\.\d+)?)x$/i.exec(trimmedValue);
+  const countMatch = /^(\d+(?:\.\d+)?)(?:x)?$/i.exec(trimmedValue);
 
   if (!countMatch || Number(countMatch[1]) <= 1) {
     return null;
   }
 
-  return trimmedValue;
+  return `${countMatch[1]}x`;
 }
 
 function achievementBadgeCountNumber(value: string) {
   const trimmedValue = value.trim();
-  const countMatch = /^(\d+(?:\.\d+)?)x$/i.exec(trimmedValue);
+  const countMatch = /^(\d+(?:\.\d+)?)(?:x)?$/i.exec(trimmedValue);
 
   return countMatch ? Number(countMatch[1]) : 1;
 }
@@ -3032,7 +3155,7 @@ function AchievementStrip({ achievements }: { achievements: Achievement[] }) {
 
   return (
     <span // AchievementStrip component
-      className="achievement-strip flex overflow-x-auto whitespace-nowrap pb-1 min-w-0"
+      className="achievement-strip roster-achievement-strip"
       aria-label={achievements.map((item) => `${item.value} ${item.label}`).join(", ")}
     >
       {achievements.map((achievement) => {

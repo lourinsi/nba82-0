@@ -24,6 +24,8 @@ const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
   scoring: "SCO - Scoring titles",
   seasons: "YRS - Seasons played",
   steals: "STL - Steal titles",
+  "three-point-contest": "3PC - 3-Point Contest wins",
+  "three-point-title": "3PT - Three-point titles",
 };
 
 export default function AllTimeResultsPage() {

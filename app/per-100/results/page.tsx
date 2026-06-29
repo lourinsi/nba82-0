@@ -1,6 +1,6 @@
 import SeasonResultsView from "../../results/SeasonResultsView";
 
-const CLASSIC_RESULT_STORAGE_KEY = "nba82_classic_result";
+const PER100_RESULT_STORAGE_KEY = "nba82_per100_result";
 
 const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
   "all-defense": "All-DEF",
@@ -9,30 +9,30 @@ const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
   "all-rookie-2nd": "All-Rookie 2nd",
   "all-star": "AS",
   "all-star-mvp": "AS MVP",
+  "avg-mpg": "Average minutes per game",
+  "avg-ts-star": "Average TS+ & TS% combined",
+  "avg-ws-48": "Average weighted win shares per 48",
   assists: "AST Champ",
-  "avg-ts-pct": "Avg true shooting",
-  "avg-ts-star": "Avg TS+ & TS% combined",
-  "avg-ws-48": "Avg win shares per 48",
   blocks: "BLK Champ",
   dpoy: "DPOY",
   "sixth-man": "6MOY",
   fmvp: "FMVP",
+  mpg: "Minutes per game",
   mvp: "MVP",
   "most-improved": "MIP",
   pra: "Pts + Rebs + Asts",
+  pts: "Points",
+  asts: "Assists",
+  rebs: "Rebounds",
   rebounds: "REB Champ",
   rings: "Championships",
   roy: "ROY",
   scoring: "PTS Champ",
-  seasons: "YRS",
   steals: "STL Champ",
   "three-point-contest": "3-Point Contest",
   "three-point-title": "3PT Champ",
-  stocks: "Stocks - Stls + Blks",
-  "ts-pct": "True shooting",
-  "ts-plus": "Era-adjusted TS%",
   "ts-star": "TS+ & TS% combined",
-  "ws-48": "Win shares per 48",
+  "ws-48": "Weighted win shares per 48",
 };
 
 const RESULT_BADGE_META_BY_ID = {
@@ -81,21 +81,20 @@ const RESULT_BADGE_SCORE_WEIGHT_BY_ID: Record<string, number> = {
   "all-rookie-2nd": 0.75,
 };
 
-export default function ClassicResultsPage() {
+export default function Per100ResultsPage() {
   return (
     <SeasonResultsView
       config={{
         achievementTitleById: ACHIEVEMENT_TITLE_BY_ID,
-        defaultModeLabel: "Classic Mode",
-        defaultReturnPath: "/classic",
-        emptyButtonLabel: "Build Classic Team",
-        emptyTitle: "Classic Results",
-        expectedMode: "classic",
-        hiddenAchievementIds: ["seasons"],
+        defaultModeLabel: "PER 100 Mode",
+        defaultReturnPath: "/per-100",
+        emptyButtonLabel: "Build PER 100 Team",
+        emptyTitle: "PER 100 Results",
+        expectedMode: "per-100",
         resultBadgeMetaById: RESULT_BADGE_META_BY_ID,
         resultBadgeScoreWeightById: RESULT_BADGE_SCORE_WEIGHT_BY_ID,
         showAdjustedStats: true,
-        storageKey: CLASSIC_RESULT_STORAGE_KEY,
+        storageKey: PER100_RESULT_STORAGE_KEY,
       }}
     />
   );

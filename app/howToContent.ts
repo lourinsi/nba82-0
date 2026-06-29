@@ -18,6 +18,7 @@ export const HOW_TO_STORAGE_KEYS = {
   home: "nba82_how_to_home_dismissed",
   allTime: "nba82_how_to_all_time_dismissed",
   classic: "nba82_how_to_classic_dismissed",
+  per100: "nba82_how_to_per_100_dismissed",
   youKnowBall: "nba82_how_to_you_know_ball_dismissed",
 } as const;
 
@@ -47,6 +48,15 @@ export const HOME_HOW_TO = {
     },
     {
       eyebrow: "Playable",
+      title: "PER 100",
+      description: "Draft around pace-adjusted team-era stints.",
+      steps: [
+        "The score favors per-100 production, TS+, minutes, and offensive/defensive win shares.",
+        "Older seasons use team pace estimates only when true per-100 rows are missing.",
+      ],
+    },
+    {
+      eyebrow: "Playable",
       title: "You Know Ball",
       description: "Let's see if you know ball.",
       steps: [
@@ -56,6 +66,32 @@ export const HOME_HOW_TO = {
     },
   ],
   footer: "Use Don't Show Again to hide this guide until local storage is cleared.",
+} satisfies HowToOverlayContent;
+
+export const PER_100_HOW_TO = {
+  eyebrow: "PER 100 Guide",
+  title: "PER 100 Mode",
+  intro:
+    "Spin a team and era, then draft the player whose eligible stint grades highest by pace-adjusted per-100 production, efficiency, minutes, and win-share split.",
+  sections: [
+    {
+      title: "The Draft",
+      description: "Each pick still comes from the spun team-era pool.",
+      steps: [
+        "Fill PG, SG, SF, PF, and C.",
+        "A player is judged by his averaged eligible seasons for that team-era.",
+      ],
+    },
+    {
+      title: "Scoring",
+      description: "The formula leans on Basketball-Reference season stats.",
+      steps: [
+        "Per-100 PTS, REB, AST, TS+, OWS, DWS, minutes, and MPG drive the score.",
+        "When true per-100 stats are missing, the estimate uses that team season's pace.",
+      ],
+    },
+  ],
+  footer: "No invented defense, no made-up stocks. Missing inputs stay missing.",
 } satisfies HowToOverlayContent;
 
 export const ALL_TIME_HOW_TO = {

@@ -39,10 +39,12 @@ const ACCOLADE_WEIGHTS = {
   scoring_titles: 3,
   assist_titles: 3,
   rebound_titles: 2,
+  three_point_titles: 2.5,
   steal_titles: 1.5,
   block_titles: 1.5,
   // no more olympics point value
   all_star_mvp_count: 1.1,
+  three_point_contest_wins: 1,
   all_star_selections: 1,
   "6moy": 1,
   most_improved: 1,
@@ -62,9 +64,11 @@ export const CLASSIC_BADGE_SCORE_WEIGHTS_BY_ID: Record<string, number> = {
   scoring: ACCOLADE_WEIGHTS.scoring_titles,
   assists: ACCOLADE_WEIGHTS.assist_titles,
   rebounds: ACCOLADE_WEIGHTS.rebound_titles,
+  "three-point-title": ACCOLADE_WEIGHTS.three_point_titles,
   steals: ACCOLADE_WEIGHTS.steal_titles,
   blocks: ACCOLADE_WEIGHTS.block_titles,
   "all-star-mvp": ACCOLADE_WEIGHTS.all_star_mvp_count,
+  "three-point-contest": ACCOLADE_WEIGHTS.three_point_contest_wins,
   "all-star": ACCOLADE_WEIGHTS.all_star_selections,
   "sixth-man": ACCOLADE_WEIGHTS["6moy"],
   "most-improved": ACCOLADE_WEIGHTS.most_improved,
@@ -123,8 +127,10 @@ const MERGED_CLASSIC_ACCOLADE_KEYS = [
   "scoring_titles",
   "assist_titles",
   "rebound_titles",
+  "three_point_titles",
   "steal_titles",
   "block_titles",
+  "three_point_contest_wins",
   "games_started",
 ] as const satisfies readonly (keyof Accolades)[];
 const EARLY_CLASSIC_ERA_ACCOLADE_MULTIPLIER = 0.5;
@@ -229,6 +235,12 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   { id: "scoring", label: "SCO", count: (player) => player.accolades.scoring_titles, weight: ACCOLADE_WEIGHTS.scoring_titles },
   { id: "assists", label: "AST", count: (player) => player.accolades.assist_titles, weight: ACCOLADE_WEIGHTS.assist_titles },
   { id: "rebounds", label: "REB", count: (player) => player.accolades.rebound_titles, weight: ACCOLADE_WEIGHTS.rebound_titles },
+  {
+    id: "three-point-title",
+    label: "3PT",
+    count: (player) => player.accolades.three_point_titles ?? 0,
+    weight: ACCOLADE_WEIGHTS.three_point_titles,
+  },
   { id: "steals", label: "STL", count: (player) => player.accolades.steal_titles, weight: ACCOLADE_WEIGHTS.steal_titles },
   { id: "blocks", label: "BLK", count: (player) => player.accolades.block_titles, weight: ACCOLADE_WEIGHTS.block_titles },
   {
@@ -236,6 +248,12 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     label: "ASM",
     count: (player) => player.accolades.all_star_mvp_count ?? 0,
     weight: ACCOLADE_WEIGHTS.all_star_mvp_count,
+  },
+  {
+    id: "three-point-contest",
+    label: "3PC",
+    count: (player) => player.accolades.three_point_contest_wins ?? 0,
+    weight: ACCOLADE_WEIGHTS.three_point_contest_wins,
   },
   {
     id: "all-star",
@@ -290,9 +308,11 @@ const CLASSIC_ACCOLADE_TOOLTIPS: Record<string, string> = {
   scoring: "PTS Champ",
   seasons: "YRS",
   steals: "STL Champ",
+  "three-point-contest": "3-Point Contest",
+  "three-point-title": "3PT Champ",
 };
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
-const SEASON_TIERS: SeasonTier[] = [
+export const CLASSIC_SEASON_TIERS: SeasonTier[] = [
   {
     minScore: 1000,
     minWins: 100,
@@ -1781,7 +1801,7 @@ export const classicCourtConfig = {
     content: CLASSIC_HOW_TO,
     storageKey: HOW_TO_STORAGE_KEYS.classic,
   },
-  seasonTiers: SEASON_TIERS,
+  seasonTiers: CLASSIC_SEASON_TIERS,
   usesStatsEngineConfig: true,
   supportsAdjustedStats: true,
   courtAchievementLimit: 3,

@@ -10,8 +10,15 @@ export const HOW_TO_OPEN_EVENT = "nba82-how-to-open";
 
 const HOW_TO_DISMISSED_VALUE = "dismissed";
 const howToSeenThisPageLoad = new Set<string>();
-export type GameHeaderAction = "reset";
+export type GameHeaderAction = "reset" | "set-admin-team" | "set-admin-era";
+export type GameHeaderAdminSelection = {
+  era: string;
+  eraOptions: readonly string[];
+  team: string;
+  teamOptions: readonly string[];
+};
 export type GameHeaderState = {
+  adminSelection?: GameHeaderAdminSelection;
   eyebrow: string;
   resetDisabled: boolean;
   resetLabel: string;
@@ -101,20 +108,20 @@ export function setGameHeaderState(state: GameHeaderState | null) {
   dispatchWindowEvent(GAME_HEADER_STATE_CHANGE_EVENT);
 }
 
-export function requestGameHeaderAction(action: GameHeaderAction) {
+export function requestGameHeaderAction(action: GameHeaderAction, value?: string) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.dispatchEvent(new CustomEvent(GAME_HEADER_ACTION_EVENT, { detail: { action } }));
+  window.dispatchEvent(new CustomEvent(GAME_HEADER_ACTION_EVENT, { detail: { action, value } }));
 }
 
-export function subscribeToGameHeaderAction(onAction: (action: GameHeaderAction) => void) {
+export function subscribeToGameHeaderAction(onAction: (action: GameHeaderAction, value?: string) => void) {
   function handleAction(event: Event) {
-    const detail = event instanceof CustomEvent ? (event.detail as { action?: unknown }) : null;
+    const detail = event instanceof CustomEvent ? (event.detail as { action?: unknown; value?: unknown }) : null;
 
-    if (detail?.action === "reset") {
-      onAction(detail.action);
+    if (detail?.action === "reset" || detail?.action === "set-admin-team" || detail?.action === "set-admin-era") {
+      onAction(detail.action, typeof detail.value === "string" ? detail.value : undefined);
     }
   }
 

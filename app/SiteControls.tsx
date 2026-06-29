@@ -28,6 +28,7 @@ import {
   CLASSIC_HOW_TO,
   HOME_HOW_TO,
   HOW_TO_STORAGE_KEYS,
+  PER_100_HOW_TO,
   YOU_KNOW_BALL_HOW_TO,
   type HowToOverlayContent,
 } from "./howToContent";
@@ -52,6 +53,10 @@ const ROUTE_GUIDES: Record<string, RouteGuide> = {
     content: CLASSIC_HOW_TO,
     storageKey: HOW_TO_STORAGE_KEYS.classic,
   },
+  "/per-100": {
+    content: PER_100_HOW_TO,
+    storageKey: HOW_TO_STORAGE_KEYS.per100,
+  },
   "/classic/you-know-ball": {
     content: YOU_KNOW_BALL_HOW_TO,
     storageKey: HOW_TO_STORAGE_KEYS.youKnowBall,
@@ -63,6 +68,7 @@ const MENU_LINKS = [
   { href: "/classic", label: "Classic", adminOnly: false },
   { href: "/classic/you-know-ball", label: "You Know Ball", adminOnly: false },
   { href: "/all-time", label: "All Time", adminOnly: false },
+  { href: "/per-100", label: "PER 100", adminOnly: false },
   { href: "/legacy-engine", label: "Legacy Engine", adminOnly: true },
   { href: "/stats-engine", label: "Stats Engine", adminOnly: true },
 ] as const;
@@ -79,6 +85,26 @@ function guideForPathname(pathname: string | null) {
   return ROUTE_GUIDES[normalizePathname(pathname)] ?? null;
 }
 
+function normalizeEraInput(value: string) {
+  const compactValue = value.trim().toLowerCase().replace(/[^0-9a-z]/g, "");
+
+  if (/^\d{4}s?$/.test(compactValue)) {
+    return `${compactValue.slice(2, 4)}'s`;
+  }
+
+  if (/^\d{2}s?$/.test(compactValue)) {
+    return `${compactValue.slice(0, 2)}'s`;
+  }
+
+  return value.trim().replace(/[’`]/g, "'");
+}
+
+function resolveOption(value: string, options: readonly string[]) {
+  const normalizedValue = normalizeEraInput(value).toLowerCase();
+
+  return options.find((option) => option.toLowerCase() === normalizedValue) ?? null;
+}
+
 async function fetchAdminSession() {
   const response = await fetch("/api/admin/session", { cache: "no-store" });
   const data = (await response.json()) as { admin?: boolean };
@@ -92,7 +118,10 @@ export default function SiteControls() {
   const currentGuide = guideForPathname(pathname);
   const gameHeaderState = useSyncExternalStore(subscribeToGameHeaderState, gameHeaderStateSnapshot, () => null);
   const routeShowsAdjustedStatsToggle =
-    normalizedPathname === "/classic" || normalizedPathname === "/classic/results";
+    normalizedPathname === "/classic" ||
+    normalizedPathname === "/classic/results" ||
+    normalizedPathname === "/per-100" ||
+    normalizedPathname === "/per-100/results";
   const showAdjustedStatsToggle =
     gameHeaderState?.showAdjustedStatsToggle ?? routeShowsAdjustedStatsToggle;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -103,6 +132,7 @@ export default function SiteControls() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
+  const [openAdminPicker, setOpenAdminPicker] = useState<"team" | "era" | null>(null);
   const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
   const adjustedStats = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => false);
   const tipsEnabled = useSyncExternalStore(
@@ -111,6 +141,7 @@ export default function SiteControls() {
     () => false,
   );
   const visibleMenuLinks = MENU_LINKS.filter((link) => !link.adminOnly || isAdmin);
+  const adminSelection = gameHeaderState?.adminSelection;
 
   useEffect(() => {
     document.documentElement.classList.toggle("site-light-mode", lightMode);
@@ -151,7 +182,7 @@ export default function SiteControls() {
   }, []);
 
   useEffect(() => {
-    if (!menuOpen && !authPanelOpen) {
+    if (!menuOpen && !authPanelOpen && !openAdminPicker) {
       return;
     }
 
@@ -159,13 +190,14 @@ export default function SiteControls() {
       if (event.key === "Escape") {
         setMenuOpen(false);
         setAuthPanelOpen(false);
+        setOpenAdminPicker(null);
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [authPanelOpen, menuOpen]);
+  }, [authPanelOpen, menuOpen, openAdminPicker]);
 
   function toggleLightMode() {
     setStoredLightMode(!lightMode);
@@ -198,6 +230,56 @@ export default function SiteControls() {
     setAuthPanelOpen((open) => !open);
     setMenuOpen(false);
     setLoginError(null);
+  }
+
+  function resolveTeam(value: string) {
+    const normalizedTeam = value.trim().toUpperCase();
+
+    return adminSelection?.teamOptions.find((team) => team === normalizedTeam) ?? null;
+  }
+
+  function resolveEra(value: string) {
+    return adminSelection ? resolveOption(value, adminSelection.eraOptions) : null;
+  }
+
+  function commitAdminTeam(value: string) {
+    if (!adminSelection) {
+      return "";
+    }
+
+    const team = resolveTeam(value);
+
+    if (team) {
+      requestGameHeaderAction("set-admin-team", team);
+      return team;
+    }
+
+    return adminSelection.team;
+  }
+
+  function commitAdminEra(value: string) {
+    if (!adminSelection) {
+      return "";
+    }
+
+    const era = resolveEra(value);
+
+    if (era) {
+      requestGameHeaderAction("set-admin-era", era);
+      return era;
+    }
+
+    return adminSelection.era;
+  }
+
+  function selectAdminTeam(team: string) {
+    requestGameHeaderAction("set-admin-team", team);
+    setOpenAdminPicker(null);
+  }
+
+  function selectAdminEra(era: string) {
+    requestGameHeaderAction("set-admin-era", era);
+    setOpenAdminPicker(null);
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -263,6 +345,140 @@ export default function SiteControls() {
                 <small>{gameHeaderState.eyebrow}</small>
                 <strong>{gameHeaderState.title}</strong>
               </span>
+            ) : null}
+            {adminSelection ? (
+              <form
+                className="site-admin-picker"
+                aria-label="Admin roster selection"
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setOpenAdminPicker(null);
+                  }
+                }}
+                onSubmit={(event) => event.preventDefault()}
+              >
+                <label
+                  className={`site-admin-picker-field ${openAdminPicker === "team" ? "site-admin-picker-field-open" : ""}`}
+                >
+                  <span>Team</span>
+                  <input
+                    aria-label="Admin team"
+                    aria-autocomplete="list"
+                    aria-controls="site-admin-team-options"
+                    aria-expanded={openAdminPicker === "team"}
+                    autoComplete="off"
+                    defaultValue={adminSelection.team}
+                    disabled={gameHeaderState?.resetDisabled}
+                    key={`admin-team-${adminSelection.team}`}
+                    maxLength={3}
+                    role="combobox"
+                    onBlur={(event) => {
+                      event.currentTarget.value = commitAdminTeam(event.currentTarget.value);
+                    }}
+                    onChange={(event) => {
+                      const nextValue = event.currentTarget.value.toUpperCase();
+                      event.currentTarget.value = nextValue;
+
+                      const team = resolveTeam(nextValue);
+
+                      if (team) {
+                        requestGameHeaderAction("set-admin-team", team);
+                        event.currentTarget.value = team;
+                        setOpenAdminPicker(null);
+                      }
+                    }}
+                    onClick={() => setOpenAdminPicker("team")}
+                    onFocus={() => setOpenAdminPicker("team")}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        event.currentTarget.value = commitAdminTeam(event.currentTarget.value);
+                        setOpenAdminPicker(null);
+                      }
+                    }}
+                  />
+                  {openAdminPicker === "team" ? (
+                    <div
+                      className="site-admin-picker-menu site-admin-picker-menu-team"
+                      id="site-admin-team-options"
+                      role="listbox"
+                    >
+                      {adminSelection.teamOptions.map((team) => (
+                        <button
+                          aria-selected={team === adminSelection.team}
+                          className="site-admin-picker-option"
+                          key={team}
+                          role="option"
+                          type="button"
+                          onClick={() => selectAdminTeam(team)}
+                          onMouseDown={(event) => event.preventDefault()}
+                        >
+                          {team}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </label>
+                <label
+                  className={`site-admin-picker-field ${openAdminPicker === "era" ? "site-admin-picker-field-open" : ""}`}
+                >
+                  <span>Era</span>
+                  <input
+                    aria-label="Admin era"
+                    aria-autocomplete="list"
+                    aria-controls="site-admin-era-options"
+                    aria-expanded={openAdminPicker === "era"}
+                    autoComplete="off"
+                    defaultValue={adminSelection.era}
+                    disabled={gameHeaderState?.resetDisabled}
+                    key={`admin-era-${adminSelection.era}`}
+                    role="combobox"
+                    onBlur={(event) => {
+                      event.currentTarget.value = commitAdminEra(event.currentTarget.value);
+                    }}
+                    onChange={(event) => {
+                      const nextValue = event.currentTarget.value;
+                      const era = resolveEra(nextValue);
+
+                      if (era) {
+                        requestGameHeaderAction("set-admin-era", era);
+                        event.currentTarget.value = era;
+                        setOpenAdminPicker(null);
+                      }
+                    }}
+                    onClick={() => setOpenAdminPicker("era")}
+                    onFocus={() => setOpenAdminPicker("era")}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        event.currentTarget.value = commitAdminEra(event.currentTarget.value);
+                        setOpenAdminPicker(null);
+                      }
+                    }}
+                  />
+                  {openAdminPicker === "era" ? (
+                    <div
+                      className="site-admin-picker-menu site-admin-picker-menu-era"
+                      id="site-admin-era-options"
+                      role="listbox"
+                    >
+                      {adminSelection.eraOptions.map((era) => (
+                        <button
+                          aria-selected={era === adminSelection.era}
+                          className="site-admin-picker-option"
+                          key={era}
+                          role="option"
+                          type="button"
+                          onClick={() => selectAdminEra(era)}
+                          onMouseDown={(event) => event.preventDefault()}
+                        >
+                          {era}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </label>
+              </form>
             ) : null}
           </div>
 
