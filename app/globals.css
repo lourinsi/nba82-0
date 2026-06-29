@@ -4768,6 +4768,24 @@ select {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
 }
 
+.court-achievement-badge-retro-fmvp {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.58), transparent 34%),
+    linear-gradient(145deg, #f7e1a0, #7f8794 52%, #273241);
+  border-color: rgba(247, 225, 160, 0.72);
+  color: #ffffff;
+  box-shadow:
+    0 7px 13px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    inset 0 -2px 0 rgba(21, 29, 42, 0.46);
+}
+
+.court-achievement-badge-retro-fmvp .court-achievement-badge-symbol,
+.court-achievement-badge-retro-fmvp .achievement-badge-symbol {
+  font-size: 0.66rem;
+  font-weight: 950;
+}
+
 .court-achievement-badge-nba {
   background: linear-gradient(90deg, #17408b 0 50%, #c9082a 50% 100%);
   border-radius: 7px;
@@ -5971,6 +5989,10 @@ select {
 
   .mobile-lineup-slot .court-achievement-badge-fmvp .court-achievement-badge-symbol {
     font-size: 0.56rem;
+  }
+
+  .mobile-lineup-slot .court-achievement-badge-retro-fmvp .court-achievement-badge-symbol {
+    font-size: 0.54rem;
   }
 
   .mobile-lineup-slot .court-achievement-badge-dpoy .court-achievement-badge-symbol {

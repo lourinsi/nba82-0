@@ -22,18 +22,22 @@ import {
   type StatsEngineConfig,
   type TeamEra,
 } from "../GameCourt";
+import {
+  ACHIEVEMENT_TITLE_BY_ID,
+  RESULT_BADGE_SCORE_WEIGHT_BY_ID,
+} from "../achievementMeta";
 import { CLASSIC_HOW_TO, HOW_TO_STORAGE_KEYS, YOU_KNOW_BALL_HOW_TO } from "../howToContent";
 
 const DEFAULT_ERAS = ["60's", "90's", "00's", "10's", "20's"];
 
 const ACCOLADE_WEIGHTS = {
-  mvp_count: 8,
-  finals_mvp_count: 7.1,
+  finals_mvp_count: 7.5,
+  estimated_finals_mvp_count: 7.5,
+  mvp_count: 5,
   all_nba_1st: 7,
   all_nba_2nd: 5.5,
   all_nba_3rd: 4,
   dpoy_count: 2.5,
-  championship_rings: 2.4,
   all_def_1st: 2,
   all_def_2nd: 1.5,
   scoring_titles: 3,
@@ -46,6 +50,7 @@ const ACCOLADE_WEIGHTS = {
   all_star_mvp_count: 1.1,
   three_point_contest_wins: 1,
   all_star_selections: 1,
+  championship_rings: 1,
   "6moy": 1,
   most_improved: 1,
   roy_won: 1.1,
@@ -54,28 +59,7 @@ const ACCOLADE_WEIGHTS = {
   seasons_played: 0.25,
   // games_started: 0.01,
 } satisfies Partial<Record<keyof Accolades, number>>;
-export const CLASSIC_BADGE_SCORE_WEIGHTS_BY_ID: Record<string, number> = {
-  mvp: ACCOLADE_WEIGHTS.mvp_count,
-  fmvp: ACCOLADE_WEIGHTS.finals_mvp_count,
-  "all-nba": ACCOLADE_WEIGHTS.all_nba_1st,
-  rings: ACCOLADE_WEIGHTS.championship_rings,
-  dpoy: ACCOLADE_WEIGHTS.dpoy_count,
-  "all-defense": ACCOLADE_WEIGHTS.all_def_1st,
-  scoring: ACCOLADE_WEIGHTS.scoring_titles,
-  assists: ACCOLADE_WEIGHTS.assist_titles,
-  rebounds: ACCOLADE_WEIGHTS.rebound_titles,
-  "three-point-title": ACCOLADE_WEIGHTS.three_point_titles,
-  steals: ACCOLADE_WEIGHTS.steal_titles,
-  blocks: ACCOLADE_WEIGHTS.block_titles,
-  "all-star-mvp": ACCOLADE_WEIGHTS.all_star_mvp_count,
-  "three-point-contest": ACCOLADE_WEIGHTS.three_point_contest_wins,
-  "all-star": ACCOLADE_WEIGHTS.all_star_selections,
-  "sixth-man": ACCOLADE_WEIGHTS["6moy"],
-  "most-improved": ACCOLADE_WEIGHTS.most_improved,
-  roy: ACCOLADE_WEIGHTS.roy_won,
-  "all-rookie-1st": ACCOLADE_WEIGHTS.all_rookie_1st,
-  "all-rookie-2nd": ACCOLADE_WEIGHTS.all_rookie_2nd,
-};
+export const CLASSIC_BADGE_SCORE_WEIGHTS_BY_ID = RESULT_BADGE_SCORE_WEIGHT_BY_ID;
 const CLASSIC_ACCOLADE_SCORE_MULTIPLIER = 0.5;
 // Stored JSON points are fallback data; this is the scale baked into those cached points.
 const STORED_CLASSIC_STINT_SCALING_FACTOR = 250;
@@ -104,6 +88,7 @@ type ClassicVolumeMetric = "ppg" | "rpg" | "apg" | "spg" | "bpg";
 const MERGED_CLASSIC_ACCOLADE_KEYS = [
   "mvp_count",
   "finals_mvp_count",
+  "estimated_finals_mvp_count",
   "dpoy_count",
   "championship_rings",
   "most_improved",
@@ -211,6 +196,12 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     weight: ACCOLADE_WEIGHTS.finals_mvp_count,
   },
   {
+    id: "retro-fmvp",
+    label: "RFMVP",
+    count: (player) => player.accolades.estimated_finals_mvp_count ?? 0,
+    weight: ACCOLADE_WEIGHTS.estimated_finals_mvp_count,
+  },
+  {
     id: "all-nba",
     label: "ALL NBA",
     count: (player) => player.accolades.all_nba_1st + player.accolades.all_nba_2nd + player.accolades.all_nba_3rd,
@@ -288,29 +279,6 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   //   weight: ACCOLADE_WEIGHTS.games_started,
   // },
 ];
-const CLASSIC_ACCOLADE_TOOLTIPS: Record<string, string> = {
-  "all-defense": "All-DEF",
-  "all-nba": "All-NBA",
-  "all-rookie-1st": "All-Rookie 1st",
-  "all-rookie-2nd": "All-Rookie 2nd",
-  "all-star": "AS",
-  "all-star-mvp": "AS MVP",
-  assists: "AST Champ",
-  blocks: "BLK Champ",
-  dpoy: "DPOY",
-  "sixth-man": "6MOY",
-  fmvp: "FMVP",
-  mvp: "MVP",
-  "most-improved": "MIP",
-  rebounds: "REB Champ",
-  rings: "Championships",
-  roy: "ROY",
-  scoring: "PTS Champ",
-  seasons: "YRS",
-  steals: "STL Champ",
-  "three-point-contest": "3-Point Contest",
-  "three-point-title": "3PT Champ",
-};
 const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achievement) => achievement.id !== "goat");
 export const CLASSIC_SEASON_TIERS: SeasonTier[] = [
   {
@@ -1482,7 +1450,7 @@ function buildAccoladeAchievements(player: Player, selection?: TeamEra) {
                 ? String(count)
                 : countValue(count),
             label: achievement.label,
-            title: CLASSIC_ACCOLADE_TOOLTIPS[achievement.id] || achievement.label,
+            title: ACHIEVEMENT_TITLE_BY_ID[achievement.id] || achievement.label,
             scoreValue: achievement.sortValue?.(displayPlayer) ?? count * achievement.weight,
           },
         ]
@@ -1667,7 +1635,7 @@ function buildAchievementTotals(
                 ? String(total)
                 : countValue(total),
             label: achievement.label,
-            title: CLASSIC_ACCOLADE_TOOLTIPS[achievement.id] || achievement.label,
+            title: ACHIEVEMENT_TITLE_BY_ID[achievement.id] || achievement.label,
           },
         ]
       : [];

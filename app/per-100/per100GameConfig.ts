@@ -6,6 +6,7 @@ import {
   type Accolades,
   type Achievement,
   type AchievementDisplay,
+  type CareerSeason,
   type ClassicPointBlock,
   type GameCourtConfig,
   type LineupSlot,
@@ -22,6 +23,7 @@ import {
   CLASSIC_BADGE_SCORE_WEIGHTS_BY_ID,
   CLASSIC_SEASON_TIERS,
 } from "../classic/classicGameConfig";
+import { ACHIEVEMENT_TITLE_BY_ID } from "../achievementMeta";
 import { PER_100_HOW_TO, HOW_TO_STORAGE_KEYS } from "../howToContent";
 import {
   DEFAULT_PER100_SCORE_CONFIG,
@@ -43,13 +45,13 @@ const ROSTER_SORT_OPTIONS = [
 ] as const satisfies readonly RosterSortOption[];
 
 const ACCOLADE_WEIGHTS = {
-  mvp_count: 8,
-  finals_mvp_count: 7.1,
+  finals_mvp_count: 7.5,
+  estimated_finals_mvp_count: 7.5,
+  mvp_count: 5,
   all_nba_1st: 7,
   all_nba_2nd: 5.5,
   all_nba_3rd: 4,
   dpoy_count: 2.5,
-  championship_rings: 2.4,
   all_def_1st: 2,
   all_def_2nd: 1.5,
   scoring_titles: 3,
@@ -58,15 +60,18 @@ const ACCOLADE_WEIGHTS = {
   three_point_titles: 2.5,
   steal_titles: 1.5,
   block_titles: 1.5,
+  // no more olympics point value
   all_star_mvp_count: 1.1,
   three_point_contest_wins: 1,
   all_star_selections: 1,
+  championship_rings: 1,
   "6moy": 1,
   most_improved: 1,
   roy_won: 1.1,
   all_rookie_1st: 1,
   all_rookie_2nd: 0.75,
   seasons_played: 0.25,
+  // games_started: 0.01,
 } satisfies Partial<Record<keyof Accolades, number>>;
 
 type WeightedAccoladeKey = keyof typeof ACCOLADE_WEIGHTS;
@@ -74,6 +79,7 @@ type WeightedAccoladeKey = keyof typeof ACCOLADE_WEIGHTS;
 const MERGED_ACCOLADE_KEYS = [
   "mvp_count",
   "finals_mvp_count",
+  "estimated_finals_mvp_count",
   "dpoy_count",
   "championship_rings",
   "most_improved",
@@ -101,29 +107,6 @@ const MERGED_ACCOLADE_KEYS = [
   "6moy",
 ] as const satisfies readonly (keyof Accolades)[];
 
-const ACCOLADE_TOOLTIPS: Record<string, string> = {
-  "all-defense": "All-DEF",
-  "all-nba": "All-NBA",
-  "all-rookie-1st": "All-Rookie 1st",
-  "all-rookie-2nd": "All-Rookie 2nd",
-  "all-star": "AS",
-  "all-star-mvp": "AS MVP",
-  assists: "AST Champ",
-  blocks: "BLK Champ",
-  dpoy: "DPOY",
-  "sixth-man": "6MOY",
-  fmvp: "FMVP",
-  mvp: "MVP",
-  "most-improved": "MIP",
-  rebounds: "REB Champ",
-  rings: "Championships",
-  roy: "ROY",
-  scoring: "PTS Champ",
-  steals: "STL Champ",
-  "three-point-contest": "3-Point Contest",
-  "three-point-title": "3PT Champ",
-};
-
 const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   { id: "mvp", label: "MVP", count: (player) => player.accolades.mvp_count, weight: ACCOLADE_WEIGHTS.mvp_count },
   {
@@ -131,6 +114,12 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     label: "FMVP",
     count: (player) => player.accolades.finals_mvp_count,
     weight: ACCOLADE_WEIGHTS.finals_mvp_count,
+  },
+  {
+    id: "retro-fmvp",
+    label: "RFMVP",
+    count: (player) => player.accolades.estimated_finals_mvp_count ?? 0,
+    weight: ACCOLADE_WEIGHTS.estimated_finals_mvp_count,
   },
   {
     id: "all-nba",
@@ -353,6 +342,102 @@ function classicBlocksForSelection(player: Player | undefined, selection: TeamEr
   ) ?? [];
 }
 
+function seasonEndYear(season: unknown) {
+  const value = String(season || "").trim();
+  const fullYearRange = value.match(/^(\d{4})\D+(\d{4})/);
+
+  if (fullYearRange) {
+    return Number(fullYearRange[2]);
+  }
+
+  const shortYearRange = value.match(/^(\d{4})\D+(\d{2})/);
+
+  if (shortYearRange) {
+    const startYear = Number(shortYearRange[1]);
+    const endYearSuffix = Number(shortYearRange[2]);
+    const startCentury = Math.floor(startYear / 100) * 100;
+    const endYear = startCentury + endYearSuffix;
+
+    return endYear > startYear ? endYear : endYear + 100;
+  }
+
+  const singleYear = value.match(/\d{4}/);
+
+  return singleYear ? Number(singleYear[0]) : null;
+}
+
+function normalizedAwardDescription(value: unknown) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function isNbaAllStarSelectionAward(description: unknown) {
+  const normalized = normalizedAwardDescription(description);
+
+  return normalized.includes("nba all star") && !normalized.includes("most valuable player");
+}
+
+function seasonEndYearSet(seasons: CareerSeason[]) {
+  return new Set(
+    seasons
+      .map((season) => seasonEndYear(season.season))
+      .filter((year): year is number => typeof year === "number" && Number.isFinite(year)),
+  );
+}
+
+function inferredAllStarSelectionsForSeasons(player: Player, seasons: CareerSeason[]) {
+  if (!player.awards_raw?.length || !seasons.length) {
+    return 0;
+  }
+
+  const selectedSeasonYears = seasonEndYearSet(seasons);
+
+  if (!selectedSeasonYears.size) {
+    return 0;
+  }
+
+  const allStarSeasonYears = new Set<number>();
+
+  for (const award of player.awards_raw) {
+    if (!isNbaAllStarSelectionAward(award.description)) {
+      continue;
+    }
+
+    const awardSeasonEndYear = seasonEndYear(award.season);
+
+    if (typeof awardSeasonEndYear === "number" && selectedSeasonYears.has(awardSeasonEndYear)) {
+      allStarSeasonYears.add(awardSeasonEndYear);
+    }
+  }
+
+  return allStarSeasonYears.size;
+}
+
+function inferredAllStarSelectionsForSelection(player: Player, selection: TeamEra | undefined) {
+  return selection
+    ? inferredAllStarSelectionsForSeasons(player, careerSeasonsForPer100Selection(player, selection))
+    : 0;
+}
+
+function withInferredAllStarSelections<T extends Accolades | ScoringAccolades | undefined>(
+  accolades: T,
+  count: number,
+) {
+  if (!accolades || count <= 0) {
+    return accolades;
+  }
+
+  const currentCount = numericAccoladeValue(accolades.all_star_selections);
+
+  if (currentCount >= count) {
+    return accolades;
+  }
+
+  return { ...accolades, all_star_selections: count } as T;
+}
+
 function mergeAccolades(blocks: ClassicPointBlock[]) {
   const blocksWithAccolades = blocks.filter((block) => block.accolades);
 
@@ -380,8 +465,10 @@ function mergeAccolades(blocks: ClassicPointBlock[]) {
 
 function accoladesForSelection(player: Player, selection: TeamEra | undefined) {
   const blocks = classicBlocksForSelection(player, selection);
+  const accolades = mergeAccolades(blocks) ?? player.accolades;
+  const inferredAllStarSelections = inferredAllStarSelectionsForSelection(player, selection);
 
-  return mergeAccolades(blocks) ?? player.accolades;
+  return withInferredAllStarSelections(accolades, inferredAllStarSelections) ?? player.accolades;
 }
 
 function playerWithSelectionAccolades(player: Player, selection: TeamEra | undefined) {
@@ -718,7 +805,7 @@ function buildAccoladeAchievements(player: Player, selection?: TeamEra) {
             id: achievement.id,
             value: achievement.value ? achievement.value(displayPlayer) : countValue(count),
             label: achievement.label,
-            title: ACCOLADE_TOOLTIPS[achievement.id] || achievement.label,
+            title: ACHIEVEMENT_TITLE_BY_ID[achievement.id] || achievement.label,
             scoreValue: achievement.sortValue?.(displayPlayer) ?? count * achievement.weight,
           },
         ]
@@ -871,7 +958,7 @@ function buildAchievementTotals(
             id: achievement.id,
             value: countValue(total),
             label: achievement.label,
-            title: ACCOLADE_TOOLTIPS[achievement.id] || achievement.label,
+            title: ACHIEVEMENT_TITLE_BY_ID[achievement.id] || achievement.label,
           },
         ]
       : [];

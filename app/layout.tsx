@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react"; // 1. Added the import
 import SiteControls from "./SiteControls";
 import "./globals.css";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
         <SiteControls />
         {children}
         <Analytics /> {/* 2. Added the tracker element here */}
+        <SpeedInsights />
       </body>
     </html>
   );

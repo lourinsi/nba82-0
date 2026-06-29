@@ -19,13 +19,13 @@ import { ALL_TIME_HOW_TO, HOW_TO_STORAGE_KEYS } from "../howToContent";
 const DEFAULT_ERAS = ["60's", "90's", "00's", "10's", "20's"];
 
 const ACCOLADE_WEIGHTS = {
-  mvp_count: 8,
-  finals_mvp_count: 7.1,
+  finals_mvp_count: 7.5,
+  estimated_finals_mvp_count: 7.5,
+  mvp_count: 5,
   all_nba_1st: 7,
   all_nba_2nd: 5.5,
   all_nba_3rd: 4,
   dpoy_count: 2.5,
-  championship_rings: 2.4,
   all_def_1st: 2,
   all_def_2nd: 1.5,
   scoring_titles: 3,
@@ -38,6 +38,7 @@ const ACCOLADE_WEIGHTS = {
   all_star_mvp_count: 1.1,
   three_point_contest_wins: 1,
   all_star_selections: 1,
+  championship_rings: 1,
   "6moy": 1,
   most_improved: 1,
   roy_won: 1.1,
@@ -67,6 +68,12 @@ const ACHIEVEMENT_DISPLAY_ORDER = sortAchievementsByWeight([
     label: "FMVP",
     count: (player) => player.accolades.finals_mvp_count,
     weight: ACCOLADE_WEIGHTS.finals_mvp_count,
+  },
+  {
+    id: "retro-fmvp",
+    label: "RFMVP",
+    count: (player) => player.accolades.estimated_finals_mvp_count ?? 0,
+    weight: ACCOLADE_WEIGHTS.estimated_finals_mvp_count,
   },
   {
     id: "all-nba",
@@ -156,6 +163,7 @@ const TOTAL_ACHIEVEMENT_DISPLAY_ORDER = ACHIEVEMENT_DISPLAY_ORDER.filter((achiev
 const ROSTER_ACCOLADE_SORT_LABELS: Partial<Record<string, string>> = {
   mvp: "MVPs",
   fmvp: "FMVPs",
+  "retro-fmvp": "Retro FMVPs",
   "all-nba": "All NBA",
   scoring: "Scoring Titles",
   assists: "Assist Titles",

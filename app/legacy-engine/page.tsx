@@ -5,13 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCachedPlayers, loadApiJson, loadPlayers } from "../apiClient";
 
 const ACCOLADE_WEIGHTS = {
-  mvp_count: 8,
-  finals_mvp_count: 7.1,
+  finals_mvp_count: 7.5,
+  estimated_finals_mvp_count: 7.5,
+  mvp_count: 5,
   all_nba_1st: 7,
   all_nba_2nd: 5.5,
   all_nba_3rd: 4,
   dpoy_count: 2.5,
-  championship_rings: 2.4,
   all_def_1st: 2,
   all_def_2nd: 1.5,
   scoring_titles: 3,
@@ -20,9 +20,11 @@ const ACCOLADE_WEIGHTS = {
   three_point_titles: 2.5,
   steal_titles: 1.5,
   block_titles: 1.5,
+  // no more olympics point value
   all_star_mvp_count: 1.1,
   three_point_contest_wins: 1,
   all_star_selections: 1,
+  championship_rings: 1,
   "6moy": 1,
   most_improved: 1,
   roy_won: 1.1,
@@ -97,6 +99,7 @@ function sortHistoryPlayers(players: HistoryPlayer[]) {
 const ACCOLADE_FIELDS: AccoladeField[] = [
   { key: "mvp_count", label: "MVP", countDefault: 1, maxCount: 8, weightMax: 16 },
   { key: "finals_mvp_count", label: "Finals MVP", countDefault: 1, maxCount: 8, weightMax: 16 },
+  { key: "estimated_finals_mvp_count", label: "Retro FMVP", countDefault: 0, maxCount: 8, weightMax: 12 },
   { key: "all_nba_1st", label: "All-NBA 1st", countDefault: 3, maxCount: 16, weightMax: 16 },
   { key: "all_nba_2nd", label: "All-NBA 2nd", countDefault: 2, maxCount: 16, weightMax: 14 },
   { key: "all_nba_3rd", label: "All-NBA 3rd", countDefault: 1, maxCount: 16, weightMax: 12 },

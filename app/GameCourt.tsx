@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, DragEvent, FormEvent } from "react";
+import {
+  ACHIEVEMENT_TITLE_BY_ID,
+  RESULT_BADGE_META_BY_ID as COURT_BADGE_META_BY_ID,
+} from "./achievementMeta";
 import { getCachedPlayers, loadApiJson, loadPlayers as loadCachedPlayers } from "./apiClient";
 import { teamThemeStyle } from "./all-time/teamStyles";
 import {
@@ -32,6 +36,7 @@ export type Position = "PG" | "SG" | "SF" | "PF" | "C";
 export type Accolades = {
   mvp_count: number;
   finals_mvp_count: number;
+  estimated_finals_mvp_count?: number;
   dpoy_count: number;
   roy_won: boolean;
   championship_rings: number;
@@ -2989,72 +2994,7 @@ function SpinTile({
   );
 }
 
-const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
-  apg: "AST - Assists per game",
-  "all-defense": "All-DEF",
-  "all-nba": "All-NBA",
-  "all-rookie-1st": "All-Rookie 1st",
-  "all-rookie-2nd": "All-Rookie 2nd",
-  "all-star": "AS",
-  "all-star-mvp": "AS MVP",
-  assists: "AST Champ",
-  "avg-ts-pct": "Average true shooting",
-  "avg-ts-star": "Average TS+ & TS% combined",
-  "avg-ws-48": "Average win shares per 48",
-  bpg: "Blocks per game",
-  blocks: "BLK Champ",
-  championship_rings: "Championships",
-  dpoy: "DPOY",
-  "sixth-man": "6MOY",
-  fmvp: "FMVP",
-  "games-started": "GS - Games started",
-  goat: "GOAT rank",
-  mvp: "MVP",
-  "most-improved": "MIP",
-  pra: "Pts + Rebs + Asts",
-  rebs: "REB Champ",
-  rebounds: "REB Champ",
-  rings: "Championships",
-  roy: "ROY",
-  rpg: "Rebounds per game",
-  scoring: "PTS Champ",
-  seasons: "YRS",
-  spg: "Steals per game",
-  steals: "STL Champ",
-  "three-point-contest": "3-Point Contest",
-  "three-point-title": "3PT Champ",
-  stocks: "Stls + Blks",
-  "ts-pct": "True shooting",
-  "ts-plus": "era-adjusted TS%",
-  "ts-star": "TS+ & TS% combined",
-  ts_pct: "True shooting",
-  "ws-48": "Win shares per 48",
-};
-
 const COURT_BADGE_LIMIT = 3;
-const COURT_BADGE_META_BY_ID: Record<string, { symbol: string; variant: string; description: string }> = {
-  "all-defense": { symbol: "DEF", variant: "defense", description: "All-DEF" },
-  // 🛡️
-  "all-nba": { symbol: "NBA", variant: "nba", description: "All-NBA" },
-  "all-rookie-1st": { symbol: "R1", variant: "rookie", description: "All-Rookie 1st" },
-  "all-rookie-2nd": { symbol: "R2", variant: "rookie", description: "All-Rookie 2nd" },
-  "all-star": { symbol: "AS", variant: "all-star-logo", description: "AS" },
-  "all-star-mvp": { symbol: "★", variant: "all-star-mvp", description: "AS MVP" },
-  assists: { symbol: "AST", variant: "assist", description: "AST Champ" },
-  blocks: { symbol: "BLK", variant: "defense", description: "BLK Champ" },
-  dpoy: { symbol: "DPOY", variant: "dpoy", description: "DPOY" },
-  fmvp: { symbol: "F", variant: "fmvp", description: "FMVP" },
-  mvp: { symbol: "M", variant: "mvp", description: "MVP" },
-  "most-improved": { symbol: "↗", variant: "rise", description: "MIP" },
-  rebounds: { symbol: "REB", variant: "rebound", description: "REB Champ" },
-  rings: { symbol: "💍", variant: "ring", description: "Rings" },
-  roy: { symbol: "ROY", variant: "roy", description: "ROY" },
-  scoring: { symbol: "PTS", variant: "points", description: "PTS Champ" },
-  "sixth-man": { symbol: "6th", variant: "sixth", description: "6MOY" },
-  steals: { symbol: "STL", variant: "defense", description: "STL Champ" },
-  "three-point-contest": { symbol: "3PC", variant: "points", description: "3-Point Contest" },
-  "three-point-title": { symbol: "3PT", variant: "points", description: "3PT Champ" },
-};
 
 function achievementTitle(achievement: Achievement) {
   return achievement.title || ACHIEVEMENT_TITLE_BY_ID[achievement.id] || `${achievement.label}: ${achievement.value}`;
