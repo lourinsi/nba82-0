@@ -64,6 +64,7 @@ type ResultBadgeMeta = {
   symbol: string;
   variant: string;
   description: string;
+  featured?: boolean;
 };
 
 type SeasonResultsConfig = {
@@ -141,6 +142,8 @@ function achievementBadgeCountNumber(value: string) {
   return countMatch ? Number(countMatch[1]) : 1;
 }
 
+const RESULT_FEATURED_BADGE_VISIBLE_LIMIT = 8;
+
 export default function SeasonResultsView({ config }: { config: SeasonResultsConfig }) {
   const router = useRouter();
   const [payload, setPayload] = useState<ResultPayload | null>(null);
@@ -175,8 +178,29 @@ export default function SeasonResultsView({ config }: { config: SeasonResultsCon
       : achievementBadgeCountNumber(achievement.value) * (resultBadgeScoreWeightById[achievement.id] ?? 0);
   }
 
+  function isFeaturedResultBadgeAchievement(achievement: ResultAchievement) {
+    return Boolean(resultBadgeMetaById[achievement.id]?.featured);
+  }
+
+  function reserveFeaturedResultBadgeAchievements(achievements: ResultAchievement[]) {
+    const featuredAchievements = achievements.filter(isFeaturedResultBadgeAchievement);
+
+    if (featuredAchievements.length === 0 || achievements.length <= RESULT_FEATURED_BADGE_VISIBLE_LIMIT) {
+      return achievements;
+    }
+
+    const regularLimit = Math.max(RESULT_FEATURED_BADGE_VISIBLE_LIMIT - featuredAchievements.length, 0);
+    const regularAchievements = achievements.filter((achievement) => !isFeaturedResultBadgeAchievement(achievement));
+
+    return [
+      ...regularAchievements.slice(0, regularLimit),
+      ...featuredAchievements,
+      ...regularAchievements.slice(regularLimit),
+    ];
+  }
+
   function prioritizeResultBadgeAchievements(achievements: ResultAchievement[]) {
-    return [...achievements].sort((first, second) => {
+    const sortedAchievements = [...achievements].sort((first, second) => {
       const priorityDelta = resultBadgeScore(second) - resultBadgeScore(first);
 
       if (priorityDelta) {
@@ -191,6 +215,8 @@ export default function SeasonResultsView({ config }: { config: SeasonResultsCon
 
       return achievementTitle(first).localeCompare(achievementTitle(second));
     });
+
+    return reserveFeaturedResultBadgeAchievements(sortedAchievements);
   }
 
   useEffect(() => {

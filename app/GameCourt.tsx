@@ -308,6 +308,7 @@ const POSITIONS: Position[] = ["PG", "SG", "SF", "PF", "C"];
 const POSITION_FILTER_OPTIONS = ["All", "G", "F", "C"] as const;
 type PositionFilter = (typeof POSITION_FILTER_OPTIONS)[number];
 const CURRENT_NBA_TEAMS = [
+  "ABA",
   "ATL",
   "BKN",
   "BOS",
@@ -340,6 +341,7 @@ const CURRENT_NBA_TEAMS = [
   "WAS",
 ]; // The '40s and '50s eras are now combined into the '60s era for display and filtering purposes.
 const TEAM_FIRST_ERAS: Record<string, string> = { // Updated to reflect the combined '40s, '50s, and '60s era.
+  ABA: "60's",
   ATL: "60's",
   BKN: "60's",
   BOS: "60's",
@@ -3046,15 +3048,34 @@ function sortBadgeAchievementsByScore(
   });
 }
 
+function isFeaturedCourtBadgeAchievement(achievement: Achievement) {
+  return Boolean(COURT_BADGE_META_BY_ID[achievement.id]?.featured);
+}
+
+function reserveFeaturedBadgeAchievements(achievements: Achievement[], limit: number) {
+  const featuredAchievements = achievements.filter(isFeaturedCourtBadgeAchievement);
+
+  if (featuredAchievements.length === 0 || achievements.length <= limit) {
+    return achievements.slice(0, limit);
+  }
+
+  const regularLimit = Math.max(limit - featuredAchievements.length, 0);
+  const regularAchievements = achievements.filter((achievement) => !isFeaturedCourtBadgeAchievement(achievement));
+
+  return [...regularAchievements.slice(0, regularLimit), ...featuredAchievements].slice(0, limit);
+}
+
 function selectCourtBadgeAchievements(
   achievements: Achievement[],
   limit: number,
   badgeScoreWeights: Record<string, number>,
 ) {
-  return sortBadgeAchievementsByScore(
+  const sortedBadgeAchievements = sortBadgeAchievementsByScore(
     achievements.filter((achievement) => COURT_BADGE_META_BY_ID[achievement.id]),
     badgeScoreWeights,
-  ).slice(0, Math.min(limit, COURT_BADGE_LIMIT));
+  );
+
+  return reserveFeaturedBadgeAchievements(sortedBadgeAchievements, Math.min(limit, COURT_BADGE_LIMIT));
 }
 
 function courtBadgeTooltip(achievement: Achievement) {

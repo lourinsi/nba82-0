@@ -3427,6 +3427,8 @@ select {
 :is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-all-star-logo .achievement-badge-symbol,
 :is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-nba .achievement-badge-symbol,
 :is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-points .achievement-badge-symbol,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-three-point-title .achievement-badge-symbol,
+:is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-three-point-contest .achievement-badge-symbol,
 :is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-assist .achievement-badge-symbol,
 :is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-rebound .achievement-badge-symbol,
 :is(.game-page-classic, .game-page-per-100) .roster-player-card .court-achievement-badge-defense .achievement-badge-symbol,
@@ -4700,7 +4702,7 @@ select {
 }
 
 .roster-feed-badges {
-  left: 12px;
+  left: 24px;
   top: 7px;
   z-index: 24;
 }
@@ -4879,6 +4881,22 @@ select {
     linear-gradient(145deg, #ffbf86, #dd5b20 64%, #5f2d16);
 }
 
+.court-achievement-badge-three-point-title {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.54), transparent 34%),
+    linear-gradient(145deg, #9af2ff, #2f86ff 54%, #ff8a2a);
+  border-color: rgba(154, 242, 255, 0.72);
+  width: 26px;
+}
+
+.court-achievement-badge-three-point-contest {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.6), transparent 34%),
+    linear-gradient(145deg, #fff08a, #ff8a2a 52%, #2454a6);
+  border-color: rgba(255, 230, 138, 0.74);
+  width: 26px;
+}
+
 .court-achievement-badge-assist {
   background:
     radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.5), transparent 34%),
@@ -4918,12 +4936,24 @@ select {
 }
 
 .court-achievement-badge-points .court-achievement-badge-symbol,
+.court-achievement-badge-three-point-title .court-achievement-badge-symbol,
+.court-achievement-badge-three-point-title .achievement-badge-symbol,
+.court-achievement-badge-three-point-contest .court-achievement-badge-symbol,
+.court-achievement-badge-three-point-contest .achievement-badge-symbol,
 .court-achievement-badge-assist .court-achievement-badge-symbol,
 .court-achievement-badge-rebound .court-achievement-badge-symbol,
 .court-achievement-badge-defense .court-achievement-badge-symbol,
 .court-achievement-badge-rookie .court-achievement-badge-symbol,
 .court-achievement-badge-sixth .court-achievement-badge-symbol {
   font-size: 0.43rem;
+}
+
+.court-achievement-badge-three-point-title .court-achievement-badge-symbol,
+.court-achievement-badge-three-point-title .achievement-badge-symbol,
+.court-achievement-badge-three-point-contest .court-achievement-badge-symbol,
+.court-achievement-badge-three-point-contest .achievement-badge-symbol {
+  font-size: 0.39rem;
+  transform: scaleX(0.95);
 }
 
 .court-slot-pg {

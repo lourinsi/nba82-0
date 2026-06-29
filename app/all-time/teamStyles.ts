@@ -27,6 +27,7 @@ const FALLBACK_TEAM_PALETTE: TeamPalette = {
 };
 
 const TEAM_PALETTES: Record<string, TeamPalette> = {
+  ABA: { primary: "#5b2333", secondary: "#2fbf71", number: "#f4f2ec" },
   ATL: { primary: "#c8102e", secondary: "#fdb927", number: "#fdb927" },
   BKN: { primary: "#0b0b0d", secondary: "#ffffff", number: "#ffffff" },
   BOS: { primary: "#007a33", secondary: "#ba9653", number: "#ffffff" },

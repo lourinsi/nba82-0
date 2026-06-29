@@ -2,6 +2,7 @@ export type AchievementBadgeMeta = {
   symbol: string;
   variant: string;
   description: string;
+  featured?: boolean;
 };
 
 export const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
@@ -42,8 +43,8 @@ export const ACHIEVEMENT_TITLE_BY_ID: Record<string, string> = {
   spg: "Steals per game",
   steals: "STL Champ",
   stocks: "Stocks - Stls + Blks",
-  "three-point-contest": "3-Point Contest",
-  "three-point-title": "3PT Champ",
+  "three-point-contest": "3-Point Contest Winner",
+  "three-point-title": "3PT King",
   "ts-pct": "True shooting",
   "ts-plus": "Era-adjusted TS%",
   "ts-star": "TS+ & TS% combined",
@@ -71,8 +72,18 @@ export const RESULT_BADGE_META_BY_ID: Record<string, AchievementBadgeMeta> = {
   scoring: { symbol: "PTS", variant: "points", description: "PTS Champ" },
   "sixth-man": { symbol: "6th", variant: "sixth", description: "6MOY" },
   steals: { symbol: "STL", variant: "defense", description: "STL Champ" },
-  "three-point-contest": { symbol: "3PC", variant: "points", description: "3-Point Contest" },
-  "three-point-title": { symbol: "3PT", variant: "points", description: "3PT Champ" },
+  "three-point-contest": {
+    symbol: "3PC",
+    variant: "three-point-contest",
+    description: "3-Point Contest Winner",
+    featured: true,
+  },
+  "three-point-title": {
+    symbol: "3PT",
+    variant: "three-point-title",
+    description: "3PT King",
+    featured: true,
+  },
 };
 
 export const RESULT_BADGE_SCORE_WEIGHT_BY_ID: Record<string, number> = {

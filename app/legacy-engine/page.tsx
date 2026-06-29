@@ -80,9 +80,12 @@ type HistoryPlayer = {
 
 const TEST_PLAYER_NAME = "Test Player";
 const FALLBACK_ENGINE_PARAMS: EngineParams = {
-  descentExponent: 0.2,
-  descentNumerator: 3.2,
-  ascentMultiplier: 0.0035,
+  // Raised from 0.2 to 0.6 to make the drop-off over time aggressive
+  descentExponent: 0.6, 
+  // Raised to keep the base bonus significant at low seasons
+  descentNumerator: 5.5, 
+  // Lowered so longevity doesn't kick back in too early
+  ascentMultiplier: 0.001, 
   densityBonusMultiplier: 0.1,
 };
 
