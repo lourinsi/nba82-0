@@ -2,8 +2,9 @@
 
 /* eslint-disable @next/next/no-img-element */
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import {
   CalendarDays,
   ChevronDown,
@@ -32,29 +33,44 @@ import type { Achievement, Player, StatsEngineConfig } from "../GameCourt";
 import { UNKNOWN_PLAYER_IMAGE, handlePlayerImageError } from "../playerImages";
 import {
   DEFAULT_MYSTERY_DRAFT_SETTINGS,
+  MYSTERY_AWARD_FILTER_OPTIONS,
+  MYSTERY_SEASON_POOL_OPTIONS,
   createMysteryDraftGame,
   generateSpinCandidates,
   minimumLegalOfferForCurrentCard,
   maxLegalOffer,
-  mysteryDraftFinalScore,
+  mysteryDefaultPoolBiasForSeasonPool,
+  mysteryDraftYearsLabel,
+  mysteryPoolLogicLabel,
+  mysteryPoolSourceLabel,
+  mysterySeasonPoolLabel,
   passMysteryDraftCard,
   publicMysteryDraftCard,
   rosterSlotsRemaining,
   selectVisibleMysteryStint,
+  startMysteryDraftGame,
   submitMysteryDraftOffer,
   tsStarPercentValue,
   validateMysteryDraftOffer,
   weightedWs48Value,
+  updateConnectedPoolWeights,
   type MysteryDraftAverageStats,
-  type MysteryDraftGameState,
+  type MysteryAwardFilter,
   type MysteryDraftOfferResult,
+  type MysteryPoolBiasKey,
   type MysteryDraftRawSeasonStats,
   type MysteryDraftRosterCard,
+  type MysteryDraftSeasonPool,
   type MysteryDraftSettings,
   type MysteryDraftSpinCandidate,
   type MysteryDraftStatRanges,
   type MysteryNumberRange,
 } from "./mysteryDraftGame";
+import {
+  MYSTERY_RESULT_STORAGE_KEY,
+  MYSTERY_RESULTS_PATH,
+} from "./mysteryDraftResultConstants";
+import { buildMysteryDraftResultsPayload } from "./mysteryDraftResults";
 
 const MYSTERY_SPIN_TICK_MS = 86;
 const MYSTERY_SPIN_MAX_MS = 5000;
@@ -78,14 +94,6 @@ function formatMoney(value: number | null | undefined) {
 
 function formatMarketRange(min: number | null | undefined, max: number | null | undefined) {
   return `${formatMoney(min)}-${formatMoney(max)}`;
-}
-
-function formatScore(value: number | null | undefined) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "--";
-  }
-
-  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "");
 }
 
 function formatFixed(value: number, digits: number) {
@@ -150,10 +158,6 @@ function displayStatsForCard(
 
 function formatRawSeasonPra(rawStats: MysteryDraftRawSeasonStats) {
   return formatPraValues(rawStats.ppg, rawStats.rpg, rawStats.apg);
-}
-
-function runHasStarted(game: MysteryDraftGameState) {
-  return game.spinsUsed > 0 || game.roster.length > 0 || Boolean(game.currentCard);
 }
 
 function buildSeasonMetricAchievements(card: MysteryDraftRosterCard, showAdjustedStats: boolean): Achievement[] {
@@ -249,6 +253,76 @@ function PossibleBadgeChips({
         <b key={achievement.id}>{achievementChipLabel(achievement)}</b>
       ))}
       {hiddenCount > 0 ? <b>+{hiddenCount}</b> : null}
+    </div>
+  );
+}
+
+function PositionChips({
+  eligiblePositions,
+  primaryPosition,
+}: {
+  eligiblePositions: readonly string[];
+  primaryPosition: string | null;
+}) {
+  const visiblePositions = eligiblePositions.length ? eligiblePositions : [];
+
+  if (!visiblePositions.length) {
+    return (
+      <div className="mystery-position-chips" aria-label="Positions unknown">
+        <span className="mystery-position-chip mystery-position-chip-muted">POS unknown</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mystery-position-chips" aria-label={`Positions ${visiblePositions.join(", ")}`}>
+      {visiblePositions.map((position) => (
+        <span
+          className={`mystery-position-chip ${position === primaryPosition ? "mystery-position-chip-primary" : ""}`}
+          key={position}
+        >
+          {position}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function formatBiasPercent(value: number) {
+  return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}%`;
+}
+
+function PoolBiasSlider({
+  children,
+  helper,
+  label,
+  onChange,
+  value,
+}: {
+  children?: ReactNode;
+  helper: string;
+  label: string;
+  onChange: (value: string) => void;
+  value: number;
+}) {
+  return (
+    <div className="mystery-pool-bias-control">
+      <div className="mystery-pool-bias-row">
+        <label>
+          <span>{label}</span>
+          <strong>{formatBiasPercent(value)}</strong>
+        </label>
+        {children ? <div className="mystery-pool-bias-select">{children}</div> : null}
+      </div>
+      <input
+        max={100}
+        min={0}
+        step={0.1}
+        type="range"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <small>{helper}</small>
     </div>
   );
 }
@@ -376,19 +450,19 @@ function ResultStatusIcon({ resultType }: { resultType: MysteryDraftOfferResult[
 
 function MysteryResultCard({
   canSpin,
-  finalScore,
   isLoading,
   onNewRun,
   onSpinNext,
+  onViewResults,
   result,
   runComplete,
   showAdjustedStats,
 }: {
   canSpin: boolean;
-  finalScore: number;
   isLoading: boolean;
   onNewRun: () => void;
   onSpinNext: () => void;
+  onViewResults: () => void;
   result: MysteryDraftOfferResult;
   runComplete: boolean;
   showAdjustedStats: boolean;
@@ -452,7 +526,6 @@ function MysteryResultCard({
       <div className="mystery-result-summary">
         <span>{result.userOffer === null ? "No offer submitted" : `You offered ${formatMoney(result.userOffer)}`}</span>
         {deltaText ? <strong>{deltaText}</strong> : null}
-        {revealedCard ? <span>Score {formatScore(revealedCard.score)}</span> : null}
       </div>
 
       {revealedCard ? (
@@ -475,13 +548,19 @@ function MysteryResultCard({
         {runComplete ? (
           <>
             <div className="mystery-result-final-score">
-              <span>Final Score</span>
-              <strong>{formatScore(finalScore)}</strong>
+              <span>Run Complete</span>
+              <strong>Ready</strong>
             </div>
-            <button className="mystery-primary-button" type="button" onClick={onNewRun}>
-              <RotateCcw size={18} />
-              New Run
-            </button>
+            <div className="mystery-complete-actions">
+              <button className="mystery-primary-button" type="button" onClick={onViewResults}>
+                <Trophy size={18} />
+                View Results
+              </button>
+              <button className="mystery-secondary-button" type="button" onClick={onNewRun}>
+                <RotateCcw size={18} />
+                New Run
+              </button>
+            </div>
           </>
         ) : (
           <button className="mystery-primary-button" disabled={!canSpin} type="button" onClick={onSpinNext}>
@@ -522,7 +601,6 @@ function RosterCard({
         </div>
       </div>
       <div className="mystery-roster-meta">
-        <span>Score {formatScore(card.score)}</span>
         <span>Reserve {formatMoney(card.reservePrice)}</span>
       </div>
       <AchievementStrip
@@ -533,6 +611,7 @@ function RosterCard({
 }
 
 export default function MysteryDraftPage() {
+  const router = useRouter();
   const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
   const adjustedStatsEnabled = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => false);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -548,7 +627,6 @@ export default function MysteryDraftPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rosterPanelOpen, setRosterPanelOpen] = useState(true);
-  const [settingsPanelOpen, setSettingsPanelOpen] = useState(true);
   const [spinCandidates, setSpinCandidates] = useState<MysteryDraftSpinCandidate[]>([]);
   const [spinIndex, setSpinIndex] = useState(0);
   const spinCandidatesRef = useRef<MysteryDraftSpinCandidate[]>([]);
@@ -567,14 +645,13 @@ export default function MysteryDraftPage() {
   const offerValidation = game.currentCard
     ? validateMysteryDraftOffer(game, offerValue)
     : { message: null, valid: false };
-  const finalScore = mysteryDraftFinalScore(game);
-  const started = runHasStarted(game);
   const lastRevealDelta = game.lastResult ? revealDeltaText(game.lastResult) : null;
   const canSpin =
     !loading &&
     !error &&
     !isSpinning &&
     game.status === "ACTIVE" &&
+    game.started &&
     !game.currentCard &&
     game.spinsUsed < game.maxSpins &&
     game.roster.length < game.rosterSize;
@@ -615,12 +692,35 @@ export default function MysteryDraftPage() {
     setGame(createMysteryDraftGame(settingsDraft));
     setIsSpinning(false);
     setOfferText("");
-    setSettingsPanelOpen(true);
     setSpinCandidates([]);
     setSpinIndex(0);
     spinCandidatesRef.current = [];
     spinIndexRef.current = 0;
   }, [clearSpinTimers, settingsDraft]);
+
+  const startDraft = useCallback(() => {
+    clearSpinTimers();
+    setDetailsOpen(false);
+    setGame(startMysteryDraftGame(settingsDraft));
+    setIsSpinning(false);
+    setOfferText("");
+    setRosterPanelOpen(true);
+    setSpinCandidates([]);
+    setSpinIndex(0);
+    spinCandidatesRef.current = [];
+    spinIndexRef.current = 0;
+  }, [clearSpinTimers, settingsDraft]);
+
+  const viewResults = useCallback(() => {
+    if (game.status !== "COMPLETE") {
+      return;
+    }
+
+    const payload = buildMysteryDraftResultsPayload(game, adjustedStatsEnabled);
+
+    sessionStorage.setItem(MYSTERY_RESULT_STORAGE_KEY, JSON.stringify(payload));
+    router.push(MYSTERY_RESULTS_PATH);
+  }, [adjustedStatsEnabled, game, router]);
 
   useEffect(() => {
     let active = true;
@@ -688,17 +788,24 @@ export default function MysteryDraftPage() {
 
   useEffect(() => {
     setGameHeaderState({
-      eyebrow: game.status === "COMPLETE" ? "Mystery Final" : "Mystery Draft",
+      eyebrow: game.started ? (game.status === "COMPLETE" ? "Mystery Final" : "Mystery Draft") : "Mystery Lobby",
       resetDisabled: false,
-      resetLabel: "Reset mystery draft",
+      resetLabel: "New mystery draft",
       showAdjustedStatsToggle: true,
-      showReset: true,
+      showReset: game.started,
       title:
-        game.status === "COMPLETE"
-          ? `Score ${formatScore(finalScore)}`
-          : `${game.roster.length}/${game.rosterSize} players - ${formatMoney(game.salaryRemaining)}`,
+        game.started
+          ? `${game.roster.length}/${game.rosterSize} players - ${formatMoney(game.salaryRemaining)}`
+          : `${mysterySeasonPoolLabel(settingsDraft.seasonPool)} setup`,
     });
-  }, [finalScore, game.roster.length, game.rosterSize, game.salaryRemaining, game.status]);
+  }, [
+    game.roster.length,
+    game.rosterSize,
+    game.salaryRemaining,
+    game.started,
+    game.status,
+    settingsDraft.seasonPool,
+  ]);
 
   useEffect(() => () => setGameHeaderState(null), []);
 
@@ -718,10 +825,7 @@ export default function MysteryDraftPage() {
     const merged = { ...settingsDraft, ...nextSettings };
 
     setSettingsDraft(merged);
-
-    if (!started) {
-      setGame(createMysteryDraftGame(merged));
-    }
+    setGame(createMysteryDraftGame(merged));
   }
 
   function updateNumberSetting(key: keyof MysteryDraftSettings, value: string, min: number, max: number) {
@@ -734,12 +838,41 @@ export default function MysteryDraftPage() {
     updateSettings({ [key]: numeric } as Partial<MysteryDraftSettings>);
   }
 
-  function updateTop100Chance(value: string) {
-    const top100Chance = clamp(Number(value), 0, 100) / 100;
+  function updatePoolBias(key: MysteryPoolBiasKey, value: string) {
+    const nextWeights = updateConnectedPoolWeights(
+      {
+        activeStar: settingsDraft.activeStar,
+        award: settingsDraft.award,
+        top100: settingsDraft.top100,
+        wildcard: settingsDraft.wildcard,
+      },
+      key,
+      Number(value),
+    );
+
+    updateSettings(nextWeights);
+  }
+
+  function updateAwardFilter(key: "awardFilter" | "activeStarFilter", value: string) {
+    if (!MYSTERY_AWARD_FILTER_OPTIONS.some((option) => option.value === value)) {
+      return;
+    }
+
+    updateSettings({ [key]: value as MysteryAwardFilter } as Partial<MysteryDraftSettings>);
+  }
+
+  function updateSeasonPool(value: string) {
+    if (!MYSTERY_SEASON_POOL_OPTIONS.some((option) => option.value === value)) {
+      return;
+    }
+
+    const seasonPool = value as MysteryDraftSeasonPool;
 
     updateSettings({
-      randomHistoricalChance: Number((1 - top100Chance).toFixed(2)),
-      top100Chance: Number(top100Chance.toFixed(2)),
+      ...mysteryDefaultPoolBiasForSeasonPool(seasonPool),
+      activeStarFilter: DEFAULT_MYSTERY_DRAFT_SETTINGS.activeStarFilter,
+      awardFilter: DEFAULT_MYSTERY_DRAFT_SETTINGS.awardFilter,
+      seasonPool,
     });
   }
 
@@ -750,9 +883,8 @@ export default function MysteryDraftPage() {
 
     setOfferText("");
     setDetailsOpen(false);
-    setSettingsPanelOpen(false);
 
-    const result = generateSpinCandidates(game, players, statsEngineConfig, 34);
+    const result = generateSpinCandidates(game, players, statsEngineConfig, 30);
 
     setGame(result.state);
 
@@ -805,6 +937,220 @@ export default function MysteryDraftPage() {
     setOfferText("");
   }
 
+  if (!game.started) {
+    return (
+      <main className={`mystery-page ${lightMode ? "mystery-page-light" : ""}`}>
+        <section className="mystery-shell mystery-lobby-shell">
+          <section className="mystery-lobby-card">
+            <div className="mystery-lobby-heading">
+              <span className="mystery-kicker">Solo Mode</span>
+              <h1>Mystery Salary Draft</h1>
+            </div>
+
+            <div className="mystery-lobby-main">
+              <label className="mystery-lobby-field">
+                <span>Season Pool</span>
+                <select
+                  value={settingsDraft.seasonPool}
+                  onChange={(event) => updateSeasonPool(event.target.value)}
+                >
+                  {MYSTERY_SEASON_POOL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="mystery-lobby-field mystery-lobby-years-field">
+                <span>Draft Years</span>
+                {settingsDraft.seasonPool === "custom" ? (
+                  <div className="mystery-lobby-custom-range">
+                    <input
+                      aria-label="Draft years start"
+                      max={settingsDraft.customEndYear}
+                      min={1949}
+                      type="number"
+                      value={settingsDraft.customStartYear}
+                      onChange={(event) => updateNumberSetting("customStartYear", event.target.value, 1949, 2026)}
+                    />
+                    <input
+                      aria-label="Draft years end"
+                      max={2026}
+                      min={settingsDraft.customStartYear}
+                      type="number"
+                      value={settingsDraft.customEndYear}
+                      onChange={(event) => updateNumberSetting("customEndYear", event.target.value, 1949, 2026)}
+                    />
+                  </div>
+                ) : (
+                  <strong className="mystery-draft-years-value">{mysteryDraftYearsLabel(settingsDraft)}</strong>
+                )}
+              </div>
+
+              <button
+                className="mystery-primary-button mystery-start-button"
+                disabled={loading}
+                type="button"
+                onClick={startDraft}
+              >
+                <Sparkles size={18} />
+                {loading ? "Loading..." : "Start Draft"}
+              </button>
+
+              {error ? <p className="mystery-validation">API error: {error}</p> : null}
+            </div>
+
+            <details className="mystery-panel mystery-lobby-advanced">
+              <summary className="mystery-panel-title">
+                <Sparkles size={18} />
+                <h2>Show More Settings</h2>
+              </summary>
+              <div className="mystery-pool-bias-panel">
+                <div className="mystery-pool-bias-heading">
+                  <span className="mystery-kicker">Pool Bias</span>
+                  <strong>{mysteryPoolLogicLabel(settingsDraft)}</strong>
+                </div>
+                <PoolBiasSlider
+                  helper="Prioritizes all-time Top 100 players within the selected draft years."
+                  label="Top 100 Bias"
+                  value={settingsDraft.top100}
+                  onChange={(value) => updatePoolBias("top100", value)}
+                />
+                <PoolBiasSlider
+                  helper="Prioritizes seasons where the player actually earned the selected award or accolade."
+                  label="Award Bias"
+                  value={settingsDraft.award}
+                  onChange={(value) => updatePoolBias("award", value)}
+                >
+                  <select
+                    aria-label="Award Bias filter"
+                    value={settingsDraft.awardFilter}
+                    onChange={(event) => updateAwardFilter("awardFilter", event.target.value)}
+                  >
+                    {MYSTERY_AWARD_FILTER_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </PoolBiasSlider>
+                <PoolBiasSlider
+                  helper="Adds current active stars, even outside the selected era. At 0%, active players are not banned."
+                  label="Active Star Injection"
+                  value={settingsDraft.activeStar}
+                  onChange={(value) => updatePoolBias("activeStar", value)}
+                >
+                  <select
+                    aria-label="Active Star Injection filter"
+                    value={settingsDraft.activeStarFilter}
+                    onChange={(event) => updateAwardFilter("activeStarFilter", event.target.value)}
+                  >
+                    {MYSTERY_AWARD_FILTER_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </PoolBiasSlider>
+                <PoolBiasSlider
+                  helper="Adds random eligible seasons for variety."
+                  label="Wildcard Bias"
+                  value={settingsDraft.wildcard}
+                  onChange={(value) => updatePoolBias("wildcard", value)}
+                />
+              </div>
+              <div className="mystery-settings-grid">
+                <label>
+                  Salary Cap
+                  <input
+                    min={20}
+                    type="number"
+                    value={settingsDraft.salaryCap}
+                    onChange={(event) => updateNumberSetting("salaryCap", event.target.value, 20, 999)}
+                  />
+                </label>
+                <label>
+                  Roster Size
+                  <input
+                    max={12}
+                    min={1}
+                    type="number"
+                    value={settingsDraft.rosterSize}
+                    onChange={(event) => updateNumberSetting("rosterSize", event.target.value, 1, 12)}
+                  />
+                </label>
+                <label>
+                  Max Spins
+                  <input
+                    max={60}
+                    min={1}
+                    type="number"
+                    value={settingsDraft.maxSpins}
+                    onChange={(event) => updateNumberSetting("maxSpins", event.target.value, 1, 60)}
+                  />
+                </label>
+                <label>
+                  Minimum Offer
+                  <input
+                    min={1}
+                    type="number"
+                    value={settingsDraft.minimumOffer}
+                    onChange={(event) => updateNumberSetting("minimumOffer", event.target.value, 1, 50)}
+                  />
+                </label>
+                <label>
+                  Increment
+                  <input
+                    min={1}
+                    type="number"
+                    value={settingsDraft.offerIncrement}
+                    onChange={(event) => updateNumberSetting("offerIncrement", event.target.value, 1, 25)}
+                  />
+                </label>
+                <label>
+                  Price Multiplier
+                  <input
+                    max={2}
+                    min={0.05}
+                    step={0.05}
+                    type="number"
+                    value={settingsDraft.scoreToPriceMultiplier}
+                    onChange={(event) => updateNumberSetting("scoreToPriceMultiplier", event.target.value, 0.05, 2)}
+                  />
+                </label>
+                <label className="mystery-toggle">
+                  <input
+                    checked={settingsDraft.allowDuplicatePlayers}
+                    type="checkbox"
+                    onChange={(event) => updateSettings({ allowDuplicatePlayers: event.target.checked })}
+                  />
+                  Duplicate Players
+                </label>
+                <label className="mystery-toggle">
+                  <input
+                    checked={settingsDraft.removeOfferedStintAfterSpin}
+                    type="checkbox"
+                    onChange={(event) => updateSettings({ removeOfferedStintAfterSpin: event.target.checked })}
+                  />
+                  Remove Offered Stints
+                </label>
+                <label className="mystery-toggle">
+                  <input
+                    checked={settingsDraft.revealAfterPass}
+                    type="checkbox"
+                    onChange={(event) => updateSettings({ revealAfterPass: event.target.checked })}
+                  />
+                  Reveal Passes
+                </label>
+              </div>
+            </details>
+          </section>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className={`mystery-page ${lightMode ? "mystery-page-light" : ""}`}>
       <section className="mystery-shell">
@@ -839,7 +1185,7 @@ export default function MysteryDraftPage() {
             {isSpinning && activeSpinCandidate ? (
               <article className="mystery-current-card mystery-spin-card" style={teamThemeStyle(activeSpinCandidate.team)}>
                 <div className="mystery-card-topline">
-                  <span>{activeSpinCandidate.poolSource === "top100" ? "Top 100 Pool" : "Historical Pool"}</span>
+                  <span>{mysteryPoolSourceLabel(activeSpinCandidate.poolSource, game.settings)}</span>
                   <span>Spinning</span>
                 </div>
 
@@ -872,7 +1218,7 @@ export default function MysteryDraftPage() {
             ) : publicCard ? (
               <article className="mystery-current-card" style={teamThemeStyle(publicCard.team)}>
                 <div className="mystery-card-topline">
-                  <span>{publicCard.poolSource === "top100" ? "Top 100 Pool" : "Historical Pool"}</span>
+                  <span>{mysteryPoolSourceLabel(publicCard.poolSource, game.settings)}</span>
                   <span>
                     {publicCard.possibleSeasonLabels.length} possible season
                     {publicCard.possibleSeasonLabels.length === 1 ? "" : "s"}
@@ -886,6 +1232,10 @@ export default function MysteryDraftPage() {
                       {publicCard.team} {publicCard.eraLabel}
                     </span>
                     <h2>{publicCard.playerName}</h2>
+                    <PositionChips
+                      eligiblePositions={publicCard.eligiblePositions}
+                      primaryPosition={publicCard.primaryPosition}
+                    />
                     <div className="mystery-market-panel" aria-label="Market range">
                       <span>Market Range</span>
                       <strong>{formatMarketRange(publicCard.marketMin, publicCard.marketMax)}</strong>
@@ -1002,10 +1352,10 @@ export default function MysteryDraftPage() {
             ) : game.lastResult ? (
               <MysteryResultCard
                 canSpin={canSpin}
-                finalScore={finalScore}
                 isLoading={loading}
                 onNewRun={resetRun}
                 onSpinNext={handleSpin}
+                onViewResults={viewResults}
                 result={game.lastResult}
                 runComplete={game.status === "COMPLETE"}
                 showAdjustedStats={adjustedStatsEnabled}
@@ -1019,19 +1369,24 @@ export default function MysteryDraftPage() {
                   <span className="mystery-kicker">
                     {game.status === "COMPLETE" ? "Run Complete" : "Ready"}
                   </span>
-                  <h2>{game.status === "COMPLETE" ? "Final Score" : "Spin A Card"}</h2>
+                  <h2>{game.status === "COMPLETE" ? "Roster Ready" : "Spin A Card"}</h2>
                 </div>
                 {game.status === "COMPLETE" ? (
                   <div className="mystery-final-score">
-                    <strong>{formatScore(finalScore)}</strong>
                     <span>{game.roster.length} acquired cards</span>
                   </div>
                 ) : null}
                 {game.status === "COMPLETE" ? (
-                  <button className="mystery-primary-button" type="button" onClick={resetRun}>
-                    <RotateCcw size={18} />
-                    New Run
-                  </button>
+                  <div className="mystery-complete-actions mystery-complete-actions-centered">
+                    <button className="mystery-primary-button" type="button" onClick={viewResults}>
+                      <Trophy size={18} />
+                      View Results
+                    </button>
+                    <button className="mystery-secondary-button" type="button" onClick={resetRun}>
+                      <RotateCcw size={18} />
+                      New Run
+                    </button>
+                  </div>
                 ) : (
                   <button className="mystery-primary-button" disabled={!canSpin} type="button" onClick={handleSpin}>
                     <RefreshCw size={18} />
@@ -1070,9 +1425,6 @@ export default function MysteryDraftPage() {
                     </span>
                     <strong>{revealOutcomeText(game.lastResult)}</strong>
                     {lastRevealDelta ? <span>{lastRevealDelta}</span> : null}
-                    {game.lastResult.revealedCard ? (
-                      <span>Score {formatScore(game.lastResult.revealedCard.score)}</span>
-                    ) : null}
                   </div>
                 </div>
               </section>
@@ -1106,122 +1458,6 @@ export default function MysteryDraftPage() {
               </div>
             </details>
 
-            <details
-              className="mystery-panel mystery-settings-panel"
-              open={settingsPanelOpen}
-              onToggle={(event) => setSettingsPanelOpen(event.currentTarget.open)}
-            >
-              <summary className="mystery-panel-title">
-                <Sparkles size={18} />
-                <h2>Settings</h2>
-              </summary>
-              <div className="mystery-settings-grid">
-                <label>
-                  Salary Cap
-                  <input
-                    disabled={started}
-                    min={20}
-                    type="number"
-                    value={settingsDraft.salaryCap}
-                    onChange={(event) => updateNumberSetting("salaryCap", event.target.value, 20, 999)}
-                  />
-                </label>
-                <label>
-                  Roster Size
-                  <input
-                    disabled={started}
-                    max={12}
-                    min={1}
-                    type="number"
-                    value={settingsDraft.rosterSize}
-                    onChange={(event) => updateNumberSetting("rosterSize", event.target.value, 1, 12)}
-                  />
-                </label>
-                <label>
-                  Max Spins
-                  <input
-                    disabled={started}
-                    max={60}
-                    min={1}
-                    type="number"
-                    value={settingsDraft.maxSpins}
-                    onChange={(event) => updateNumberSetting("maxSpins", event.target.value, 1, 60)}
-                  />
-                </label>
-                <label>
-                  Minimum Offer
-                  <input
-                    disabled={started}
-                    min={1}
-                    type="number"
-                    value={settingsDraft.minimumOffer}
-                    onChange={(event) => updateNumberSetting("minimumOffer", event.target.value, 1, 50)}
-                  />
-                </label>
-                <label>
-                  Increment
-                  <input
-                    disabled={started}
-                    min={1}
-                    type="number"
-                    value={settingsDraft.offerIncrement}
-                    onChange={(event) => updateNumberSetting("offerIncrement", event.target.value, 1, 25)}
-                  />
-                </label>
-                <label>
-                  Price Multiplier
-                  <input
-                    disabled={started}
-                    max={2}
-                    min={0.05}
-                    step={0.05}
-                    type="number"
-                    value={settingsDraft.scoreToPriceMultiplier}
-                    onChange={(event) => updateNumberSetting("scoreToPriceMultiplier", event.target.value, 0.05, 2)}
-                  />
-                </label>
-                <label className="mystery-setting-wide">
-                  Top 100 Chance
-                  <input
-                    disabled={started}
-                    max={100}
-                    min={0}
-                    step={1}
-                    type="range"
-                    value={Math.round(settingsDraft.top100Chance * 100)}
-                    onChange={(event) => updateTop100Chance(event.target.value)}
-                  />
-                  <span>{Math.round(settingsDraft.top100Chance * 100)}%</span>
-                </label>
-                <label className="mystery-toggle">
-                  <input
-                    checked={settingsDraft.allowDuplicatePlayers}
-                    disabled={started}
-                    type="checkbox"
-                    onChange={(event) => updateSettings({ allowDuplicatePlayers: event.target.checked })}
-                  />
-                  Duplicate Players
-                </label>
-                <label className="mystery-toggle">
-                  <input
-                    checked={settingsDraft.removeOfferedStintAfterSpin}
-                    disabled={started}
-                    type="checkbox"
-                    onChange={(event) => updateSettings({ removeOfferedStintAfterSpin: event.target.checked })}
-                  />
-                  Remove Offered Stints
-                </label>
-                <label className="mystery-toggle">
-                  <input
-                    checked={settingsDraft.revealAfterPass}
-                    disabled={started}
-                    type="checkbox"
-                    onChange={(event) => updateSettings({ revealAfterPass: event.target.checked })}
-                  />
-                  Reveal Passes
-                </label>
-              </div>
-            </details>
           </aside>
         </div>
       </section>

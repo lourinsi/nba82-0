@@ -7,6 +7,7 @@ import { teamThemeStyle } from "../all-time/teamStyles";
 import {
   adjustedStatsSnapshot,
   colorModeSnapshot,
+  setGameHeaderState,
   subscribeToAdjustedStats,
   subscribeToColorMode,
 } from "../clientPreferences";
@@ -32,8 +33,13 @@ type DraftSelection = {
   eraLabel: string;
 };
 type PositionBonus = {
+  label?: string;
   multiplier: number;
   points: number;
+};
+type ResultSalaryInfo = {
+  paidPrice?: number;
+  reservePrice?: number;
 };
 type ResultPlayer = {
   position: Position;
@@ -43,17 +49,27 @@ type ResultPlayer = {
   };
   selection?: DraftSelection;
   scoreContribution?: number;
+  baseScore?: number;
+  eligiblePositions?: Position[];
+  emptySlot?: boolean;
+  fitLabel?: string;
   achievements: ResultAchievement[];
   originalAchievements?: ResultAchievement[];
   adjustedAchievements?: ResultAchievement[];
+  positionAdjustedScore?: number;
   positionBonus?: PositionBonus;
+  primaryPosition?: Position | null;
+  salary?: ResultSalaryInfo;
 };
 type ResultPayload = {
   mode: string;
   selectedTeam: string;
   selectedEraLabel: string;
   resultModeLabel?: string;
+  resultSummary?: Array<{ label: string; value: string }>;
   returnPath?: string;
+  draftBaseScore?: number;
+  finalOptimizedScore?: number;
   simulationResult: SeasonProjection;
   lineup: ResultPlayer[];
   totals: ResultAchievement[];
@@ -120,8 +136,14 @@ function formatLegacyScore(score: number) {
   return Number.isInteger(score) ? String(score) : score.toFixed(1);
 }
 
-function formatBoostPercent(multiplier: number) {
-  return `${Math.round((multiplier - 1) * 100)}%`;
+function formatSignedBoostPercent(multiplier: number) {
+  const percent = Math.round((multiplier - 1) * 100);
+
+  if (percent > 0) {
+    return `+${percent}%`;
+  }
+
+  return `${percent}%`;
 }
 
 function achievementBadgeCount(value: string) {
@@ -228,6 +250,19 @@ export default function SeasonResultsView({ config }: { config: SeasonResultsCon
     return () => window.clearTimeout(timeout);
   }, [config.expectedMode, config.storageKey]);
 
+  useEffect(() => {
+    setGameHeaderState({
+      eyebrow: "Season Results",
+      resetDisabled: false,
+      resetLabel: "Back to court",
+      showAdjustedStatsToggle: Boolean(config.showAdjustedStats),
+      showReset: false,
+      title: config.defaultModeLabel,
+    });
+
+    return () => setGameHeaderState(null);
+  }, [config.defaultModeLabel, config.showAdjustedStats]);
+
   function goBack() {
     router.push(payload?.returnPath ?? config.defaultReturnPath);
   }
@@ -309,6 +344,17 @@ export default function SeasonResultsView({ config }: { config: SeasonResultsCon
           </div>
 
           <p className="season-result-description">{simulationResult.description}</p>
+
+          {payload.resultSummary?.length ? (
+            <div className="season-result-summary-grid" aria-label="Result summary">
+              {payload.resultSummary.map((item) => (
+                <span className="season-result-summary-item" key={`${item.label}-${item.value}`}>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </span>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         <div className="season-result-actions">
@@ -345,6 +391,7 @@ export default function SeasonResultsView({ config }: { config: SeasonResultsCon
                   fallbackTeam={selectedTeam}
                   player={entry.player}
                   position={entry.position}
+                  fitLabel={entry.fitLabel}
                   positionBonus={entry.positionBonus}
                   prioritizeResultBadgeAchievements={prioritizeResultBadgeAchievements}
                   resultBadgeMetaById={resultBadgeMetaById}
@@ -376,6 +423,7 @@ function ResultPlayerRow({
   canShowBadges,
   fallbackEraLabel,
   fallbackTeam,
+  fitLabel,
   player,
   position,
   positionBonus,
@@ -391,6 +439,7 @@ function ResultPlayerRow({
   canShowBadges: boolean;
   fallbackEraLabel: string;
   fallbackTeam: string;
+  fitLabel?: string;
   player: { id: string; name: string };
   position: Position;
   positionBonus?: PositionBonus;
@@ -405,7 +454,21 @@ function ResultPlayerRow({
     team: selection?.team ?? fallbackTeam,
     eraLabel: selection?.eraLabel ?? fallbackEraLabel,
   };
-  const positionBoost = positionBonus && positionBonus.points > 0 ? positionBonus : null;
+  const positionBoost = positionBonus ?? null;
+  const positionBoostTone =
+    positionBoost && positionBoost.points > 0
+      ? "positive"
+      : positionBoost && positionBoost.points < 0
+        ? "negative"
+        : "neutral";
+  const positionBoostLabel =
+    fitLabel ||
+    positionBoost?.label ||
+    (positionBoost && positionBoost.points > 0
+      ? `Primary Fit ${formatSignedBoostPercent(positionBoost.multiplier)}`
+      : positionBoost && positionBoost.points < 0
+        ? `Out of Position ${formatSignedBoostPercent(positionBoost.multiplier)}`
+        : "Secondary Fit");
   const contribution =
     typeof scoreContribution === "number" && Number.isFinite(scoreContribution) ? scoreContribution : null;
   const displayAchievements = visibleAchievements(achievements);
@@ -430,14 +493,14 @@ function ResultPlayerRow({
       ) : null}
       {positionBoost ? (
         <span
-          aria-label={`Primary position fit bonus: ${formatBoostPercent(positionBoost.multiplier)}.`}
-          className="result-position-boost"
+          aria-label={`${positionBoostLabel}: ${formatSignedBoostPercent(positionBoost.multiplier)}.`}
+          className={`result-position-boost result-position-boost-${positionBoostTone}`}
           tabIndex={0}
         >
           <span>fit</span>
-          <span>+{formatBoostPercent(positionBoost.multiplier)}</span>
+          <span>{formatSignedBoostPercent(positionBoost.multiplier)}</span>
           <span className="result-position-boost-tooltip" role="tooltip">
-            Primary position fit bonus.
+            {positionBoostLabel}
           </span>
         </span>
       ) : null}

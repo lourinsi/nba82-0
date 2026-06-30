@@ -1,4 +1,4 @@
-import type { Achievement, CareerSeason, Player, StatsEngineConfig, TeamEra } from "../GameCourt";
+import type { Achievement, CareerSeason, Player, Position, StatsEngineConfig, TeamEra } from "../GameCourt";
 import { ACHIEVEMENT_TITLE_BY_ID, RESULT_BADGE_SCORE_WEIGHT_BY_ID } from "../achievementMeta";
 import { getPlayerImageForMysteryCard } from "../playerImages";
 import { playerPer100AwardsScore } from "../per-100/per100GameConfig";
@@ -12,17 +12,116 @@ import {
 
 export type MysteryDraftSettings = {
   allowDuplicatePlayers: boolean;
+  activeStar: number;
+  activeStarFilter: MysteryAwardFilter;
+  award: number;
+  awardFilter: MysteryAwardFilter;
+  customEndYear: number;
+  customStartYear: number;
   maxSpins: number;
   minimumOffer: number;
   offerIncrement: number;
-  randomHistoricalChance: number;
   removeOfferedStintAfterSpin: boolean;
   revealAfterPass: boolean;
   rosterSize: number;
   salaryCap: number;
   scoreToPriceMultiplier: number;
-  top100Chance: number;
+  seasonPool: MysteryDraftSeasonPool;
+  top100: number;
+  wildcard: number;
 };
+
+export type MysteryDraftSeasonPool =
+  | "all-time"
+  | "current"
+  | "2020s"
+  | "2010s"
+  | "2000s"
+  | "1990s"
+  | "1980s"
+  | "1970s"
+  | "1960s"
+  | "1950s"
+  | "custom";
+
+export type MysteryDraftSeasonPoolOption = {
+  label: string;
+  value: MysteryDraftSeasonPool;
+};
+
+export type MysteryPoolBiasKey = "top100" | "award" | "activeStar" | "wildcard";
+export type MysteryPoolBiasWeights = Record<MysteryPoolBiasKey, number>;
+
+export type MysteryAwardFilter =
+  | "all_star"
+  | "mvp"
+  | "finals_mvp"
+  | "all_nba"
+  | "all_defensive"
+  | "dpoy"
+  | "scoring_title"
+  | "assist_title"
+  | "rebound_title"
+  | "steals_title"
+  | "blocks_title"
+  | "champion"
+  | "roy"
+  | "sixth_man"
+  | "most_improved";
+
+export type MysteryAwardFilterOption = {
+  label: string;
+  value: MysteryAwardFilter;
+};
+
+export const CURRENT_MYSTERY_SEASON_END_YEAR = 2026;
+export const FIRST_MYSTERY_SEASON_END_YEAR = 1949;
+export const MYSTERY_SEASON_POOL_OPTIONS = [
+  { label: "All-Time", value: "all-time" },
+  { label: "Current Season (2025-26)", value: "current" },
+  { label: "2020s", value: "2020s" },
+  { label: "2010s", value: "2010s" },
+  { label: "2000s", value: "2000s" },
+  { label: "1990s", value: "1990s" },
+  { label: "1980s", value: "1980s" },
+  { label: "1970s", value: "1970s" },
+  { label: "1960s", value: "1960s" },
+  { label: "1950s", value: "1950s" },
+  { label: "Custom Range", value: "custom" },
+] as const satisfies readonly MysteryDraftSeasonPoolOption[];
+
+export const MYSTERY_POOL_BIAS_KEYS = ["top100", "award", "activeStar", "wildcard"] as const;
+export const MYSTERY_AWARD_FILTER_OPTIONS = [
+  { label: "All-Star", value: "all_star" },
+  { label: "MVP", value: "mvp" },
+  { label: "Finals MVP", value: "finals_mvp" },
+  { label: "All-NBA", value: "all_nba" },
+  { label: "All-Defensive", value: "all_defensive" },
+  { label: "DPOY", value: "dpoy" },
+  { label: "Scoring Title", value: "scoring_title" },
+  { label: "Assist Title", value: "assist_title" },
+  { label: "Rebound Title", value: "rebound_title" },
+  { label: "Steals Title", value: "steals_title" },
+  { label: "Blocks Title", value: "blocks_title" },
+  { label: "Champion", value: "champion" },
+  { label: "ROY", value: "roy" },
+  { label: "6MOY", value: "sixth_man" },
+  { label: "MIP", value: "most_improved" },
+] as const satisfies readonly MysteryAwardFilterOption[];
+
+export const ALL_TIME_MYSTERY_POOL_BIAS_DEFAULTS: MysteryPoolBiasWeights = Object.freeze({
+  activeStar: 29,
+  award: 0,
+  top100: 70,
+  wildcard: 1,
+});
+
+export const RANGE_MYSTERY_POOL_BIAS_DEFAULTS: MysteryPoolBiasWeights = Object.freeze({
+  activeStar: 0,
+  award: 90,
+  top100: 5,
+  wildcard: 5,
+});
 
 export const DEFAULT_MYSTERY_DRAFT_SETTINGS: MysteryDraftSettings = Object.freeze({
   salaryCap: 1000,
@@ -30,9 +129,16 @@ export const DEFAULT_MYSTERY_DRAFT_SETTINGS: MysteryDraftSettings = Object.freez
   maxSpins: 15,
   minimumOffer: 1,
   offerIncrement: 1,
-  top100Chance: 0.99,
-  randomHistoricalChance: 0.01,
+  top100: ALL_TIME_MYSTERY_POOL_BIAS_DEFAULTS.top100,
+  award: ALL_TIME_MYSTERY_POOL_BIAS_DEFAULTS.award,
+  activeStar: ALL_TIME_MYSTERY_POOL_BIAS_DEFAULTS.activeStar,
+  wildcard: ALL_TIME_MYSTERY_POOL_BIAS_DEFAULTS.wildcard,
+  awardFilter: "all_star",
+  activeStarFilter: "all_star",
   scoreToPriceMultiplier: 1.00,
+  seasonPool: "all-time",
+  customStartYear: 2000,
+  customEndYear: 2009,
   allowDuplicatePlayers: false,
   removeOfferedStintAfterSpin: true,
   revealAfterPass: true,
@@ -40,7 +146,7 @@ export const DEFAULT_MYSTERY_DRAFT_SETTINGS: MysteryDraftSettings = Object.freez
 
 export type MysteryDraftSettingsInput = Partial<MysteryDraftSettings>;
 export type MysteryDraftStatus = "ACTIVE" | "COMPLETE";
-export type MysteryDraftPoolSource = "top100" | "historical";
+export type MysteryDraftPoolSource = MysteryPoolBiasKey;
 export type MysteryDraftOfferResultType = "ACCEPTED" | "REJECTED" | "PASSED";
 
 export type MysteryNumberRange = {
@@ -79,6 +185,8 @@ export type MysteryDraftRawSeasonStats = {
 export type MysteryScoredSeason = {
   accoladeScore: number;
   cardSeasonLabel: string;
+  eligiblePositions: Position[];
+  primaryPosition: Position | null;
   rawStats: MysteryDraftRawSeasonStats;
   reservePrice: number;
   score: number;
@@ -94,6 +202,7 @@ export type MysteryScoredSeason = {
 export type MysteryDraftPublicCard = {
   averageStats: MysteryDraftAverageStats;
   cardId: string;
+  eligiblePositions: Position[];
   era: string;
   eraLabel: string;
   marketMax: number;
@@ -101,6 +210,7 @@ export type MysteryDraftPublicCard = {
   playerImageUrl: string | null;
   playerId: string;
   playerName: string;
+  primaryPosition: Position | null;
   poolSource: MysteryDraftPoolSource;
   possibleAchievements: Achievement[];
   possibleSeasonLabels: string[];
@@ -121,12 +231,14 @@ export type MysteryDraftCard = MysteryDraftPublicCard & {
 export type MysteryDraftRosterCard = {
   accoladeScore: number;
   cardSeasonLabel: string;
+  eligiblePositions: Position[];
   era: string;
   eraLabel: string;
   paidPrice: number;
   playerImageUrl: string | null;
   playerId: string;
   playerName: string;
+  primaryPosition: Position | null;
   rawStats: MysteryDraftRawSeasonStats;
   reservePrice: number;
   rosterCardId: string;
@@ -164,6 +276,7 @@ export type MysteryDraftGameState = {
   salaryRemaining: number;
   settings: MysteryDraftSettings;
   spinsUsed: number;
+  started: boolean;
   status: MysteryDraftStatus;
   warnings: string[];
 };
@@ -180,6 +293,13 @@ type CandidateStint = {
   team: string;
 };
 
+type MysterySeasonPredicate = (player: Player, selection: TeamEra, season: CareerSeason) => boolean;
+
+type MysteryCandidateStintOptions = {
+  ignoreSeasonPool?: boolean;
+  seasonPredicate?: MysterySeasonPredicate;
+};
+
 export type MysteryDraftSpinCandidate = CandidateStint & {
   candidateId: string;
   playerId: string;
@@ -193,8 +313,8 @@ export type MysteryDraftSpinCandidateResult = {
   state: MysteryDraftGameState;
 };
 
-const MAX_SPIN_ATTEMPTS = 220;
 const MAX_WARNING_COUNT = 5;
+export const MYSTERY_LINEUP_POSITIONS = ["PG", "SG", "SF", "PF", "C"] as const satisfies readonly Position[];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -216,13 +336,302 @@ function positiveNumber(value: unknown, fallback: number) {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
 }
 
-function normalizeSettings(settings: MysteryDraftSettingsInput = {}): MysteryDraftSettings {
-  const top100Chance = clamp(Number(settings.top100Chance ?? DEFAULT_MYSTERY_DRAFT_SETTINGS.top100Chance), 0, 1);
-  const randomHistoricalChance = clamp(
-    Number(settings.randomHistoricalChance ?? DEFAULT_MYSTERY_DRAFT_SETTINGS.randomHistoricalChance),
-    0,
-    1,
+function allowedSeasonPool(value: unknown): MysteryDraftSeasonPool {
+  const seasonPool = String(value || "");
+
+  return MYSTERY_SEASON_POOL_OPTIONS.some((option) => option.value === seasonPool)
+    ? (seasonPool as MysteryDraftSeasonPool)
+    : DEFAULT_MYSTERY_DRAFT_SETTINGS.seasonPool;
+}
+
+function allowedAwardFilter(value: unknown): MysteryAwardFilter {
+  const awardFilter = String(value || "");
+
+  return MYSTERY_AWARD_FILTER_OPTIONS.some((option) => option.value === awardFilter)
+    ? (awardFilter as MysteryAwardFilter)
+    : DEFAULT_MYSTERY_DRAFT_SETTINGS.awardFilter;
+}
+
+function seasonEndYearSetting(value: unknown, fallback: number) {
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric) ? Math.round(numeric) : fallback;
+}
+
+function poolBiasNumber(value: unknown, fallback: number) {
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric) ? clamp(numeric, 0, 100) : fallback;
+}
+
+export function mysteryDefaultPoolBiasForSeasonPool(pool: MysteryDraftSeasonPool): MysteryPoolBiasWeights {
+  return {
+    ...(pool === "all-time" ? ALL_TIME_MYSTERY_POOL_BIAS_DEFAULTS : RANGE_MYSTERY_POOL_BIAS_DEFAULTS),
+  };
+}
+
+export function normalizePoolWeights(weights: Partial<MysteryPoolBiasWeights>): MysteryPoolBiasWeights {
+  const total = MYSTERY_POOL_BIAS_KEYS.reduce((sum, key) => sum + poolBiasNumber(weights[key], 0), 0);
+
+  if (total <= 0) {
+    return {
+      activeStar: 25,
+      award: 25,
+      top100: 25,
+      wildcard: 25,
+    };
+  }
+
+  const normalized = MYSTERY_POOL_BIAS_KEYS.reduce(
+    (next, key) => ({
+      ...next,
+      [key]: Math.round((poolBiasNumber(weights[key], 0) / total) * 1000) / 10,
+    }),
+    {} as MysteryPoolBiasWeights,
   );
+  const roundedTotal = MYSTERY_POOL_BIAS_KEYS.reduce((sum, key) => sum + normalized[key], 0);
+  const diff = Math.round((100 - roundedTotal) * 10) / 10;
+
+  if (diff !== 0) {
+    const largestKey = MYSTERY_POOL_BIAS_KEYS.reduce((best, key) =>
+      normalized[key] > normalized[best] ? key : best,
+    MYSTERY_POOL_BIAS_KEYS[0]);
+
+    normalized[largestKey] = Math.round((normalized[largestKey] + diff) * 10) / 10;
+  }
+
+  return normalized;
+}
+
+export function updateConnectedPoolWeights(
+  weights: MysteryPoolBiasWeights,
+  changedKey: MysteryPoolBiasKey,
+  newValue: number,
+): MysteryPoolBiasWeights {
+  const clampedValue = clamp(newValue, 0, 100);
+  const otherKeys = MYSTERY_POOL_BIAS_KEYS.filter((key) => key !== changedKey);
+  const oldOtherTotal = otherKeys.reduce((sum, key) => sum + weights[key], 0);
+  const newOtherTotal = 100 - clampedValue;
+  const next = {
+    ...weights,
+    [changedKey]: clampedValue,
+  };
+
+  if (oldOtherTotal <= 0) {
+    const split = newOtherTotal / otherKeys.length;
+
+    for (const key of otherKeys) {
+      next[key] = split;
+    }
+  } else {
+    for (const key of otherKeys) {
+      next[key] = (weights[key] / oldOtherTotal) * newOtherTotal;
+    }
+  }
+
+  return normalizePoolWeights(next);
+}
+
+export function getCategoryCounts(weights: MysteryPoolBiasWeights, poolSize = 30): MysteryPoolBiasWeights {
+  const normalizedPoolSize = clamp(Math.round(poolSize), 0, 1000);
+  const raw = MYSTERY_POOL_BIAS_KEYS.reduce(
+    (next, key) => ({
+      ...next,
+      [key]: (weights[key] / 100) * normalizedPoolSize,
+    }),
+    {} as MysteryPoolBiasWeights,
+  );
+  const floors = MYSTERY_POOL_BIAS_KEYS.reduce(
+    (next, key) => ({
+      ...next,
+      [key]: Math.floor(raw[key]),
+    }),
+    {} as MysteryPoolBiasWeights,
+  );
+  const used = MYSTERY_POOL_BIAS_KEYS.reduce((sum, key) => sum + floors[key], 0);
+  let remaining = normalizedPoolSize - used;
+  const decimals = MYSTERY_POOL_BIAS_KEYS.map((key) => ({
+    decimal: raw[key] - Math.floor(raw[key]),
+    key,
+  })).sort((first, second) => second.decimal - first.decimal);
+
+  for (let index = 0; index < remaining; index += 1) {
+    floors[decimals[index % decimals.length].key] += 1;
+  }
+
+  for (const key of MYSTERY_POOL_BIAS_KEYS) {
+    if (weights[key] > 0 && floors[key] === 0 && normalizedPoolSize >= MYSTERY_POOL_BIAS_KEYS.length) {
+      const donorKey = MYSTERY_POOL_BIAS_KEYS.filter((candidateKey) => candidateKey !== key).sort(
+        (first, second) => floors[second] - floors[first],
+      )[0];
+
+      if (donorKey && floors[donorKey] > 1) {
+        floors[donorKey] -= 1;
+        floors[key] += 1;
+      }
+    }
+  }
+
+  let total = MYSTERY_POOL_BIAS_KEYS.reduce((sum, key) => sum + floors[key], 0);
+
+  while (total > normalizedPoolSize) {
+    const donorKey = [...MYSTERY_POOL_BIAS_KEYS].sort((first, second) => floors[second] - floors[first])[0];
+
+    floors[donorKey] -= 1;
+    total -= 1;
+  }
+
+  while (total < normalizedPoolSize) {
+    const receiverKey = [...MYSTERY_POOL_BIAS_KEYS].sort((first, second) => weights[second] - weights[first])[0];
+
+    floors[receiverKey] += 1;
+    total += 1;
+  }
+
+  remaining = normalizedPoolSize - MYSTERY_POOL_BIAS_KEYS.reduce((sum, key) => sum + floors[key], 0);
+
+  if (remaining !== 0) {
+    floors.wildcard += remaining;
+  }
+
+  return floors;
+}
+
+function uniquePositions(positions: Position[]) {
+  return MYSTERY_LINEUP_POSITIONS.filter((position) => positions.includes(position));
+}
+
+export function parseEligiblePositions(value: unknown): Position[] {
+  if (Array.isArray(value)) {
+    return uniquePositions(value.flatMap((item) => parseEligiblePositions(item)));
+  }
+
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  const raw = String(value).trim();
+
+  if (!raw) {
+    return [];
+  }
+
+  const normalized = raw
+    .toUpperCase()
+    .replace(/POINT\s+GUARD/g, "PG")
+    .replace(/SHOOTING\s+GUARD/g, "SG")
+    .replace(/SMALL\s+FORWARD/g, "SF")
+    .replace(/POWER\s+FORWARD/g, "PF")
+    .replace(/CENTRE/g, "C")
+    .replace(/CENTER/g, "C");
+  const positions: Position[] = [];
+
+  for (const match of normalized.matchAll(/\b(PG|SG|SF|PF|C)\b/g)) {
+    positions.push(match[1] as Position);
+  }
+
+  if (positions.length === 0) {
+    if (/\bG\b|\bGUARD\b/.test(normalized)) {
+      positions.push("PG", "SG");
+    }
+
+    if (/\bF\b|\bFORWARD\b/.test(normalized)) {
+      positions.push("SF", "PF");
+    }
+  }
+
+  return uniquePositions(positions);
+}
+
+export function normalizePosition(value: unknown): Position | null {
+  return parseEligiblePositions(value)[0] ?? null;
+}
+
+function firstPositionFromSources(sources: unknown[]) {
+  for (const source of sources) {
+    const position = normalizePosition(source);
+
+    if (position) {
+      return position;
+    }
+  }
+
+  return null;
+}
+
+function positionsFromSources(sources: unknown[]) {
+  return uniquePositions(sources.flatMap((source) => parseEligiblePositions(source)));
+}
+
+export function mysteryPositionInfoForPlayer(
+  player: Player,
+  season?: CareerSeason | null,
+): { eligiblePositions: Position[]; primaryPosition: Position | null } {
+  const playerRecord = player as Record<string, unknown>;
+  const seasonRecord = (season ?? {}) as Record<string, unknown>;
+  const explicitPrimaryPosition = firstPositionFromSources([
+    seasonRecord.primary_position,
+    seasonRecord.primaryPosition,
+    seasonRecord.primary_pos,
+    seasonRecord.primaryPos,
+    playerRecord.primary_position,
+    playerRecord.primaryPosition,
+    playerRecord.primary_pos,
+    playerRecord.primaryPos,
+  ]);
+  const parsedEligiblePositions = positionsFromSources([
+    seasonRecord.positions,
+    seasonRecord.position,
+    seasonRecord.secondaryPositions,
+    seasonRecord.secondary_positions,
+    seasonRecord.pos,
+    seasonRecord.bref_position,
+    seasonRecord.brefPosition,
+    playerRecord.positions,
+    playerRecord.position,
+    playerRecord.secondaryPositions,
+    playerRecord.secondary_positions,
+    playerRecord.pos,
+    playerRecord.bref_position,
+    playerRecord.brefPosition,
+  ]);
+  const primaryPosition = explicitPrimaryPosition ?? parsedEligiblePositions[0] ?? null;
+  const eligiblePositions = primaryPosition
+    ? uniquePositions([primaryPosition, ...parsedEligiblePositions])
+    : parsedEligiblePositions;
+
+  return {
+    eligiblePositions: eligiblePositions.length ? eligiblePositions : [...MYSTERY_LINEUP_POSITIONS],
+    primaryPosition,
+  };
+}
+
+function normalizeSettings(settings: MysteryDraftSettingsInput = {}): MysteryDraftSettings {
+  const settingsRecord = settings as Record<string, unknown>;
+  const seasonPool = allowedSeasonPool(settings.seasonPool);
+  const defaultBias = mysteryDefaultPoolBiasForSeasonPool(seasonPool);
+  const legacyTop100Chance = Number(settingsRecord.top100Chance);
+  const hasLegacyChance = Number.isFinite(legacyTop100Chance);
+  const customStartYear = clamp(seasonEndYearSetting(
+    settings.customStartYear,
+    DEFAULT_MYSTERY_DRAFT_SETTINGS.customStartYear,
+  ), FIRST_MYSTERY_SEASON_END_YEAR, CURRENT_MYSTERY_SEASON_END_YEAR);
+  const customEndYear = clamp(seasonEndYearSetting(
+    settings.customEndYear,
+    DEFAULT_MYSTERY_DRAFT_SETTINGS.customEndYear,
+  ), FIRST_MYSTERY_SEASON_END_YEAR, CURRENT_MYSTERY_SEASON_END_YEAR);
+  const poolWeights = normalizePoolWeights({
+    activeStar: poolBiasNumber(settings.activeStar, defaultBias.activeStar),
+    award: poolBiasNumber(settings.award, defaultBias.award),
+    top100: poolBiasNumber(
+      settings.top100,
+      hasLegacyChance ? clamp(legacyTop100Chance, 0, 1) * 100 : defaultBias.top100,
+    ),
+    wildcard: poolBiasNumber(
+      settings.wildcard,
+      hasLegacyChance ? (1 - clamp(legacyTop100Chance, 0, 1)) * 100 : defaultBias.wildcard,
+    ),
+  });
 
   return {
     salaryCap: positiveInteger(settings.salaryCap, DEFAULT_MYSTERY_DRAFT_SETTINGS.salaryCap),
@@ -230,12 +639,16 @@ function normalizeSettings(settings: MysteryDraftSettingsInput = {}): MysteryDra
     maxSpins: positiveInteger(settings.maxSpins, DEFAULT_MYSTERY_DRAFT_SETTINGS.maxSpins),
     minimumOffer: positiveInteger(settings.minimumOffer, DEFAULT_MYSTERY_DRAFT_SETTINGS.minimumOffer),
     offerIncrement: positiveInteger(settings.offerIncrement, DEFAULT_MYSTERY_DRAFT_SETTINGS.offerIncrement),
-    top100Chance,
-    randomHistoricalChance,
+    ...poolWeights,
+    awardFilter: allowedAwardFilter(settings.awardFilter),
+    activeStarFilter: allowedAwardFilter(settings.activeStarFilter),
     scoreToPriceMultiplier: positiveNumber(
       settings.scoreToPriceMultiplier,
       DEFAULT_MYSTERY_DRAFT_SETTINGS.scoreToPriceMultiplier,
     ),
+    seasonPool,
+    customStartYear: Math.min(customStartYear, customEndYear),
+    customEndYear: Math.max(customStartYear, customEndYear),
     allowDuplicatePlayers: Boolean(settings.allowDuplicatePlayers ?? DEFAULT_MYSTERY_DRAFT_SETTINGS.allowDuplicatePlayers),
     removeOfferedStintAfterSpin: Boolean(
       settings.removeOfferedStintAfterSpin ?? DEFAULT_MYSTERY_DRAFT_SETTINGS.removeOfferedStintAfterSpin,
@@ -327,6 +740,10 @@ function appendWarnings(state: MysteryDraftGameState, warnings: string[]) {
 
 function randomItem<T>(items: readonly T[]) {
   return items[Math.floor(Math.random() * items.length)];
+}
+
+function shuffled<T>(items: readonly T[]) {
+  return [...items].sort(() => Math.random() - 0.5);
 }
 
 function randomId(prefix: string) {
@@ -700,26 +1117,187 @@ function seasonAchievementsForSelection(
   selection: TeamEra,
   season: CareerSeason,
 ) {
+  const badgeIds = seasonAwardBadgeIdsForSelection(player, selection, season);
   const selectedSeasonEndYear = seasonEndYear(season.season);
   const counts = new Map<string, number>();
 
-  if (!player.awards_raw?.length || typeof selectedSeasonEndYear !== "number") {
+  if (typeof selectedSeasonEndYear !== "number") {
     return [];
   }
 
-  for (const award of player.awards_raw) {
-    if (seasonEndYear(award.season) !== selectedSeasonEndYear || !awardAppliesToSelection(award, selection)) {
-      continue;
-    }
-
-    for (const badgeId of badgeIdsForAward(award)) {
-      counts.set(badgeId, (counts.get(badgeId) ?? 0) + 1);
-    }
+  for (const badgeId of badgeIds) {
+    counts.set(badgeId, (counts.get(badgeId) ?? 0) + 1);
   }
 
   return sortBadgeAchievements(
     Array.from(counts.entries()).map(([badgeId, count]) => badgeAchievement(badgeId, count)),
   );
+}
+
+function seasonAwardBadgeIdsForSelection(player: Player, selection: TeamEra, season: CareerSeason) {
+  const selectedSeasonEndYear = seasonEndYear(season.season);
+
+  if (!player.awards_raw?.length || typeof selectedSeasonEndYear !== "number") {
+    return [];
+  }
+
+  return player.awards_raw.flatMap((award) => {
+    if (seasonEndYear(award.season) !== selectedSeasonEndYear || !awardAppliesToSelection(award, selection)) {
+      return [];
+    }
+
+    return badgeIdsForAward(award);
+  });
+}
+
+function seasonAwardSourceRecord(season: CareerSeason) {
+  const seasonRecord = season as Record<string, unknown>;
+  const awards = seasonRecord.awards;
+
+  return awards && typeof awards === "object"
+    ? { ...seasonRecord, ...(awards as Record<string, unknown>) }
+    : seasonRecord;
+}
+
+function truthySeasonAwardValue(value: unknown) {
+  if (value === true) {
+    return true;
+  }
+
+  if (typeof value === "number") {
+    return value === 1;
+  }
+
+  const normalized = String(value || "").trim().toLowerCase();
+
+  return normalized === "true" || normalized === "yes" || normalized === "1";
+}
+
+function seasonHasAwardField(season: CareerSeason, keys: readonly string[]) {
+  const source = seasonAwardSourceRecord(season);
+
+  return keys.some((key) => truthySeasonAwardValue(source[key]));
+}
+
+function seasonHasRankOneAwardField(season: CareerSeason, keys: readonly string[]) {
+  const source = seasonAwardSourceRecord(season);
+
+  return keys.some((key) => Number(source[key]) === 1);
+}
+
+export function seasonMatchesAwardFilter(
+  player: Player,
+  selection: TeamEra,
+  season: CareerSeason,
+  awardFilter: MysteryAwardFilter,
+) {
+  const badgeIds = new Set(seasonAwardBadgeIdsForSelection(player, selection, season));
+
+  switch (awardFilter) {
+    case "all_star":
+      return (
+        badgeIds.has("all-star") ||
+        badgeIds.has("all-star-mvp") ||
+        badgeIds.has("aba-all-star") ||
+        badgeIds.has("aba-all-star-mvp") ||
+        seasonHasAwardField(season, ["all_star", "allStar", "is_all_star", "isAllStar"])
+      );
+
+    case "mvp":
+      return (
+        badgeIds.has("mvp") ||
+        badgeIds.has("aba-mvp") ||
+        seasonHasAwardField(season, ["mvp", "most_valuable_player"]) ||
+        seasonHasRankOneAwardField(season, ["mvp_rank", "mvpRank"])
+      );
+
+    case "finals_mvp":
+      return (
+        badgeIds.has("fmvp") ||
+        badgeIds.has("retro-fmvp") ||
+        badgeIds.has("aba-playoffs-mvp") ||
+        seasonHasAwardField(season, ["finals_mvp", "finalsMvp", "playoffs_mvp", "playoffsMvp"])
+      );
+
+    case "all_nba":
+      return (
+        badgeIds.has("all-nba") ||
+        badgeIds.has("aba-all-league") ||
+        seasonHasAwardField(season, [
+          "all_nba",
+          "all_nba_1st",
+          "all_nba_2nd",
+          "all_nba_3rd",
+          "allNba",
+          "allNba1st",
+          "allNba2nd",
+          "allNba3rd",
+          "aba_all_league_1st",
+          "aba_all_league_2nd",
+        ])
+      );
+
+    case "all_defensive":
+      return (
+        badgeIds.has("all-defense") ||
+        badgeIds.has("aba-all-defense") ||
+        seasonHasAwardField(season, [
+          "all_defensive",
+          "all_def",
+          "all_def_1st",
+          "all_def_2nd",
+          "allDefense",
+          "allDef1st",
+          "allDef2nd",
+          "aba_all_def_1st",
+          "aba_all_def_2nd",
+        ])
+      );
+
+    case "dpoy":
+      return (
+        badgeIds.has("dpoy") ||
+        seasonHasAwardField(season, ["dpoy", "defensive_player_of_the_year"]) ||
+        seasonHasRankOneAwardField(season, ["dpoy_rank", "dpoyRank"])
+      );
+
+    case "scoring_title":
+      return badgeIds.has("scoring") || badgeIds.has("aba-scoring") || seasonHasAwardField(season, ["scoring_title"]);
+
+    case "assist_title":
+      return badgeIds.has("assists") || badgeIds.has("aba-assists") || seasonHasAwardField(season, ["assist_title"]);
+
+    case "rebound_title":
+      return badgeIds.has("rebounds") || badgeIds.has("aba-rebounds") || seasonHasAwardField(season, ["rebound_title"]);
+
+    case "steals_title":
+      return badgeIds.has("steals") || seasonHasAwardField(season, ["steals_title", "steal_title"]);
+
+    case "blocks_title":
+      return badgeIds.has("blocks") || seasonHasAwardField(season, ["blocks_title", "block_title"]);
+
+    case "champion":
+      return (
+        badgeIds.has("rings") ||
+        badgeIds.has("aba-champ") ||
+        seasonHasAwardField(season, ["champion", "championship", "nba_champion", "aba_champion"])
+      );
+
+    case "roy":
+      return badgeIds.has("roy") || badgeIds.has("aba-roy") || seasonHasAwardField(season, ["roy", "rookie_of_year"]);
+
+    case "sixth_man":
+      return (
+        badgeIds.has("sixth-man") ||
+        seasonHasAwardField(season, ["sixth_man", "sixth_man_of_the_year", "sixthMan"])
+      );
+
+    case "most_improved":
+      return badgeIds.has("most-improved") || seasonHasAwardField(season, ["most_improved", "mostImproved"]);
+
+    default:
+      return false;
+  }
 }
 
 function possibleAchievementsForSeasons(seasons: MysteryScoredSeason[]) {
@@ -756,6 +1334,95 @@ function fullEraLabel(era: string) {
   return `${decade >= 40 ? 1900 + decade : 2000 + decade}s`;
 }
 
+export function mysterySeasonPoolLabel(pool: MysteryDraftSeasonPool) {
+  return MYSTERY_SEASON_POOL_OPTIONS.find((option) => option.value === pool)?.label ?? "All-Time";
+}
+
+export function mysteryAwardFilterLabel(filter: MysteryAwardFilter) {
+  return MYSTERY_AWARD_FILTER_OPTIONS.find((option) => option.value === filter)?.label ?? "All-Star";
+}
+
+export function mysterySeasonPoolRange(settings: MysteryDraftSettingsInput = {}) {
+  const normalizedSettings = normalizeSettings(settings);
+
+  if (normalizedSettings.seasonPool === "all-time") {
+    return null;
+  }
+
+  if (normalizedSettings.seasonPool === "current") {
+    return {
+      endYear: CURRENT_MYSTERY_SEASON_END_YEAR,
+      startYear: CURRENT_MYSTERY_SEASON_END_YEAR,
+    };
+  }
+
+  if (normalizedSettings.seasonPool === "custom") {
+    return {
+      endYear: normalizedSettings.customEndYear,
+      startYear: normalizedSettings.customStartYear,
+    };
+  }
+
+  const startYear = Number(normalizedSettings.seasonPool.slice(0, 4));
+
+  return {
+    endYear: Math.min(startYear + 9, CURRENT_MYSTERY_SEASON_END_YEAR),
+    startYear,
+  };
+}
+
+export function mysteryDraftYearsLabel(settings: MysteryDraftSettingsInput = {}) {
+  const normalizedSettings = normalizeSettings(settings);
+  const range = mysterySeasonPoolRange(normalizedSettings);
+
+  if (!range) {
+    return `${FIRST_MYSTERY_SEASON_END_YEAR}-${CURRENT_MYSTERY_SEASON_END_YEAR}`;
+  }
+
+  return range.startYear === range.endYear ? String(range.endYear) : `${range.startYear}-${range.endYear}`;
+}
+
+export function mysteryPoolLogicLabel(settings: MysteryDraftSettingsInput = {}) {
+  const normalizedSettings = normalizeSettings(settings);
+
+  return [
+    `${normalizedSettings.top100}% Top 100`,
+    `${normalizedSettings.award}% ${mysteryAwardFilterLabel(normalizedSettings.awardFilter)}`,
+    `${normalizedSettings.activeStar}% Active Star`,
+    `${normalizedSettings.wildcard}% Wildcard`,
+  ].join(" / ");
+}
+
+export function mysteryPoolSourceLabel(poolSource: MysteryDraftPoolSource, settings: MysteryDraftSettingsInput = {}) {
+  const normalizedSettings = normalizeSettings(settings);
+
+  if (poolSource === "top100") {
+    return "Top 100 Bias";
+  }
+
+  if (poolSource === "award") {
+    return `${mysteryAwardFilterLabel(normalizedSettings.awardFilter)} Award Bias`;
+  }
+
+  if (poolSource === "activeStar") {
+    return `Active ${mysteryAwardFilterLabel(normalizedSettings.activeStarFilter)} Injection`;
+  }
+
+  return "Wildcard Bias";
+}
+
+function careerSeasonInMysteryPool(season: CareerSeason, settings: MysteryDraftSettings) {
+  const range = mysterySeasonPoolRange(settings);
+
+  if (!range) {
+    return true;
+  }
+
+  const endYear = seasonEndYear(season.season);
+
+  return typeof endYear === "number" && endYear >= range.startYear && endYear <= range.endYear;
+}
+
 function decadeLabelFromSeason(season: unknown) {
   const endYear = seasonEndYear(season);
 
@@ -790,32 +1457,54 @@ function playerIsTop100(player: Player) {
   return (rank >= 1 && rank <= 100) || goatScore > 0;
 }
 
-function playerPoolSource(settings: MysteryDraftSettings): MysteryDraftPoolSource {
-  const topChance = Math.max(0, settings.top100Chance);
-  const historicalChance = Math.max(0, settings.randomHistoricalChance);
-  const totalChance = topChance + historicalChance;
+function playerIsCurrentlyActive(player: Player) {
+  const playerRecord = player as Record<string, unknown>;
 
-  if (totalChance <= 0) {
-    return "top100";
+  if (typeof playerRecord.is_active === "boolean") {
+    return playerRecord.is_active;
   }
 
-  return Math.random() < topChance / totalChance ? "top100" : "historical";
+  if (typeof playerRecord.active === "boolean") {
+    return playerRecord.active;
+  }
+
+  const currentTeam = String(player.current_team || "").trim().toLowerCase();
+
+  return Boolean(currentTeam && currentTeam !== "retired" && currentTeam !== "none" && currentTeam !== "n/a");
 }
 
-function candidatePlayersForSource(
-  players: Player[],
-  state: MysteryDraftGameState,
-  poolSource: MysteryDraftPoolSource,
-) {
-  return players.filter(
-    (player) =>
-      player.id &&
-      player.name &&
-      !playerAlreadyAcquired(player, state) &&
-      Array.isArray(player.career_seasons) &&
-      player.career_seasons.length > 0 &&
-      (poolSource === "historical" || playerIsTop100(player)),
-  );
+function sourceSeasonPredicate(poolSource: MysteryDraftPoolSource, settings: MysteryDraftSettings): MysterySeasonPredicate {
+  if (poolSource === "award") {
+    return (player, selection, season) => seasonMatchesAwardFilter(player, selection, season, settings.awardFilter);
+  }
+
+  if (poolSource === "activeStar") {
+    return (player, selection, season) => seasonMatchesAwardFilter(player, selection, season, settings.activeStarFilter);
+  }
+
+  return () => true;
+}
+
+function playerCanContributeToSource(player: Player, state: MysteryDraftGameState, poolSource: MysteryDraftPoolSource) {
+  if (
+    !player.id ||
+    !player.name ||
+    !Array.isArray(player.career_seasons) ||
+    player.career_seasons.length === 0 ||
+    playerAlreadyAcquired(player, state)
+  ) {
+    return false;
+  }
+
+  if (poolSource === "top100") {
+    return playerIsTop100(player);
+  }
+
+  if (poolSource === "activeStar") {
+    return playerIsCurrentlyActive(player);
+  }
+
+  return true;
 }
 
 function teamEraStintKey(playerId: string, team: string, era: string) {
@@ -840,12 +1529,21 @@ function cardSeasonLabel(season: CareerSeason) {
   return String(seasonEndYear(season.season) ?? seasonLabel(season));
 }
 
-function careerSeasonsForMysterySelection(player: Player, selection: TeamEra) {
+function careerSeasonsForMysterySelection(
+  player: Player,
+  selection: TeamEra,
+  settings: MysteryDraftSettings,
+  options: MysteryCandidateStintOptions = {},
+) {
   const selectedEra = getCanonicalEra(selection.era);
 
   return (
     player.career_seasons?.filter(
-      (season) => season.team === selection.team && eraForCareerSeason(season) === selectedEra,
+      (season) =>
+        season.team === selection.team &&
+        eraForCareerSeason(season) === selectedEra &&
+        (options.ignoreSeasonPool || careerSeasonInMysteryPool(season, settings)) &&
+        (!options.seasonPredicate || options.seasonPredicate(player, selection, season)),
     ) ?? []
   );
 }
@@ -874,11 +1572,12 @@ export function resolveEligibleStintSeasons(
   selection: TeamEra,
   statsEngineConfig: StatsEngineConfig,
   settings: MysteryDraftSettingsInput = {},
+  options: MysteryCandidateStintOptions = {},
 ) {
   const normalizedSettings = normalizeSettings(settings);
   const accoladeScore = playerPer100AwardsScore(player, selection);
 
-  return careerSeasonsForMysterySelection(player, selection)
+  return careerSeasonsForMysterySelection(player, selection, normalizedSettings, options)
     .map((season, index) => {
       const statScore = scorePer100Season(
         season,
@@ -892,9 +1591,13 @@ export function resolveEligibleStintSeasons(
       const statScoreOnly = statScore.totalScore;
       const score = rounded(statScoreOnly + accoladeScore);
 
+      const positionInfo = mysteryPositionInfoForPlayer(player, season);
+
       return {
         accoladeScore,
         cardSeasonLabel: cardSeasonLabel(season),
+        eligiblePositions: positionInfo.eligiblePositions,
+        primaryPosition: positionInfo.primaryPosition,
         rawStats: rawStatsForSeason(season),
         reservePrice: calculateSeasonReservePrice(score, normalizedSettings),
         score,
@@ -920,14 +1623,21 @@ function playerCandidateStints(
   player: Player,
   state: MysteryDraftGameState,
   statsEngineConfig: StatsEngineConfig,
+  options: MysteryCandidateStintOptions = {},
 ) {
   const groupedSelections = new Map<string, TeamEra>();
 
   for (const season of player.career_seasons ?? []) {
     const team = String(season.team || "").trim();
     const era = eraForCareerSeason(season);
+    const selection = { team, era };
 
-    if (!team || !era) {
+    if (
+      !team ||
+      !era ||
+      (!options.ignoreSeasonPool && !careerSeasonInMysteryPool(season, state.settings)) ||
+      (options.seasonPredicate && !options.seasonPredicate(player, selection, season))
+    ) {
       continue;
     }
 
@@ -937,7 +1647,7 @@ function playerCandidateStints(
       continue;
     }
 
-    groupedSelections.set(key, { team, era });
+    groupedSelections.set(key, selection);
   }
 
   return Array.from(groupedSelections.entries()).flatMap(([stintKey, selection]) => {
@@ -946,6 +1656,7 @@ function playerCandidateStints(
       selection,
       statsEngineConfig,
       state.settings,
+      options,
     );
 
     if (!eligibleSeasons.length) {
@@ -1081,10 +1792,13 @@ function possibleYearRange(seasons: MysteryScoredSeason[]) {
 function createCardFromStint(stint: CandidateStint, poolSource: MysteryDraftPoolSource) {
   const hiddenSeason = randomItem(stint.eligibleSeasons);
   const { marketMax, marketMin } = calculateMarketRange(stint.eligibleSeasons);
+  const eligiblePositions = uniquePositions(stint.eligibleSeasons.flatMap((season) => season.eligiblePositions));
+  const primaryPosition = stint.eligibleSeasons.find((season) => season.primaryPosition)?.primaryPosition ?? null;
 
   return {
     averageStats: averageStatsForSeasons(stint.eligibleSeasons),
     cardId: randomId("mystery-card"),
+    eligiblePositions,
     eligibleSeasons: stint.eligibleSeasons,
     era: stint.era,
     eraLabel: stint.eraLabel,
@@ -1095,6 +1809,7 @@ function createCardFromStint(stint: CandidateStint, poolSource: MysteryDraftPool
     playerImageUrl: stint.playerImageUrl,
     playerId: stint.player.id,
     playerName: stint.player.name,
+    primaryPosition,
     poolSource,
     possibleAchievements: stint.possibleAchievements,
     possibleSeasonLabels: stint.eligibleSeasons.map((season) => season.seasonLabel),
@@ -1115,6 +1830,7 @@ export function publicMysteryDraftCard(card: MysteryDraftCard | null): MysteryDr
   return {
     averageStats: card.averageStats,
     cardId: card.cardId,
+    eligiblePositions: card.eligiblePositions,
     era: card.era,
     eraLabel: card.eraLabel,
     marketMax: card.marketMax,
@@ -1122,6 +1838,7 @@ export function publicMysteryDraftCard(card: MysteryDraftCard | null): MysteryDr
     playerImageUrl: card.playerImageUrl,
     playerId: card.playerId,
     playerName: card.playerName,
+    primaryPosition: card.primaryPosition,
     poolSource: card.poolSource,
     possibleAchievements: card.possibleAchievements,
     possibleSeasonLabels: card.possibleSeasonLabels,
@@ -1149,8 +1866,16 @@ export function createMysteryDraftGame(settings: MysteryDraftSettingsInput = {})
     salaryRemaining: normalizedSettings.salaryCap,
     settings: normalizedSettings,
     spinsUsed: 0,
+    started: false,
     status: "ACTIVE",
     warnings: [],
+  };
+}
+
+export function startMysteryDraftGame(settings: MysteryDraftSettingsInput = {}): MysteryDraftGameState {
+  return {
+    ...createMysteryDraftGame(settings),
+    started: true,
   };
 }
 
@@ -1206,13 +1931,57 @@ function spinCandidateFromStint(
   };
 }
 
+function spinCandidatesForSource(
+  players: Player[],
+  state: MysteryDraftGameState,
+  statsEngineConfig: StatsEngineConfig,
+  poolSource: MysteryDraftPoolSource,
+) {
+  const options: MysteryCandidateStintOptions = {
+    ignoreSeasonPool: poolSource === "activeStar",
+    seasonPredicate: sourceSeasonPredicate(poolSource, state.settings),
+  };
+
+  return shuffled(players).flatMap((player) => {
+    if (!playerCanContributeToSource(player, state, poolSource)) {
+      return [];
+    }
+
+    return playerCandidateStints(player, state, statsEngineConfig, options).map((stint) =>
+      spinCandidateFromStint(stint, poolSource),
+    );
+  });
+}
+
+function broadestSpinCandidates(
+  players: Player[],
+  state: MysteryDraftGameState,
+  statsEngineConfig: StatsEngineConfig,
+) {
+  return shuffled(players).flatMap((player) => {
+    if (
+      !player.id ||
+      !player.name ||
+      !Array.isArray(player.career_seasons) ||
+      player.career_seasons.length === 0 ||
+      playerAlreadyAcquired(player, state)
+    ) {
+      return [];
+    }
+
+    return playerCandidateStints(player, state, statsEngineConfig).map((stint) =>
+      spinCandidateFromStint(stint, "wildcard"),
+    );
+  });
+}
+
 export function generateSpinCandidates(
   state: MysteryDraftGameState,
   players: Player[],
   statsEngineConfig: StatsEngineConfig,
-  count = 28,
+  count = 30,
 ): MysteryDraftSpinCandidateResult {
-  if (state.status !== "ACTIVE") {
+  if (!state.started || state.status !== "ACTIVE") {
     return { candidates: [], state };
   }
 
@@ -1230,53 +1999,121 @@ export function generateSpinCandidates(
     return { candidates: [], state: completeMysteryDraftGame(state) };
   }
 
-  const requestedPoolSource = playerPoolSource(state.settings);
-  const poolSources: MysteryDraftPoolSource[] =
-    requestedPoolSource === "top100" ? ["top100", "historical"] : ["historical", "top100"];
   const warnings: string[] = [];
   const targetCount = clamp(Math.round(count), 1, 80);
+  const counts = getCategoryCounts(
+    {
+      activeStar: state.settings.activeStar,
+      award: state.settings.award,
+      top100: state.settings.top100,
+      wildcard: state.settings.wildcard,
+    },
+    targetCount,
+  );
+  const sourceOrder: MysteryDraftPoolSource[] = ["top100", "award", "activeStar", "wildcard"];
+  const sourceCandidates = sourceOrder.reduce(
+    (next, poolSource) => ({
+      ...next,
+      [poolSource]: spinCandidatesForSource(players, state, statsEngineConfig, poolSource),
+    }),
+    {} as Record<MysteryDraftPoolSource, MysteryDraftSpinCandidate[]>,
+  );
+  const selected: MysteryDraftSpinCandidate[] = [];
+  const selectedStintKeys = new Set<string>();
+  const selectedPlayerIds = new Set<string>();
 
-  for (const poolSource of poolSources) {
-    const candidates = candidatePlayersForSource(players, state, poolSource);
+  function addFromSource(
+    poolSource: MysteryDraftPoolSource,
+    targetSourceCount: number,
+    allowDuplicatePlayers = false,
+  ) {
+    let added = 0;
 
-    if (!candidates.length) {
-      warnings.push(
-        poolSource === "top100"
-          ? "Top 100 pool has no available eligible players for this run."
-          : "Historical pool has no available eligible players for this run.",
-      );
-      continue;
-    }
+    for (const candidate of shuffled(sourceCandidates[poolSource])) {
+      if (added >= targetSourceCount) {
+        break;
+      }
 
-    const spinCandidates: MysteryDraftSpinCandidate[] = [];
-
-    for (let attempt = 0; attempt < MAX_SPIN_ATTEMPTS && spinCandidates.length < targetCount; attempt += 1) {
-      const player = randomItem(candidates);
-      const stints = playerCandidateStints(player, state, statsEngineConfig);
-
-      if (!stints.length) {
+      if (selectedStintKeys.has(candidate.stintKey)) {
         continue;
       }
 
-      spinCandidates.push(spinCandidateFromStint(randomItem(stints), poolSource));
+      if (!allowDuplicatePlayers && selectedPlayerIds.has(candidate.playerId)) {
+        continue;
+      }
+
+      selected.push(candidate);
+      selectedStintKeys.add(candidate.stintKey);
+      selectedPlayerIds.add(candidate.playerId);
+      added += 1;
     }
 
-    if (spinCandidates.length) {
-      return {
-        candidates: spinCandidates,
-        state: {
-          ...state,
-          lastResult: null,
-          warnings: appendWarnings(state, warnings),
-        },
-      };
+    return added;
+  }
+
+  for (const poolSource of sourceOrder) {
+    const targetSourceCount = counts[poolSource];
+
+    if (targetSourceCount <= 0) {
+      continue;
     }
 
-    warnings.push(
-      poolSource === "top100"
-        ? "Skipped unavailable Top 100 entries that could not produce a scored mystery stint."
-        : "Skipped unavailable historical entries that could not produce a scored mystery stint.",
-    );
+    if (!sourceCandidates[poolSource].length) {
+      warnings.push(`${mysteryPoolSourceLabel(poolSource, state.settings)} has no available eligible seasons.`);
+      continue;
+    }
+
+    addFromSource(poolSource, targetSourceCount, false);
+  }
+
+  let missing = targetCount - selected.length;
+
+  if (missing > 0) {
+    addFromSource("wildcard", missing, false);
+  }
+
+  missing = targetCount - selected.length;
+
+  if (missing > 0) {
+    for (const poolSource of ["wildcard", "award", "top100", "activeStar"] as const) {
+      if (selected.length >= targetCount) {
+        break;
+      }
+
+      addFromSource(poolSource, targetCount - selected.length, true);
+    }
+  }
+
+  missing = targetCount - selected.length;
+
+  if (missing > 0) {
+    for (const candidate of broadestSpinCandidates(players, state, statsEngineConfig)) {
+      if (selected.length >= targetCount) {
+        break;
+      }
+
+      if (selectedStintKeys.has(candidate.stintKey)) {
+        continue;
+      }
+
+      selected.push(candidate);
+      selectedStintKeys.add(candidate.stintKey);
+    }
+  }
+
+  if (selected.length) {
+    if (selected.length < targetCount) {
+      warnings.push(`Only ${selected.length} eligible mystery candidates were available for this spin.`);
+    }
+
+    return {
+      candidates: shuffled(selected).slice(0, targetCount),
+      state: {
+        ...state,
+        lastResult: null,
+        warnings: appendWarnings(state, warnings),
+      },
+    };
   }
 
   return {
@@ -1346,12 +2183,14 @@ function revealedCardFromSeason(
   return {
     accoladeScore: season.accoladeScore,
     cardSeasonLabel: season.cardSeasonLabel,
+    eligiblePositions: season.eligiblePositions,
     era: card.era,
     eraLabel: card.eraLabel,
     paidPrice,
     playerImageUrl: card.playerImageUrl,
     playerId: card.playerId,
     playerName: card.playerName,
+    primaryPosition: season.primaryPosition,
     rawStats: season.rawStats,
     reservePrice: season.reservePrice,
     rosterCardId: randomId("mystery-roster-card"),
