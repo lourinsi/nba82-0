@@ -164,7 +164,7 @@ function getCanonicalEra(era: string) {
   return era === "40's" || era === "50's" ? "60's" : era;
 }
 
-function seasonEndYear(season: unknown) {
+export function seasonEndYear(season: unknown) {
   const value = String(season || "").trim();
   const fullYearRange = value.match(/^(\d{4})\D+(\d{4})/);
 

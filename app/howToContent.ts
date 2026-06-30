@@ -18,6 +18,7 @@ export const HOW_TO_STORAGE_KEYS = {
   home: "nba82_how_to_home_dismissed",
   allTime: "nba82_how_to_all_time_dismissed",
   classic: "nba82_how_to_classic_dismissed",
+  mysteryDraft: "nba82_how_to_mystery_draft_dismissed",
   per100: "nba82_how_to_per_100_dismissed",
   youKnowBall: "nba82_how_to_you_know_ball_dismissed",
 } as const;
@@ -57,6 +58,15 @@ export const HOME_HOW_TO = {
     },
     {
       eyebrow: "Playable",
+      title: "Mystery Draft",
+      description: "Bid salary on hidden Per 100 season cards.",
+      steps: [
+        "The card shows the player, team, era, market range, stat ranges, and stint badges.",
+        "The exact season reveals after your offer or pass.",
+      ],
+    },
+    {
+      eyebrow: "Playable",
       title: "You Know Ball",
       description: "Let's see if you know ball.",
       steps: [
@@ -92,6 +102,32 @@ export const PER_100_HOW_TO = {
     },
   ],
   footer: "No invented defense, no made-up stocks. Missing inputs stay missing.",
+} satisfies HowToOverlayContent;
+
+export const MYSTERY_DRAFT_HOW_TO = {
+  eyebrow: "Mystery Draft Guide",
+  title: "Mystery Salary Draft",
+  intro:
+    "Spin a player/team/era card, bid from the visible range, then reveal the exact Per 100 season behind it.",
+  sections: [
+    {
+      title: "The Bid",
+      description: "Each card has one hidden season chosen before your offer.",
+      steps: [
+        "The visible market range comes from every eligible season in that team-era stint.",
+        "If your offer meets the hidden reserve, the revealed season joins your roster.",
+      ],
+    },
+    {
+      title: "The Score",
+      description: "The final score is the sum of acquired revealed cards.",
+      steps: [
+        "Hidden reserves use the same Per 100 mixed score source as PER 100 mode.",
+        "Passed and rejected cards do not spend salary.",
+      ],
+    },
+  ],
+  footer: "No multiplayer or AI fit yet. This is the first solo bidding version.",
 } satisfies HowToOverlayContent;
 
 export const ALL_TIME_HOW_TO = {

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "images:check": "node scripts/check-player-image-map.mjs",
+    "images:write-map": "node scripts/check-player-image-map.mjs --write"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

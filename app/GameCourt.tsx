@@ -61,6 +61,19 @@ export type Accolades = {
   scoring_titles: number;
   assist_titles: number;
   rebound_titles: number;
+  aba_mvp_count?: number;
+  aba_playoffs_mvp_count?: number;
+  aba_all_league_1st?: number;
+  aba_all_league_2nd?: number;
+  aba_all_def_1st?: number;
+  aba_all_def_2nd?: number;
+  aba_all_star_selections?: number;
+  aba_all_star_mvp_count?: number;
+  aba_rookie_of_year_count?: number;
+  aba_championship_rings?: number;
+  aba_scoring_titles?: number;
+  aba_assist_titles?: number;
+  aba_rebound_titles?: number;
   three_point_titles?: number;
   steal_titles: number;
   block_titles: number;
@@ -98,6 +111,11 @@ export type CareerSeason = Partial<TeamEra> & {
 export type AwardRow = {
   season?: string | number | null;
   team?: string | null;
+  original_team?: string | null;
+  source_league?: "ABA" | "NBA" | null;
+  team_name?: string | null;
+  franchise_group?: string | null;
+  is_aba_only_team?: boolean | null;
   description?: string | null;
   all_nba_team_number?: string | number | null;
 };
@@ -105,7 +123,15 @@ export type AwardRow = {
 export type Player = {
   id: string;
   name: string;
+  avatarUrl?: string | null;
+  bref_id?: string | null;
+  brefId?: string | null;
+  fallbackImageUrl?: string | null;
+  headshotUrl?: string | null;
+  imageUrl?: string | null;
   legacy_points?: number; // Career all-time score.
+  photoUrl?: string | null;
+  portraitUrl?: string | null;
   classic_points_by_team_era?: ClassicPointBlock[];
   career_seasons?: CareerSeason[];
   awards_raw?: AwardRow[];

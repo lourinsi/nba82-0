@@ -28,6 +28,7 @@ import {
   CLASSIC_HOW_TO,
   HOME_HOW_TO,
   HOW_TO_STORAGE_KEYS,
+  MYSTERY_DRAFT_HOW_TO,
   PER_100_HOW_TO,
   YOU_KNOW_BALL_HOW_TO,
   type HowToOverlayContent,
@@ -57,6 +58,10 @@ const ROUTE_GUIDES: Record<string, RouteGuide> = {
     content: PER_100_HOW_TO,
     storageKey: HOW_TO_STORAGE_KEYS.per100,
   },
+  "/mystery-draft": {
+    content: MYSTERY_DRAFT_HOW_TO,
+    storageKey: HOW_TO_STORAGE_KEYS.mysteryDraft,
+  },
   "/classic/you-know-ball": {
     content: YOU_KNOW_BALL_HOW_TO,
     storageKey: HOW_TO_STORAGE_KEYS.youKnowBall,
@@ -69,6 +74,7 @@ const MENU_LINKS = [
   { href: "/classic/you-know-ball", label: "You Know Ball", adminOnly: false },
   { href: "/all-time", label: "All Time", adminOnly: false },
   { href: "/per-100", label: "PER 100", adminOnly: false },
+  { href: "/mystery-draft", label: "Mystery Draft", adminOnly: false },
   { href: "/legacy-engine", label: "Legacy Engine", adminOnly: true },
   { href: "/stats-engine", label: "Stats Engine", adminOnly: true },
 ] as const;

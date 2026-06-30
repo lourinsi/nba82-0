@@ -48,26 +48,39 @@ const ACCOLADE_WEIGHTS = {
   finals_mvp_count: 7.5,
   estimated_finals_mvp_count: 7.5,
   mvp_count: 5,
+  aba_mvp_count: 7,
+  aba_playoffs_mvp_count: 5,
   all_nba_1st: 7,
   all_nba_2nd: 5.5,
   all_nba_3rd: 4,
+  aba_all_league_1st: 6,
+  aba_all_league_2nd: 4,
   dpoy_count: 2.5,
   all_def_1st: 2,
   all_def_2nd: 1.5,
+  aba_all_def_1st: 1.75,
+  aba_all_def_2nd: 1.25,
   scoring_titles: 3,
   assist_titles: 3,
   rebound_titles: 2,
+  aba_scoring_titles: 2.5,
+  aba_assist_titles: 2.5,
+  aba_rebound_titles: 1.75,
   three_point_titles: 2.5,
   steal_titles: 1.5,
   block_titles: 1.5,
   // no more olympics point value
   all_star_mvp_count: 1.1,
+  aba_all_star_mvp_count: 1,
   three_point_contest_wins: 1,
   all_star_selections: 1,
+  aba_all_star_selections: 0.8,
   championship_rings: 1,
+  aba_championship_rings: 2,
   "6moy": 1,
   most_improved: 1,
   roy_won: 1.1,
+  aba_rookie_of_year_count: 1,
   all_rookie_1st: 1,
   all_rookie_2nd: 0.75,
   seasons_played: 0.25,
@@ -80,8 +93,11 @@ const MERGED_ACCOLADE_KEYS = [
   "mvp_count",
   "finals_mvp_count",
   "estimated_finals_mvp_count",
+  "aba_mvp_count",
+  "aba_playoffs_mvp_count",
   "dpoy_count",
   "championship_rings",
+  "aba_championship_rings",
   "most_improved",
   "top_3_mvp",
   "top_10_mvp",
@@ -89,16 +105,26 @@ const MERGED_ACCOLADE_KEYS = [
   "all_nba_1st",
   "all_nba_2nd",
   "all_nba_3rd",
+  "aba_all_league_1st",
+  "aba_all_league_2nd",
   "all_def_1st",
   "all_def_2nd",
+  "aba_all_def_1st",
+  "aba_all_def_2nd",
   "all_rookie_1st",
   "all_rookie_2nd",
   "all_star_selections",
   "all_star_mvp_count",
+  "aba_all_star_selections",
+  "aba_all_star_mvp_count",
+  "aba_rookie_of_year_count",
   "seasons_played",
   "scoring_titles",
   "assist_titles",
   "rebound_titles",
+  "aba_scoring_titles",
+  "aba_assist_titles",
+  "aba_rebound_titles",
   "three_point_titles",
   "steal_titles",
   "block_titles",
@@ -110,10 +136,22 @@ const MERGED_ACCOLADE_KEYS = [
 const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   { id: "mvp", label: "MVP", count: (player) => player.accolades.mvp_count, weight: ACCOLADE_WEIGHTS.mvp_count },
   {
+    id: "aba-mvp",
+    label: "ABA MVP",
+    count: (player) => player.accolades.aba_mvp_count ?? 0,
+    weight: ACCOLADE_WEIGHTS.aba_mvp_count,
+  },
+  {
     id: "fmvp",
     label: "FMVP",
     count: (player) => player.accolades.finals_mvp_count,
     weight: ACCOLADE_WEIGHTS.finals_mvp_count,
+  },
+  {
+    id: "aba-playoffs-mvp",
+    label: "ABA PMVP",
+    count: (player) => player.accolades.aba_playoffs_mvp_count ?? 0,
+    weight: ACCOLADE_WEIGHTS.aba_playoffs_mvp_count,
   },
   {
     id: "retro-fmvp",
@@ -129,10 +167,23 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     weight: ACCOLADE_WEIGHTS.all_nba_1st,
   },
   {
+    id: "aba-all-league",
+    label: "ALL ABA",
+    count: (player) => (player.accolades.aba_all_league_1st ?? 0) + (player.accolades.aba_all_league_2nd ?? 0),
+    sortValue: (player) => weightedAccoladeScore(player, ["aba_all_league_1st", "aba_all_league_2nd"]),
+    weight: ACCOLADE_WEIGHTS.aba_all_league_1st,
+  },
+  {
     id: "rings",
     label: "RING",
     count: (player) => player.accolades.championship_rings,
     weight: ACCOLADE_WEIGHTS.championship_rings,
+  },
+  {
+    id: "aba-champ",
+    label: "ABA CH",
+    count: (player) => player.accolades.aba_championship_rings ?? 0,
+    weight: ACCOLADE_WEIGHTS.aba_championship_rings,
   },
   { id: "dpoy", label: "DPOY", count: (player) => player.accolades.dpoy_count, weight: ACCOLADE_WEIGHTS.dpoy_count },
   {
@@ -142,9 +193,34 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     sortValue: (player) => weightedAccoladeScore(player, ["all_def_1st", "all_def_2nd"]),
     weight: ACCOLADE_WEIGHTS.all_def_1st,
   },
+  {
+    id: "aba-all-defense",
+    label: "ABA DEF",
+    count: (player) => (player.accolades.aba_all_def_1st ?? 0) + (player.accolades.aba_all_def_2nd ?? 0),
+    sortValue: (player) => weightedAccoladeScore(player, ["aba_all_def_1st", "aba_all_def_2nd"]),
+    weight: ACCOLADE_WEIGHTS.aba_all_def_1st,
+  },
   { id: "scoring", label: "SCO", count: (player) => player.accolades.scoring_titles, weight: ACCOLADE_WEIGHTS.scoring_titles },
+  {
+    id: "aba-scoring",
+    label: "ABA SCO",
+    count: (player) => player.accolades.aba_scoring_titles ?? 0,
+    weight: ACCOLADE_WEIGHTS.aba_scoring_titles,
+  },
   { id: "assists", label: "AST", count: (player) => player.accolades.assist_titles, weight: ACCOLADE_WEIGHTS.assist_titles },
+  {
+    id: "aba-assists",
+    label: "ABA AST",
+    count: (player) => player.accolades.aba_assist_titles ?? 0,
+    weight: ACCOLADE_WEIGHTS.aba_assist_titles,
+  },
   { id: "rebounds", label: "REB", count: (player) => player.accolades.rebound_titles, weight: ACCOLADE_WEIGHTS.rebound_titles },
+  {
+    id: "aba-rebounds",
+    label: "ABA REB",
+    count: (player) => player.accolades.aba_rebound_titles ?? 0,
+    weight: ACCOLADE_WEIGHTS.aba_rebound_titles,
+  },
   {
     id: "three-point-title",
     label: "3PT",
@@ -160,6 +236,12 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     weight: ACCOLADE_WEIGHTS.all_star_mvp_count,
   },
   {
+    id: "aba-all-star-mvp",
+    label: "ABA ASM",
+    count: (player) => player.accolades.aba_all_star_mvp_count ?? 0,
+    weight: ACCOLADE_WEIGHTS.aba_all_star_mvp_count,
+  },
+  {
     id: "three-point-contest",
     label: "3PC",
     count: (player) => player.accolades.three_point_contest_wins ?? 0,
@@ -171,6 +253,12 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     count: (player) => player.accolades.all_star_selections,
     weight: ACCOLADE_WEIGHTS.all_star_selections,
   },
+  {
+    id: "aba-all-star",
+    label: "ABA AS",
+    count: (player) => player.accolades.aba_all_star_selections ?? 0,
+    weight: ACCOLADE_WEIGHTS.aba_all_star_selections,
+  },
   { id: "sixth-man", label: "6MOY", count: (player) => player.accolades["6moy"] ?? 0, weight: ACCOLADE_WEIGHTS["6moy"] },
   {
     id: "most-improved",
@@ -179,6 +267,12 @@ const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
     weight: ACCOLADE_WEIGHTS.most_improved,
   },
   { id: "roy", label: "ROY", count: (player) => (player.accolades.roy_won ? 1 : 0), weight: ACCOLADE_WEIGHTS.roy_won },
+  {
+    id: "aba-roy",
+    label: "ABA ROY",
+    count: (player) => player.accolades.aba_rookie_of_year_count ?? 0,
+    weight: ACCOLADE_WEIGHTS.aba_rookie_of_year_count,
+  },
   {
     id: "all-rookie-1st",
     label: "R1",
@@ -793,7 +887,7 @@ function buildMissingAchievements(score: WeightedPer100SeasonScore | null) {
   ];
 }
 
-function buildAccoladeAchievements(player: Player, selection?: TeamEra) {
+export function buildAccoladeAchievements(player: Player, selection?: TeamEra) {
   const displayPlayer = playerWithSelectionAccolades(player, selection);
 
   return ACHIEVEMENT_DISPLAY_ORDER.flatMap((achievement) => {
@@ -975,7 +1069,7 @@ function playerPer100StatsScore(
   return per100StintScoreForSelection(player, selection, statsEngineConfig)?.totalScore ?? 0;
 }
 
-function playerPer100AwardsScore(player: Player | undefined, selection: TeamEra | undefined) {
+export function playerPer100AwardsScore(player: Player | undefined, selection: TeamEra | undefined) {
   if (!player) {
     return 0;
   }
