@@ -4035,6 +4035,13 @@ select {
   color: #ffb4ae;
 }
 
+.result-score-bonus {
+  background: rgba(255, 209, 102, 0.14);
+  border-color: rgba(255, 209, 102, 0.42);
+  color: #ffe39a;
+  top: 34px;
+}
+
 .result-position-boost:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.92);
   outline-offset: 2px;
@@ -7721,6 +7728,10 @@ select {
     top: 42px;
   }
 
+  .result-score-bonus {
+    top: 68px;
+  }
+
   .result-totals {
     background: rgba(21, 27, 43, 0.7);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -8024,6 +8035,10 @@ select {
   .result-position-boost {
     right: 12px;
     top: 50px;
+  }
+
+  .result-score-bonus {
+    top: 78px;
   }
 }
 
@@ -9257,6 +9272,15 @@ select {
   line-height: 1.25;
 }
 
+.mystery-result-price-row {
+  align-items: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+  min-width: 0;
+}
+
 .mystery-hidden-price-panel {
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(8, 11, 18, 0.24)),
@@ -9264,27 +9288,28 @@ select {
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
   display: inline-grid;
-  gap: 4px;
+  gap: 3px;
+  align-content: center;
   justify-self: start;
-  margin-top: 4px;
-  min-width: min(100%, 260px);
-  padding: 13px 15px;
+  margin-top: 0;
+  min-width: 132px;
+  padding: 8px 11px;
 }
 
 .mystery-hidden-price-panel span {
   color: #aeb4c2;
-  font-size: 0.66rem;
+  font-size: 0.54rem;
   font-weight: 950;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.12em;
   line-height: 1;
   text-transform: uppercase;
 }
 
 .mystery-hidden-price-panel strong {
   color: #ffffff;
-  font-size: 2rem;
+  font-size: 1.35rem;
   font-weight: 950;
-  line-height: 0.95;
+  line-height: 1;
 }
 
 .mystery-result-card-accepted .mystery-hidden-price-panel {
@@ -9390,6 +9415,12 @@ select {
 
 .mystery-result-card-rejected-counter .mystery-result-summary strong {
   color: #ffd0a6;
+}
+
+.mystery-result-details-toggle {
+  display: none;
+  justify-self: start;
+  margin-bottom: 12px;
 }
 
 .mystery-counter-actions {
@@ -10969,8 +11000,68 @@ select {
     font-size: clamp(1.45rem, 8vw, 1.86rem);
   }
 
+  .mystery-result-price-row {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mystery-result-price-row .mystery-hidden-price-panel {
+    min-width: 0;
+    padding: 7px 9px;
+  }
+
+  .mystery-result-price-row .mystery-hidden-price-panel span {
+    font-size: 0.5rem;
+    overflow-wrap: anywhere;
+  }
+
+  .mystery-result-price-row .mystery-hidden-price-panel strong {
+    font-size: clamp(1.12rem, 6vw, 1.38rem);
+  }
+
   .mystery-details-block {
-    display: none;
+    display: grid;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .mystery-card-secondary-row {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mystery-possible-years {
+    font-size: 0.72rem;
+    gap: 6px;
+  }
+
+  .mystery-possible-years svg {
+    height: 15px;
+    width: 15px;
+  }
+
+  .mystery-details-toggle {
+    font-size: 0.72rem;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 10px;
+  }
+
+  .mystery-details-body {
+    gap: 10px;
+    max-height: min(48vh, 430px);
+    overflow: auto;
+    padding: 10px;
+  }
+
+  .mystery-detail-stat-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .mystery-detail-stat-group .mystery-card-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .mystery-offer-form {
@@ -11038,9 +11129,31 @@ select {
   }
 
   .mystery-reveal-log,
-  .mystery-result-details,
   .mystery-result-stamp {
     display: none;
+  }
+
+  .mystery-result-details-toggle {
+    display: inline-flex;
+    justify-content: center;
+    justify-self: stretch;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .mystery-result-details {
+    display: none;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .mystery-result-details.mystery-result-details-open {
+    display: grid;
+  }
+
+  .mystery-result-detail-block {
+    gap: 8px;
+    padding: 10px;
   }
 
   .mystery-result-actions,

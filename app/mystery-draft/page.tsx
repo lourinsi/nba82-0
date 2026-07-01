@@ -111,14 +111,6 @@ function formatMoney(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `$${value}` : "--";
 }
 
-function formatScore(value: number | null | undefined) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "--";
-  }
-
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 function formatMarketRange(min: number | null | undefined, max: number | null | undefined) {
   return `${formatMoney(min)}-${formatMoney(max)}`;
 }
@@ -586,10 +578,6 @@ function resultToneLabel(result: MysteryDraftOfferResult) {
 
 function resultSubcopy(result: MysteryDraftOfferResult) {
   if (result.resultType === "SNIPED") {
-    const baseScore = formatScore(result.baseScore ?? result.revealedCard?.baseScore ?? 0);
-    const finalScore = formatScore(result.finalScore ?? result.revealedCard?.finalScore ?? 0);
-
-    // return `Perfect price. +10% score bonus: ${baseScore} to ${finalScore}`;
     return `Perfect price +10%`;
   }
 
@@ -651,6 +639,7 @@ function MysteryResultCard({
   const deltaText = revealDeltaText(result);
   const articleStyle = revealedCard ? teamThemeStyle(revealedCard.team) : undefined;
   const isCounterOffer = result.resultType === "REJECTED_COUNTER";
+  const [resultDetailsOpen, setResultDetailsOpen] = useState(false);
 
   return (
     <article
@@ -678,17 +667,21 @@ function MysteryResultCard({
           <h2>{revealedCard ? revealedCard.playerName : "Card Skipped"}</h2>
           {revealedCard ? <p className="mystery-result-season">{revealedCard.seasonLabel}</p> : null}
 
-          {result.minimumNeeded !== null ? (
-            <div className="mystery-hidden-price-panel" aria-label="Hidden price">
-              <span>Hidden Price</span>
-              <strong>{formatMoney(result.minimumNeeded)}</strong>
-            </div>
-          ) : null}
+          {result.minimumNeeded !== null || result.secondOffer !== null ? (
+            <div className="mystery-result-price-row">
+              {result.minimumNeeded !== null ? (
+                <div className="mystery-hidden-price-panel" aria-label="Hidden price">
+                  <span>Hidden Price</span>
+                  <strong>{formatMoney(result.minimumNeeded)}</strong>
+                </div>
+              ) : null}
 
-          {result.secondOffer !== null ? (
-            <div className="mystery-hidden-price-panel mystery-second-offer-panel" aria-label="Second offer">
-              <span>{result.acceptedSecondOffer ? "Second Offer Paid" : "Second Offer"}</span>
-              <strong>{formatMoney(result.secondOffer)}</strong>
+              {result.secondOffer !== null ? (
+                <div className="mystery-hidden-price-panel mystery-second-offer-panel" aria-label="Second offer">
+                  <span>{result.acceptedSecondOffer ? "Second Offer Paid" : "Second Offer"}</span>
+                  <strong>{formatMoney(result.secondOffer)}</strong>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -720,7 +713,19 @@ function MysteryResultCard({
       </div>
 
       {revealedCard ? (
-        <div className="mystery-result-details">
+        <button
+          aria-expanded={resultDetailsOpen}
+          className="mystery-details-toggle mystery-result-details-toggle"
+          type="button"
+          onClick={() => setResultDetailsOpen((open) => !open)}
+        >
+          <ChevronDown size={18} />
+          {resultDetailsOpen ? "Hide Details" : "See More"}
+        </button>
+      ) : null}
+
+      {revealedCard ? (
+        <div className={`mystery-result-details ${resultDetailsOpen ? "mystery-result-details-open" : ""}`}>
           <div className="mystery-result-detail-block">
             <span className="mystery-kicker">Exact Season Stats</span>
             <AchievementStrip achievements={buildSeasonMetricAchievements(revealedCard, showAdjustedStats)} />

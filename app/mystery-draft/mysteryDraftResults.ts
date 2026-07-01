@@ -58,6 +58,11 @@ type MysteryResultPlayer = {
     paidPrice?: number;
     reservePrice?: number;
   };
+  scoreBonus?: {
+    label?: string;
+    multiplier: number;
+    points: number;
+  };
   scoreContribution?: number;
   selection?: {
     era?: string;
@@ -425,6 +430,13 @@ export function buildMysteryDraftResultsPayload(
           ? {
               paidPrice: card.paidPrice,
               reservePrice: card.reservePrice,
+            }
+          : undefined,
+        scoreBonus: card?.wasSniped
+          ? {
+              label: "Snipe Bonus",
+              multiplier: card.scoreMultiplier,
+              points: rounded((card.finalScore ?? card.score) - (card.baseScore ?? card.score)),
             }
           : undefined,
         scoreContribution: assignment.positionAdjustedScore,

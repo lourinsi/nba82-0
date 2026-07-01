@@ -37,6 +37,11 @@ type PositionBonus = {
   multiplier: number;
   points: number;
 };
+type ScoreBonus = {
+  label?: string;
+  multiplier: number;
+  points: number;
+};
 type ResultSalaryInfo = {
   paidPrice?: number;
   reservePrice?: number;
@@ -60,6 +65,7 @@ type ResultPlayer = {
   positionBonus?: PositionBonus;
   primaryPosition?: Position | null;
   salary?: ResultSalaryInfo;
+  scoreBonus?: ScoreBonus;
 };
 type ResultPayload = {
   mode: string;
@@ -397,6 +403,7 @@ export default function SeasonResultsView({ config }: { config: SeasonResultsCon
                   resultBadgeMetaById={resultBadgeMetaById}
                   resultBadgeTooltip={resultBadgeTooltip}
                   scoreContribution={entry.scoreContribution}
+                  scoreBonus={entry.scoreBonus}
                   selection={entry.selection}
                   visibleAchievements={visibleAchievements}
                 />
@@ -431,6 +438,7 @@ function ResultPlayerRow({
   resultBadgeMetaById,
   resultBadgeTooltip,
   scoreContribution,
+  scoreBonus,
   selection,
   visibleAchievements,
 }: {
@@ -447,6 +455,7 @@ function ResultPlayerRow({
   resultBadgeMetaById: Record<string, ResultBadgeMeta>;
   resultBadgeTooltip: (achievement: ResultAchievement) => string;
   scoreContribution?: number;
+  scoreBonus?: ScoreBonus;
   selection?: DraftSelection;
   visibleAchievements: (achievements: ResultAchievement[]) => ResultAchievement[];
 }) {
@@ -501,6 +510,19 @@ function ResultPlayerRow({
           <span>{formatSignedBoostPercent(positionBoost.multiplier)}</span>
           <span className="result-position-boost-tooltip" role="tooltip">
             {positionBoostLabel}
+          </span>
+        </span>
+      ) : null}
+      {scoreBonus ? (
+        <span
+          aria-label={`${scoreBonus.label ?? "Score bonus"}: ${formatSignedBoostPercent(scoreBonus.multiplier)}.`}
+          className="result-position-boost result-score-bonus result-position-boost-positive"
+          tabIndex={0}
+        >
+          <span>snipe</span>
+          <span>{formatSignedBoostPercent(scoreBonus.multiplier)}</span>
+          <span className="result-position-boost-tooltip" role="tooltip">
+            {scoreBonus.label ?? "Snipe Bonus"}
           </span>
         </span>
       ) : null}
