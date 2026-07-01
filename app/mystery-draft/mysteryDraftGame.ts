@@ -300,6 +300,12 @@ type MysteryCandidateStintOptions = {
   seasonPredicate?: MysterySeasonPredicate;
 };
 
+type MysteryPlayerSeason = {
+  player: Player;
+  season: CareerSeason;
+  selection: TeamEra;
+};
+
 export type MysteryDraftSpinCandidate = CandidateStint & {
   candidateId: string;
   playerId: string;
@@ -434,6 +440,7 @@ export function updateConnectedPoolWeights(
 
 export function getCategoryCounts(weights: MysteryPoolBiasWeights, poolSize = 30): MysteryPoolBiasWeights {
   const normalizedPoolSize = clamp(Math.round(poolSize), 0, 1000);
+  const positiveWeightKeys = MYSTERY_POOL_BIAS_KEYS.filter((key) => weights[key] > 0);
   const raw = MYSTERY_POOL_BIAS_KEYS.reduce(
     (next, key) => ({
       ...next,
@@ -450,12 +457,12 @@ export function getCategoryCounts(weights: MysteryPoolBiasWeights, poolSize = 30
   );
   const used = MYSTERY_POOL_BIAS_KEYS.reduce((sum, key) => sum + floors[key], 0);
   let remaining = normalizedPoolSize - used;
-  const decimals = MYSTERY_POOL_BIAS_KEYS.map((key) => ({
+  const decimals = positiveWeightKeys.map((key) => ({
     decimal: raw[key] - Math.floor(raw[key]),
     key,
   })).sort((first, second) => second.decimal - first.decimal);
 
-  for (let index = 0; index < remaining; index += 1) {
+  for (let index = 0; decimals.length && index < remaining; index += 1) {
     floors[decimals[index % decimals.length].key] += 1;
   }
 
@@ -482,7 +489,11 @@ export function getCategoryCounts(weights: MysteryPoolBiasWeights, poolSize = 30
   }
 
   while (total < normalizedPoolSize) {
-    const receiverKey = [...MYSTERY_POOL_BIAS_KEYS].sort((first, second) => weights[second] - weights[first])[0];
+    const receiverKey = [...positiveWeightKeys].sort((first, second) => weights[second] - weights[first])[0];
+
+    if (!receiverKey) {
+      break;
+    }
 
     floors[receiverKey] += 1;
     total += 1;
@@ -490,7 +501,7 @@ export function getCategoryCounts(weights: MysteryPoolBiasWeights, poolSize = 30
 
   remaining = normalizedPoolSize - MYSTERY_POOL_BIAS_KEYS.reduce((sum, key) => sum + floors[key], 0);
 
-  if (remaining !== 0) {
+  if (remaining !== 0 && weights.wildcard > 0) {
     floors.wildcard += remaining;
   }
 
@@ -740,6 +751,30 @@ function appendWarnings(state: MysteryDraftGameState, warnings: string[]) {
 
 function randomItem<T>(items: readonly T[]) {
   return items[Math.floor(Math.random() * items.length)];
+}
+
+function weightedRandomItem<T>(items: readonly T[], getWeight: (item: T) => number) {
+  const weightedItems = items.map((item) => ({
+    item,
+    weight: Math.max(0, getWeight(item)),
+  }));
+  const totalWeight = weightedItems.reduce((sum, item) => sum + item.weight, 0);
+
+  if (totalWeight <= 0) {
+    return randomItem(items);
+  }
+
+  let threshold = Math.random() * totalWeight;
+
+  for (const weightedItem of weightedItems) {
+    threshold -= weightedItem.weight;
+
+    if (threshold <= 0) {
+      return weightedItem.item;
+    }
+  }
+
+  return weightedItems[weightedItems.length - 1].item;
 }
 
 function shuffled<T>(items: readonly T[]) {
@@ -1439,6 +1474,93 @@ function eraForCareerSeason(season: CareerSeason) {
   return getCanonicalEra(decadeLabelFromSeason(season.season) ?? String(season.era || ""));
 }
 
+type MysterySeasonYearRange = ReturnType<typeof mysterySeasonPoolRange>;
+
+function isSeasonInYearRange(season: CareerSeason, yearRange: MysterySeasonYearRange) {
+  if (!yearRange) {
+    return true;
+  }
+
+  const endYear = seasonEndYear(season.season);
+
+  return typeof endYear === "number" && endYear >= yearRange.startYear && endYear <= yearRange.endYear;
+}
+
+function allMysteryPlayerSeasons(players: Player[]) {
+  return players.flatMap((player) => {
+    if (!player.id || !Array.isArray(player.career_seasons)) {
+      return [];
+    }
+
+    return player.career_seasons.flatMap((season) => {
+      const team = String(season.team || "").trim();
+      const era = eraForCareerSeason(season);
+
+      if (!team || !era) {
+        return [];
+      }
+
+      return [
+        {
+          player,
+          season,
+          selection: { team, era },
+        } satisfies MysteryPlayerSeason,
+      ];
+    });
+  });
+}
+
+export function getAwardQualifiedPlayerIds(
+  playerSeasons: MysteryPlayerSeason[],
+  yearRange: MysterySeasonYearRange,
+  awardFilter: MysteryAwardFilter,
+) {
+  const qualifiedPlayerIds = new Set<string>();
+
+  for (const playerSeason of playerSeasons) {
+    if (!isSeasonInYearRange(playerSeason.season, yearRange)) {
+      continue;
+    }
+
+    if (
+      seasonMatchesAwardFilter(
+        playerSeason.player,
+        playerSeason.selection,
+        playerSeason.season,
+        awardFilter,
+      )
+    ) {
+      qualifiedPlayerIds.add(playerSeason.player.id);
+    }
+  }
+
+  return qualifiedPlayerIds;
+}
+
+export function getAwardCandidates(
+  playerSeasons: MysteryPlayerSeason[],
+  yearRange: MysterySeasonYearRange,
+  awardFilter: MysteryAwardFilter,
+) {
+  const qualifiedPlayerIds = getAwardQualifiedPlayerIds(playerSeasons, yearRange, awardFilter);
+
+  return playerSeasons.filter(
+    (playerSeason) =>
+      isSeasonInYearRange(playerSeason.season, yearRange) &&
+      qualifiedPlayerIds.has(playerSeason.player.id),
+  );
+}
+
+export function getAwardCandidateWeight(
+  player: Player,
+  selection: TeamEra,
+  season: CareerSeason,
+  awardFilter: MysteryAwardFilter,
+) {
+  return seasonMatchesAwardFilter(player, selection, season, awardFilter) ? 2 : 1;
+}
+
 function playerAlreadyAcquired(player: Player, state: MysteryDraftGameState) {
   if (state.settings.allowDuplicatePlayers) {
     return false;
@@ -1474,10 +1596,6 @@ function playerIsCurrentlyActive(player: Player) {
 }
 
 function sourceSeasonPredicate(poolSource: MysteryDraftPoolSource, settings: MysteryDraftSettings): MysterySeasonPredicate {
-  if (poolSource === "award") {
-    return (player, selection, season) => seasonMatchesAwardFilter(player, selection, season, settings.awardFilter);
-  }
-
   if (poolSource === "activeStar") {
     return (player, selection, season) => seasonMatchesAwardFilter(player, selection, season, settings.activeStarFilter);
   }
@@ -1789,8 +1907,17 @@ function possibleYearRange(seasons: MysteryScoredSeason[]) {
   return min === max ? String(min) : `${min}-${max}`;
 }
 
-function createCardFromStint(stint: CandidateStint, poolSource: MysteryDraftPoolSource) {
-  const hiddenSeason = randomItem(stint.eligibleSeasons);
+function createCardFromStint(
+  stint: CandidateStint,
+  poolSource: MysteryDraftPoolSource,
+  settings: MysteryDraftSettings,
+) {
+  const hiddenSeason =
+    poolSource === "award"
+      ? weightedRandomItem(stint.eligibleSeasons, (season) =>
+          getAwardCandidateWeight(stint.player, stint.selection, season.sourceSeason, settings.awardFilter),
+        )
+      : randomItem(stint.eligibleSeasons);
   const { marketMax, marketMin } = calculateMarketRange(stint.eligibleSeasons);
   const eligiblePositions = uniquePositions(stint.eligibleSeasons.flatMap((season) => season.eligiblePositions));
   const primaryPosition = stint.eligibleSeasons.find((season) => season.primaryPosition)?.primaryPosition ?? null;
@@ -1937,6 +2064,14 @@ function spinCandidatesForSource(
   statsEngineConfig: StatsEngineConfig,
   poolSource: MysteryDraftPoolSource,
 ) {
+  const awardQualifiedPlayerIds =
+    poolSource === "award"
+      ? getAwardQualifiedPlayerIds(
+          allMysteryPlayerSeasons(players),
+          mysterySeasonPoolRange(state.settings),
+          state.settings.awardFilter,
+        )
+      : null;
   const options: MysteryCandidateStintOptions = {
     ignoreSeasonPool: poolSource === "activeStar",
     seasonPredicate: sourceSeasonPredicate(poolSource, state.settings),
@@ -1944,6 +2079,10 @@ function spinCandidatesForSource(
 
   return shuffled(players).flatMap((player) => {
     if (!playerCanContributeToSource(player, state, poolSource)) {
+      return [];
+    }
+
+    if (awardQualifiedPlayerIds && !awardQualifiedPlayerIds.has(player.id)) {
       return [];
     }
 
@@ -2021,11 +2160,17 @@ export function generateSpinCandidates(
   const selected: MysteryDraftSpinCandidate[] = [];
   const selectedStintKeys = new Set<string>();
   const selectedPlayerIds = new Set<string>();
+  const poolWeights: MysteryPoolBiasWeights = {
+    activeStar: state.settings.activeStar,
+    award: state.settings.award,
+    top100: state.settings.top100,
+    wildcard: state.settings.wildcard,
+  };
 
   function addFromSource(
     poolSource: MysteryDraftPoolSource,
     targetSourceCount: number,
-    allowDuplicatePlayers = false,
+    allowDuplicatePlayers = state.settings.allowDuplicatePlayers,
   ) {
     let added = 0;
 
@@ -2063,19 +2208,39 @@ export function generateSpinCandidates(
       continue;
     }
 
-    addFromSource(poolSource, targetSourceCount, false);
+    addFromSource(poolSource, targetSourceCount, state.settings.allowDuplicatePlayers);
   }
+
+  for (const poolSource of sourceOrder) {
+    if (poolSource === "wildcard" || poolWeights[poolSource] <= 0 || selected.length >= targetCount) {
+      continue;
+    }
+
+    addFromSource(poolSource, targetCount - selected.length, state.settings.allowDuplicatePlayers);
+  }
+
+  const strictNonWildcardSource = sourceOrder.find(
+    (poolSource) => poolSource !== "wildcard" && poolWeights[poolSource] >= 100,
+  );
+  const strictSourceStillAvailable =
+    Boolean(strictNonWildcardSource) &&
+    poolWeights.wildcard <= 0 &&
+    selected.some((candidate) => candidate.poolSource === strictNonWildcardSource);
 
   let missing = targetCount - selected.length;
 
-  if (missing > 0) {
-    addFromSource("wildcard", missing, false);
+  if (missing > 0 && !strictSourceStillAvailable) {
+    addFromSource("wildcard", missing, state.settings.allowDuplicatePlayers);
   }
 
   missing = targetCount - selected.length;
 
-  if (missing > 0) {
-    for (const poolSource of ["wildcard", "award", "top100", "activeStar"] as const) {
+  if (missing > 0 && !strictSourceStillAvailable && !state.settings.allowDuplicatePlayers) {
+    const duplicateFallbackSources = sourceOrder.filter(
+      (poolSource) => poolSource === "wildcard" || poolWeights[poolSource] > 0,
+    );
+
+    for (const poolSource of duplicateFallbackSources) {
       if (selected.length >= targetCount) {
         break;
       }
@@ -2086,7 +2251,7 @@ export function generateSpinCandidates(
 
   missing = targetCount - selected.length;
 
-  if (missing > 0) {
+  if (missing > 0 && !strictSourceStillAvailable) {
     for (const candidate of broadestSpinCandidates(players, state, statsEngineConfig)) {
       if (selected.length >= targetCount) {
         break;
@@ -2147,7 +2312,7 @@ export function selectVisibleMysteryStint(
     return completeMysteryDraftGame(state);
   }
 
-  const card = createCardFromStint(candidate, candidate.poolSource);
+  const card = createCardFromStint(candidate, candidate.poolSource, state.settings);
   const offeredStintKeys = state.settings.removeOfferedStintAfterSpin
     ? Array.from(new Set([...state.offeredStintKeys, card.stintKey]))
     : state.offeredStintKeys;

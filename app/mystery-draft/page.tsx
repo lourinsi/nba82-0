@@ -10,6 +10,8 @@ import {
   ChevronDown,
   CheckCircle2,
   DollarSign,
+  List,
+  Map,
   RefreshCw,
   RotateCcw,
   SkipForward,
@@ -19,7 +21,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { RESULT_BADGE_META_BY_ID } from "../achievementMeta";
-import { loadApiJson, loadPlayers } from "../apiClient";
+import { getCachedPlayers, loadApiJson, loadPlayers } from "../apiClient";
 import { teamThemeStyle } from "../all-time/teamStyles";
 import {
   adjustedStatsSnapshot,
@@ -29,8 +31,18 @@ import {
   subscribeToColorMode,
   subscribeToGameHeaderAction,
 } from "../clientPreferences";
+import {
+  FIRST_GAME_TIP_INDEX,
+  GAME_TIPS,
+  nextRotatingGameTipIndex,
+  type GameTip,
+} from "../gameTips";
 import type { Achievement, Player, StatsEngineConfig } from "../GameCourt";
 import { UNKNOWN_PLAYER_IMAGE, handlePlayerImageError } from "../playerImages";
+import {
+  optimizeMysteryDraftPositions,
+  type MysteryPositionAssignment,
+} from "./mysteryDraftResults";
 import {
   DEFAULT_MYSTERY_DRAFT_SETTINGS,
   MYSTERY_AWARD_FILTER_OPTIONS,
@@ -74,6 +86,7 @@ import { buildMysteryDraftResultsPayload } from "./mysteryDraftResults";
 
 const MYSTERY_SPIN_TICK_MS = 86;
 const MYSTERY_SPIN_MAX_MS = 5000;
+const MYSTERY_TOAST_MS = 3600;
 
 const FALLBACK_STATS_ENGINE_CONFIG: StatsEngineConfig = {
   allTimeTsBaseline: 0.54,
@@ -121,6 +134,15 @@ function formatPraValues(points: number | null, rebounds: number | null, assists
     formatAverage(rebounds, 0),
     formatAverage(assists, 0),
   ].join(" / ");
+}
+
+function playerInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
 function formatPraRange(ranges: MysteryDraftStatRanges | null | undefined) {
@@ -225,6 +247,106 @@ function AchievementBadge({ achievement }: { achievement: Achievement }) {
       <span className="achievement-value">{achievement.value}</span>
       <span className="achievement-label">{achievement.label}</span>
     </span>
+  );
+}
+
+function RosterBadgeFloat({ achievements }: { achievements: Achievement[] }) {
+  if (!achievements.length) {
+    return null;
+  }
+
+  const visibleAchievements = achievements.slice(0, 4);
+  const hiddenCount = Math.max(0, achievements.length - visibleAchievements.length);
+
+  return (
+    <div className="mystery-roster-floating-badges" aria-label="Season badges">
+      {visibleAchievements.map((achievement, index) => {
+        const meta = RESULT_BADGE_META_BY_ID[achievement.id];
+        const title = achievement.title || meta?.description || achievementChipLabel(achievement);
+
+        return (
+          <span
+            className={`mystery-roster-floating-badge ${
+              meta ? `court-achievement-badge-${meta.variant}` : ""
+            }`}
+            key={`${achievement.id}-${index}`}
+            title={title}
+          >
+            {meta?.symbol || achievement.label}
+          </span>
+        );
+      })}
+      {hiddenCount > 0 ? (
+        <span className="mystery-roster-floating-badge mystery-roster-floating-badge-more">
+          +{hiddenCount}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function MysteryCourtBadgeRail({ achievements }: { achievements: Achievement[] }) {
+  if (!achievements.length) {
+    return null;
+  }
+
+  const visibleAchievements = achievements.slice(0, 3);
+  const hiddenCount = Math.max(0, achievements.length - visibleAchievements.length);
+
+  return (
+    <span className="mystery-court-badges" aria-label="Season badges">
+      {visibleAchievements.map((achievement, index) => {
+        const meta = RESULT_BADGE_META_BY_ID[achievement.id];
+        const title = achievement.title || meta?.description || achievementChipLabel(achievement);
+
+        return (
+          <span
+            className={`mystery-court-badge ${meta ? `court-achievement-badge-${meta.variant}` : ""}`}
+            key={`${achievement.id}-${index}`}
+            title={title}
+          >
+            {meta?.symbol || achievement.label}
+          </span>
+        );
+      })}
+      {hiddenCount > 0 ? <span className="mystery-court-badge mystery-court-badge-more">+{hiddenCount}</span> : null}
+    </span>
+  );
+}
+
+function rosterStatIcon(statId: string) {
+  switch (statId) {
+    case "pra":
+      return "🏀";
+    case "ts-pct":
+    case "ts-star":
+      return "🎯";
+    case "ws-48":
+      return "📈";
+    case "mpg":
+      return "⏱";
+    default:
+      return "•";
+  }
+}
+
+function RosterStatStrip({ achievements }: { achievements: Achievement[] }) {
+  return (
+    <div className="mystery-roster-stat-strip" aria-label="Season stats">
+      {achievements.map((achievement, index) => (
+        <span
+          className={`mystery-roster-stat-pill mystery-roster-stat-${achievement.id}`}
+          key={`${achievement.id}-${achievement.value}-${index}`}
+          title={achievement.title}
+        >
+          <span className="mystery-roster-stat-icon" aria-hidden="true">
+            {rosterStatIcon(achievement.id)}
+          </span>
+          <span className="mystery-roster-stat-value">{achievement.value}</span>
+          <span className="mystery-roster-stat-label">{achievement.label}</span>
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -334,7 +456,7 @@ function PlayerPortrait({
 }: {
   imageUrl: string | null;
   playerName: string;
-  variant?: "card" | "spin" | "result";
+  variant?: "card" | "spin" | "result" | "roster";
 }) {
   const initials = playerName
     .split(/\s+/)
@@ -582,31 +704,119 @@ function RosterCard({
   rank: number;
   showAdjustedStats: boolean;
 }) {
+  const statAchievements = buildSeasonMetricAchievements(card, showAdjustedStats);
+
   return (
     <article className="mystery-roster-card" style={teamThemeStyle(card.team)}>
-      <div className="mystery-roster-rank">{rank}</div>
       <div className="mystery-roster-main">
-        <div>
-          <span className="mystery-kicker">
-            {card.team} {card.cardSeasonLabel}
-          </span>
-          <h3>{card.playerName}</h3>
-          <p>
-            {card.eraLabel} - {card.seasonLabel}
-          </p>
+        <div className="mystery-roster-heading">
+          <div className="mystery-roster-rank">
+            <span>{rank}</span>
+            <small>Pick</small>
+          </div>
+          <div className="mystery-roster-price">
+            <span>{formatMoney(card.paidPrice)}</span>
+            <small>Paid</small>
+          </div>
         </div>
-        <div className="mystery-roster-price">
-          <span>{formatMoney(card.paidPrice)}</span>
-          <small>Paid</small>
+        <div className="mystery-roster-person">
+          <div className="mystery-roster-media">
+            <div className="mystery-roster-photo-stack">
+              <PlayerPortrait
+                imageUrl={card.playerImageUrl}
+                playerName={card.playerName}
+                variant="roster"
+              />
+              <RosterBadgeFloat achievements={card.seasonAchievements} />
+            </div>
+            <PositionChips
+              eligiblePositions={card.eligiblePositions}
+              primaryPosition={card.primaryPosition}
+            />
+          </div>
+          <div className="mystery-roster-copy">
+            <div className="mystery-roster-teamline">
+              <span>{card.team}</span>
+              <i aria-hidden="true" />
+              <span>{card.seasonLabel}</span>
+            </div>
+            <h3>{card.playerName}</h3>
+            <div className="mystery-roster-season-line">
+              <CalendarDays size={18} />
+              <span>{card.eraLabel} era</span>
+              <strong>{card.seasonLabel} season</strong>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="mystery-roster-meta">
-        <span>Reserve {formatMoney(card.reservePrice)}</span>
+      <div className="mystery-roster-stats">
+        <RosterStatStrip achievements={statAchievements} />
       </div>
-      <AchievementStrip
-        achievements={[...buildSeasonMetricAchievements(card, showAdjustedStats), ...card.seasonAchievements]}
-      />
     </article>
+  );
+}
+
+function MysteryCourtSlot({ assignment }: { assignment: MysteryPositionAssignment }) {
+  const card = assignment.card;
+
+  return (
+    <div
+      className={`court-slot court-slot-${assignment.slot.toLowerCase()} mystery-court-slot ${
+        card ? "court-slot-filled" : ""
+      }`}
+      role="group"
+      aria-label={card ? `${card.playerName}, ${assignment.slot}` : `${assignment.slot} slot`}
+      data-player-name={card?.playerName}
+      style={card ? teamThemeStyle(card.team) : undefined}
+    >
+      <span className="court-slot-position">{assignment.slot}</span>
+      {card ? (
+        <>
+          <span className="court-slot-name">{playerInitials(card.playerName)}</span>
+          <span className="court-slot-team">
+            {card.team} - {card.eraLabel}
+          </span>
+          <MysteryCourtBadgeRail achievements={card.seasonAchievements} />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function MysteryCourtView({ roster }: { roster: MysteryDraftRosterCard[] }) {
+  const optimization = useMemo(() => optimizeMysteryDraftPositions(roster), [roster]);
+
+  return (
+    <div className="mystery-court-view">
+      <div className="mystery-court-note" role="note">
+        Positions are automatically optimized for the best lineup fit. Manual swaps are unavailable in Mystery Draft.
+      </div>
+      <div className="game-court court-blueprint mystery-court-board" aria-label="Auto-positioned mystery lineup">
+        <div className="court-key" />
+        <div className="court-rim" />
+        <div className="court-arc" />
+        {optimization.assignments.map((assignment) => (
+          <MysteryCourtSlot assignment={assignment} key={assignment.slot} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MysteryRosterWarmup({ tip }: { tip: GameTip }) {
+  return (
+    <section className="mystery-shell mystery-lobby-shell mystery-warmup-shell">
+      <article className="mystery-warmup-card" role="status" aria-live="polite">
+        <RefreshCw className="mystery-warmup-spinner" size={42} />
+        <span className="mystery-kicker">Warming Rosters</span>
+        <h1>Mystery Salary Draft</h1>
+        <p>Fetching the player-season pool...</p>
+        <span className="roster-tip-content mystery-warmup-tip" key={`${tip.eyebrow}-${tip.text}`}>
+          <span className="roster-tip-kicker">{tip.eyebrow}</span>
+          <span className="roster-tip-copy">{tip.text}</span>
+        </span>
+      </article>
+    </section>
   );
 }
 
@@ -614,10 +824,10 @@ export default function MysteryDraftPage() {
   const router = useRouter();
   const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
   const adjustedStatsEnabled = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => false);
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [players, setPlayers] = useState<Player[]>(() => getCachedPlayers<Player>() ?? []);
   const [statsEngineConfig, setStatsEngineConfig] =
     useState<StatsEngineConfig>(FALLBACK_STATS_ENGINE_CONFIG);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !getCachedPlayers<Player>());
   const [error, setError] = useState<string | null>(null);
   const [settingsDraft, setSettingsDraft] = useState<MysteryDraftSettings>({
     ...DEFAULT_MYSTERY_DRAFT_SETTINGS,
@@ -627,14 +837,19 @@ export default function MysteryDraftPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rosterPanelOpen, setRosterPanelOpen] = useState(true);
+  const [rosterViewMode, setRosterViewMode] = useState<"roster" | "court">("roster");
+  const [toastWarning, setToastWarning] = useState<string | null>(null);
   const [spinCandidates, setSpinCandidates] = useState<MysteryDraftSpinCandidate[]>([]);
   const [spinIndex, setSpinIndex] = useState(0);
+  const [activeTipIndex, setActiveTipIndex] = useState(FIRST_GAME_TIP_INDEX);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spinCandidatesRef = useRef<MysteryDraftSpinCandidate[]>([]);
   const spinIndexRef = useRef(0);
   const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const publicCard = useMemo(() => publicMysteryDraftCard(game.currentCard), [game.currentCard]);
+  const activeTip = GAME_TIPS[activeTipIndex] ?? GAME_TIPS[0];
   const displayedCardStats = publicCard ? displayStatsForCard(publicCard, adjustedStatsEnabled) : null;
   const activeSpinCandidate = spinCandidates[spinIndex] ?? null;
   const legalMaxOffer = maxLegalOffer(game);
@@ -688,10 +903,15 @@ export default function MysteryDraftPage() {
 
   const resetRun = useCallback(() => {
     clearSpinTimers();
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = null;
+    }
     setDetailsOpen(false);
     setGame(createMysteryDraftGame(settingsDraft));
     setIsSpinning(false);
     setOfferText("");
+    setToastWarning(null);
     setSpinCandidates([]);
     setSpinIndex(0);
     spinCandidatesRef.current = [];
@@ -700,11 +920,17 @@ export default function MysteryDraftPage() {
 
   const startDraft = useCallback(() => {
     clearSpinTimers();
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = null;
+    }
     setDetailsOpen(false);
     setGame(startMysteryDraftGame(settingsDraft));
     setIsSpinning(false);
     setOfferText("");
     setRosterPanelOpen(true);
+    setRosterViewMode("roster");
+    setToastWarning(null);
     setSpinCandidates([]);
     setSpinIndex(0);
     spinCandidatesRef.current = [];
@@ -727,6 +953,19 @@ export default function MysteryDraftPage() {
 
     async function loadData() {
       try {
+        const cachedPlayers = getCachedPlayers<Player>();
+
+        if (cachedPlayers) {
+          setPlayers(cachedPlayers);
+          setError(null);
+          setLoading(false);
+          return;
+        }
+
+        if (active) {
+          setLoading(true);
+        }
+
         const loadedPlayers = await loadPlayers<Player>();
 
         if (active) {
@@ -810,6 +1049,58 @@ export default function MysteryDraftPage() {
   useEffect(() => () => setGameHeaderState(null), []);
 
   useEffect(() => () => clearSpinTimers(), [clearSpinTimers]);
+
+  useEffect(() => {
+    if (!game.warnings.length) {
+      return;
+    }
+
+    const latestWarning = game.warnings[game.warnings.length - 1] ?? null;
+
+    if (!latestWarning) {
+      return;
+    }
+
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+
+    const showToastTimeout = setTimeout(() => {
+      setToastWarning(latestWarning);
+
+      toastTimeoutRef.current = setTimeout(() => {
+        setToastWarning(null);
+        toastTimeoutRef.current = null;
+      }, MYSTERY_TOAST_MS);
+    }, 0);
+
+    return () => {
+      clearTimeout(showToastTimeout);
+    };
+  }, [game.warnings]);
+
+  useEffect(
+    () => () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!loading) {
+      return;
+    }
+
+    const tipInterval = window.setInterval(() => {
+      setActiveTipIndex((currentIndex) => nextRotatingGameTipIndex(currentIndex));
+    }, 10000);
+
+    return () => {
+      window.clearInterval(tipInterval);
+    };
+  }, [loading]);
 
   useEffect(
     () =>
@@ -938,6 +1229,14 @@ export default function MysteryDraftPage() {
   }
 
   if (!game.started) {
+    if (loading && !error) {
+      return (
+        <main className={`mystery-page ${lightMode ? "mystery-page-light" : ""}`}>
+          <MysteryRosterWarmup tip={activeTip} />
+        </main>
+      );
+    }
+
     return (
       <main className={`mystery-page ${lightMode ? "mystery-page-light" : ""}`}>
         <section className="mystery-shell mystery-lobby-shell">
@@ -1018,7 +1317,7 @@ export default function MysteryDraftPage() {
                   onChange={(value) => updatePoolBias("top100", value)}
                 />
                 <PoolBiasSlider
-                  helper="Prioritizes seasons where the player actually earned the selected award or accolade."
+                  helper="Prioritizes players who earned the selected award or accolade inside the selected draft years."
                   label="Award Bias"
                   value={settingsDraft.award}
                   onChange={(value) => updatePoolBias("award", value)}
@@ -1172,13 +1471,9 @@ export default function MysteryDraftPage() {
           <StatTile label="Max Offer" value={formatMoney(legalMaxOffer)} />
         </section>
 
-        {game.warnings.length ? (
-          <div className="mystery-warning-strip">
-            {game.warnings.map((warning, index) => (
-              <span key={`${warning}-${index}`}>{warning}</span>
-            ))}
-          </div>
-        ) : null}
+        <div className="mystery-toast-region" aria-live="polite">
+          {toastWarning ? <div className="mystery-toast">{toastWarning}</div> : null}
+        </div>
 
         <div className="mystery-layout">
           <section className="mystery-table">
@@ -1439,23 +1734,47 @@ export default function MysteryDraftPage() {
             >
               <summary className="mystery-panel-title">
                 <Trophy size={18} />
-                <h2>Roster</h2>
+                <h2>{rosterViewMode === "roster" ? "Roster" : "Court"}</h2>
                 <span>{slotsRemaining} slots left</span>
               </summary>
-              <div className="mystery-roster-list">
-                {game.roster.length ? (
-                  game.roster.map((card, index) => (
-                    <RosterCard
-                      card={card}
-                      key={card.rosterCardId}
-                      rank={index + 1}
-                      showAdjustedStats={adjustedStatsEnabled}
-                    />
-                  ))
-                ) : (
-                  <p className="mystery-empty-copy">No acquired cards yet.</p>
-                )}
+              <div className="mystery-view-toggle" aria-label="Roster panel view">
+                <button
+                  aria-pressed={rosterViewMode === "roster"}
+                  className={rosterViewMode === "roster" ? "mystery-view-toggle-active" : ""}
+                  type="button"
+                  onClick={() => setRosterViewMode("roster")}
+                >
+                  <List size={16} />
+                  Roster
+                </button>
+                <button
+                  aria-pressed={rosterViewMode === "court"}
+                  className={rosterViewMode === "court" ? "mystery-view-toggle-active" : ""}
+                  type="button"
+                  onClick={() => setRosterViewMode("court")}
+                >
+                  <Map size={16} />
+                  Court
+                </button>
               </div>
+              {rosterViewMode === "roster" ? (
+                <div className="mystery-roster-list">
+                  {game.roster.length ? (
+                    game.roster.map((card, index) => (
+                      <RosterCard
+                        card={card}
+                        key={card.rosterCardId}
+                        rank={index + 1}
+                        showAdjustedStats={adjustedStatsEnabled}
+                      />
+                    ))
+                  ) : (
+                    <p className="mystery-empty-copy">No acquired cards yet.</p>
+                  )}
+                </div>
+              ) : (
+                <MysteryCourtView roster={game.roster} />
+              )}
             </details>
 
           </aside>

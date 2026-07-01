@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { Moon, RotateCcw, Sun } from "lucide-react";
+import { warmupPlayers } from "./apiClient";
 import {
   ADMIN_SESSION_CHANGE_EVENT,
   adjustedStatsSnapshot,
@@ -148,6 +149,10 @@ export default function SiteControls() {
   );
   const visibleMenuLinks = MENU_LINKS.filter((link) => !link.adminOnly || isAdmin);
   const adminSelection = gameHeaderState?.adminSelection;
+
+  useEffect(() => {
+    void warmupPlayers().catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("site-light-mode", lightMode);

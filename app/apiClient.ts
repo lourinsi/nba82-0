@@ -65,3 +65,7 @@ export function getCachedPlayers<T>() {
 export function loadPlayers<T>() {
   return loadApiJson<T[]>(PLAYERS_PATH);
 }
+
+export function warmupPlayers<T>() {
+  return loadPlayers<T>();
+}
