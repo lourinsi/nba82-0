@@ -38,6 +38,10 @@ import {
   type GameTip,
 } from "../gameTips";
 import type { Achievement, Player, StatsEngineConfig } from "../GameCourt";
+import MobileGameFooter, {
+  type MobileGameFooterNavItem,
+  type MobileGameFooterSlot,
+} from "../MobileGameFooter";
 import { UNKNOWN_PLAYER_IMAGE, handlePlayerImageError } from "../playerImages";
 import {
   optimizeMysteryDraftPositions,
@@ -47,7 +51,9 @@ import {
   DEFAULT_MYSTERY_DRAFT_SETTINGS,
   MYSTERY_AWARD_FILTER_OPTIONS,
   MYSTERY_SEASON_POOL_OPTIONS,
+  acceptMysteryDraftSecondOffer,
   createMysteryDraftGame,
+  declineMysteryDraftSecondOffer,
   generateSpinCandidates,
   minimumLegalOfferForCurrentCard,
   maxLegalOffer,
@@ -103,6 +109,14 @@ function clamp(value: number, min: number, max: number) {
 
 function formatMoney(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `$${value}` : "--";
+}
+
+function formatScore(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "--";
+  }
+
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function formatMarketRange(min: number | null | undefined, max: number | null | undefined) {
@@ -504,9 +518,21 @@ function revealCardTitle(result: MysteryDraftOfferResult) {
     : "Card Skipped";
 }
 
+function resultTypeClassName(resultType: MysteryDraftOfferResult["resultType"]) {
+  return resultType.toLowerCase().replace(/_/g, "-");
+}
+
 function revealOutcomeText(result: MysteryDraftOfferResult) {
+  if (result.resultType === "SNIPED") {
+    return "SNIPED! Added to roster";
+  }
+
   if (result.resultType === "ACCEPTED") {
-    return "Accepted - Added to roster";
+    return result.acceptedSecondOffer ? "Accepted second offer - Added to roster" : "Accepted - Added to roster";
+  }
+
+  if (result.resultType === "REJECTED_COUNTER") {
+    return "Rejected - Second offer available";
   }
 
   if (result.resultType === "REJECTED") {
@@ -523,11 +549,19 @@ function revealDeltaText(result: MysteryDraftOfferResult) {
 
   const delta = result.userOffer - result.minimumNeeded;
 
+  if (result.resultType === "SNIPED") {
+    return "Perfect match";
+  }
+
   if (result.resultType === "ACCEPTED") {
+    if (result.acceptedSecondOffer) {
+      return "Accepted counter offer";
+    }
+
     return delta > 0 ? `Overpaid by ${formatMoney(delta)}` : "Matched true price";
   }
 
-  if (result.resultType === "REJECTED") {
+  if (result.resultType === "REJECTED" || result.resultType === "REJECTED_COUNTER") {
     return `Short by ${formatMoney(Math.abs(delta))}`;
   }
 
@@ -535,11 +569,15 @@ function revealDeltaText(result: MysteryDraftOfferResult) {
 }
 
 function resultToneLabel(result: MysteryDraftOfferResult) {
+  if (result.resultType === "SNIPED") {
+    return "SNIPED!";
+  }
+
   if (result.resultType === "ACCEPTED") {
     return "Accepted";
   }
 
-  if (result.resultType === "REJECTED") {
+  if (result.resultType === "REJECTED" || result.resultType === "REJECTED_COUNTER") {
     return "Rejected";
   }
 
@@ -547,8 +585,20 @@ function resultToneLabel(result: MysteryDraftOfferResult) {
 }
 
 function resultSubcopy(result: MysteryDraftOfferResult) {
+  if (result.resultType === "SNIPED") {
+    const baseScore = formatScore(result.baseScore ?? result.revealedCard?.baseScore ?? 0);
+    const finalScore = formatScore(result.finalScore ?? result.revealedCard?.finalScore ?? 0);
+
+    // return `Perfect price. +10% score bonus: ${baseScore} to ${finalScore}`;
+    return `Perfect price +10%`;
+  }
+
   if (result.resultType === "ACCEPTED") {
-    return "Added to roster";
+    return result.acceptedSecondOffer ? "Counter offer accepted" : "Added to roster";
+  }
+
+  if (result.resultType === "REJECTED_COUNTER") {
+    return "Counter offer available";
   }
 
   if (result.resultType === "REJECTED") {
@@ -559,11 +609,11 @@ function resultSubcopy(result: MysteryDraftOfferResult) {
 }
 
 function ResultStatusIcon({ resultType }: { resultType: MysteryDraftOfferResult["resultType"] }) {
-  if (resultType === "ACCEPTED") {
+  if (resultType === "ACCEPTED" || resultType === "SNIPED") {
     return <CheckCircle2 />;
   }
 
-  if (resultType === "REJECTED") {
+  if (resultType === "REJECTED" || resultType === "REJECTED_COUNTER") {
     return <XCircle />;
   }
 
@@ -571,8 +621,12 @@ function ResultStatusIcon({ resultType }: { resultType: MysteryDraftOfferResult[
 }
 
 function MysteryResultCard({
+  canAcceptSecondOffer = false,
   canSpin,
+  counterOfferUnavailableText = null,
   isLoading,
+  onAcceptSecondOffer,
+  onDeclineSecondOffer,
   onNewRun,
   onSpinNext,
   onViewResults,
@@ -580,8 +634,12 @@ function MysteryResultCard({
   runComplete,
   showAdjustedStats,
 }: {
+  canAcceptSecondOffer?: boolean;
   canSpin: boolean;
+  counterOfferUnavailableText?: string | null;
   isLoading: boolean;
+  onAcceptSecondOffer?: () => void;
+  onDeclineSecondOffer?: () => void;
   onNewRun: () => void;
   onSpinNext: () => void;
   onViewResults: () => void;
@@ -592,10 +650,11 @@ function MysteryResultCard({
   const revealedCard = result.revealedCard;
   const deltaText = revealDeltaText(result);
   const articleStyle = revealedCard ? teamThemeStyle(revealedCard.team) : undefined;
+  const isCounterOffer = result.resultType === "REJECTED_COUNTER";
 
   return (
     <article
-      className={`mystery-current-card mystery-result-card mystery-result-card-${result.resultType.toLowerCase()}`}
+      className={`mystery-current-card mystery-result-card mystery-result-card-${resultTypeClassName(result.resultType)}`}
       style={articleStyle}
     >
       <div className="mystery-card-topline">
@@ -625,6 +684,13 @@ function MysteryResultCard({
               <strong>{formatMoney(result.minimumNeeded)}</strong>
             </div>
           ) : null}
+
+          {result.secondOffer !== null ? (
+            <div className="mystery-hidden-price-panel mystery-second-offer-panel" aria-label="Second offer">
+              <span>{result.acceptedSecondOffer ? "Second Offer Paid" : "Second Offer"}</span>
+              <strong>{formatMoney(result.secondOffer)}</strong>
+            </div>
+          ) : null}
         </div>
 
         {revealedCard ? (
@@ -647,6 +713,9 @@ function MysteryResultCard({
 
       <div className="mystery-result-summary">
         <span>{result.userOffer === null ? "No offer submitted" : `You offered ${formatMoney(result.userOffer)}`}</span>
+        {result.paidAmount !== null ? <span>Paid {formatMoney(result.paidAmount)}</span> : null}
+        {result.secondOffer !== null ? <strong>Second Offer {formatMoney(result.secondOffer)}</strong> : null}
+        {result.wasSniped ? <strong>+10% player score</strong> : null}
         {deltaText ? <strong>{deltaText}</strong> : null}
       </div>
 
@@ -667,7 +736,31 @@ function MysteryResultCard({
       ) : null}
 
       <div className="mystery-result-actions">
-        {runComplete ? (
+        {isCounterOffer ? (
+          <div className="mystery-counter-actions">
+            <button
+              className="mystery-primary-button"
+              disabled={!canAcceptSecondOffer || isLoading}
+              type="button"
+              onClick={onAcceptSecondOffer}
+            >
+              <DollarSign size={18} />
+              Accept {formatMoney(result.secondOffer)}
+            </button>
+            <button
+              className="mystery-secondary-button"
+              disabled={isLoading}
+              type="button"
+              onClick={onDeclineSecondOffer}
+            >
+              <SkipForward size={18} />
+              Decline
+            </button>
+            <p className="mystery-validation">
+              {counterOfferUnavailableText || "Accepting a second offer does not apply the snipe bonus."}
+            </p>
+          </div>
+        ) : runComplete ? (
           <>
             <div className="mystery-result-final-score">
               <span>Run Complete</span>
@@ -685,7 +778,13 @@ function MysteryResultCard({
             </div>
           </>
         ) : (
-          <button className="mystery-primary-button" disabled={!canSpin} type="button" onClick={onSpinNext}>
+          <button
+            aria-disabled={!canSpin}
+            className="mystery-primary-button"
+            disabled={isLoading}
+            type="button"
+            onClick={onSpinNext}
+          >
             <RefreshCw size={18} />
             {isLoading ? "Loading..." : "Spin Next"}
           </button>
@@ -820,6 +919,17 @@ function MysteryRosterWarmup({ tip }: { tip: GameTip }) {
   );
 }
 
+function MysteryGameTipCard({ tip }: { tip: GameTip }) {
+  return (
+    <aside className="mystery-game-tip-card" role="note">
+      <span className="roster-tip-content" key={`${tip.eyebrow}-${tip.text}`}>
+        <span className="roster-tip-kicker">{tip.eyebrow}</span>
+        <span className="roster-tip-copy">{tip.text}</span>
+      </span>
+    </aside>
+  );
+}
+
 export default function MysteryDraftPage() {
   const router = useRouter();
   const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
@@ -861,6 +971,14 @@ export default function MysteryDraftPage() {
     ? validateMysteryDraftOffer(game, offerValue)
     : { message: null, valid: false };
   const lastRevealDelta = game.lastResult ? revealDeltaText(game.lastResult) : null;
+  const counterOfferResult = game.lastResult?.resultType === "REJECTED_COUNTER" ? game.lastResult : null;
+  const counterOfferAmount = counterOfferResult?.secondOffer ?? null;
+  const canAcceptCounterOffer =
+    counterOfferAmount !== null && Number.isFinite(counterOfferAmount) && counterOfferAmount <= legalMaxOffer;
+  const counterOfferUnavailableText =
+    counterOfferAmount !== null && !canAcceptCounterOffer
+      ? "Not enough salary cap for this second offer."
+      : null;
   const canSpin =
     !loading &&
     !error &&
@@ -869,7 +987,34 @@ export default function MysteryDraftPage() {
     game.started &&
     !game.currentCard &&
     game.spinsUsed < game.maxSpins &&
-    game.roster.length < game.rosterSize;
+    game.roster.length < game.rosterSize &&
+    legalMaxOffer >= game.settings.minimumOffer;
+  const mobileCourtAssignments = useMemo(
+    () => optimizeMysteryDraftPositions(game.roster).assignments,
+    [game.roster],
+  );
+  const mysteryMobileFooterSlots: MobileGameFooterSlot[] = mobileCourtAssignments.map((assignment) => {
+    const card = assignment.card;
+
+    return {
+      ariaLabel: card ? `${card.playerName}, ${assignment.slot}` : `${assignment.slot} slot`,
+      className: `mystery-mobile-footer-slot-${assignment.fitKind}`,
+      filled: Boolean(card),
+      key: assignment.slot,
+      label: assignment.slot,
+      style: card ? teamThemeStyle(card.team) : undefined,
+      title: card ? `${card.playerName} - ${card.team} ${card.seasonLabel}` : `${assignment.slot} slot`,
+      token: card ? playerInitials(card.playerName) : assignment.slot,
+    };
+  });
+  const mysteryMobileFooterNavItems: MobileGameFooterNavItem[] = [
+    { active: true, id: "play", label: "Play" },
+    { id: "feed", label: "Feed" },
+    { id: "leaderboard", label: "Leaderboard" },
+    { id: "challenges", label: "Challenges" },
+    { id: "profile", label: "Profile" },
+  ];
+  const shouldShowMysteryTip = game.started && game.status === "ACTIVE" && !game.lastResult;
 
   const clearSpinTimers = useCallback(() => {
     if (spinIntervalRef.current) {
@@ -881,6 +1026,22 @@ export default function MysteryDraftPage() {
       clearTimeout(spinTimeoutRef.current);
       spinTimeoutRef.current = null;
     }
+  }, []);
+
+  const showToastWarning = useCallback((message: string) => {
+    if (!message) {
+      return;
+    }
+
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+
+    setToastWarning(message);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastWarning(null);
+      toastTimeoutRef.current = null;
+    }, MYSTERY_TOAST_MS);
   }, []);
 
   const stopMysterySpin = useCallback(() => {
@@ -1061,23 +1222,12 @@ export default function MysteryDraftPage() {
       return;
     }
 
-    if (toastTimeoutRef.current) {
-      clearTimeout(toastTimeoutRef.current);
-    }
-
-    const showToastTimeout = setTimeout(() => {
-      setToastWarning(latestWarning);
-
-      toastTimeoutRef.current = setTimeout(() => {
-        setToastWarning(null);
-        toastTimeoutRef.current = null;
-      }, MYSTERY_TOAST_MS);
-    }, 0);
+    const showToastTimeout = setTimeout(() => showToastWarning(latestWarning), 0);
 
     return () => {
       clearTimeout(showToastTimeout);
     };
-  }, [game.warnings]);
+  }, [game.warnings, showToastWarning]);
 
   useEffect(
     () => () => {
@@ -1089,7 +1239,7 @@ export default function MysteryDraftPage() {
   );
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !shouldShowMysteryTip) {
       return;
     }
 
@@ -1100,7 +1250,7 @@ export default function MysteryDraftPage() {
     return () => {
       window.clearInterval(tipInterval);
     };
-  }, [loading]);
+  }, [loading, shouldShowMysteryTip]);
 
   useEffect(
     () =>
@@ -1167,8 +1317,53 @@ export default function MysteryDraftPage() {
     });
   }
 
+  function spinUnavailableMessage() {
+    if (loading) {
+      return "Loading the player pool.";
+    }
+
+    if (error) {
+      return `API error: ${error}`;
+    }
+
+    if (isSpinning) {
+      return "Spin already in progress.";
+    }
+
+    if (!game.started) {
+      return "Start the draft first.";
+    }
+
+    if (game.status === "COMPLETE") {
+      return "Run complete. View results or start a new run.";
+    }
+
+    if (counterOfferResult) {
+      return "Accept or decline the second offer first.";
+    }
+
+    if (game.currentCard) {
+      return "Bid or pass on the current card first.";
+    }
+
+    if (game.roster.length >= game.rosterSize) {
+      return "Roster is full. View results when ready.";
+    }
+
+    if (game.spinsUsed >= game.maxSpins) {
+      return "All spins are exhausted.";
+    }
+
+    if (legalMaxOffer < game.settings.minimumOffer) {
+      return "Not enough salary left to bid on another card.";
+    }
+
+    return "Can't spin right now.";
+  }
+
   function handleSpin() {
     if (!canSpin) {
+      showToastWarning(spinUnavailableMessage());
       return;
     }
 
@@ -1214,10 +1409,47 @@ export default function MysteryDraftPage() {
     event.preventDefault();
 
     if (!offerValidation.valid) {
+      showToastWarning(
+        offerValidation.message ||
+          (legalMaxOffer < currentMinimumOffer
+            ? "Not enough salary left for the minimum offer."
+            : `Minimum offer is ${formatMoney(currentMinimumOffer)}.`),
+      );
       return;
     }
 
-    setGame((current) => submitMysteryDraftOffer(current, offerValue));
+    const nextGame = submitMysteryDraftOffer(game, offerValue);
+
+    setGame(nextGame);
+    if (nextGame.lastResult?.resultType === "ACCEPTED" || nextGame.lastResult?.resultType === "SNIPED") {
+      setRosterViewMode("court");
+    }
+    setDetailsOpen(false);
+    setOfferText("");
+  }
+
+  function handleAcceptSecondOffer() {
+    if (!counterOfferResult) {
+      return;
+    }
+
+    if (!canAcceptCounterOffer) {
+      showToastWarning(counterOfferUnavailableText || "Not enough salary cap for this second offer.");
+      return;
+    }
+
+    const nextGame = acceptMysteryDraftSecondOffer(game);
+
+    setGame(nextGame);
+    if (nextGame.lastResult?.accepted) {
+      setRosterViewMode("court");
+    }
+    setDetailsOpen(false);
+    setOfferText("");
+  }
+
+  function handleDeclineSecondOffer() {
+    setGame((current) => declineMysteryDraftSecondOffer(current));
     setDetailsOpen(false);
     setOfferText("");
   }
@@ -1510,6 +1742,21 @@ export default function MysteryDraftPage() {
                   <p>Auto-stops after 5 seconds.</p>
                 </div>
               </article>
+            ) : counterOfferResult ? (
+              <MysteryResultCard
+                canAcceptSecondOffer={canAcceptCounterOffer}
+                canSpin={canSpin}
+                counterOfferUnavailableText={counterOfferUnavailableText}
+                isLoading={loading}
+                onAcceptSecondOffer={handleAcceptSecondOffer}
+                onDeclineSecondOffer={handleDeclineSecondOffer}
+                onNewRun={resetRun}
+                onSpinNext={handleSpin}
+                onViewResults={viewResults}
+                result={counterOfferResult}
+                runComplete={game.status === "COMPLETE"}
+                showAdjustedStats={adjustedStatsEnabled}
+              />
             ) : publicCard ? (
               <article className="mystery-current-card" style={teamThemeStyle(publicCard.team)}>
                 <div className="mystery-card-topline">
@@ -1628,7 +1875,7 @@ export default function MysteryDraftPage() {
                     </div>
                   </label>
                   <div className="mystery-offer-actions">
-                    <button className="mystery-primary-button" disabled={!offerValidation.valid} type="submit">
+                    <button className="mystery-primary-button" type="submit">
                       <DollarSign size={18} />
                       Submit Offer
                     </button>
@@ -1683,7 +1930,13 @@ export default function MysteryDraftPage() {
                     </button>
                   </div>
                 ) : (
-                  <button className="mystery-primary-button" disabled={!canSpin} type="button" onClick={handleSpin}>
+                  <button
+                    aria-disabled={!canSpin}
+                    className="mystery-primary-button"
+                    disabled={loading}
+                    type="button"
+                    onClick={handleSpin}
+                  >
                     <RefreshCw size={18} />
                     {loading ? "Loading..." : "Spin Card"}
                   </button>
@@ -1692,9 +1945,11 @@ export default function MysteryDraftPage() {
               </article>
             )}
 
-            {game.lastResult ? (
+            {shouldShowMysteryTip ? <MysteryGameTipCard tip={activeTip} /> : null}
+
+            {game.lastResult && !counterOfferResult ? (
               <section
-                className={`mystery-reveal mystery-reveal-log mystery-reveal-${game.lastResult.resultType.toLowerCase()}`}
+                className={`mystery-reveal mystery-reveal-log mystery-reveal-${resultTypeClassName(game.lastResult.resultType)}`}
                 aria-label="Last reveal"
               >
                 <div className="mystery-reveal-icon" aria-hidden="true">
@@ -1719,6 +1974,10 @@ export default function MysteryDraftPage() {
                         : `You offered ${formatMoney(game.lastResult.userOffer)}`}
                     </span>
                     <strong>{revealOutcomeText(game.lastResult)}</strong>
+                    {game.lastResult.secondOffer !== null ? (
+                      <span>Second Offer {formatMoney(game.lastResult.secondOffer)}</span>
+                    ) : null}
+                    {game.lastResult.wasSniped ? <span>+10% player score</span> : null}
                     {lastRevealDelta ? <span>{lastRevealDelta}</span> : null}
                   </div>
                 </div>
@@ -1780,6 +2039,11 @@ export default function MysteryDraftPage() {
           </aside>
         </div>
       </section>
+      <MobileGameFooter
+        className="mobile-game-footer-mystery"
+        navItems={mysteryMobileFooterNavItems}
+        slots={mysteryMobileFooterSlots}
+      />
     </main>
   );
 }

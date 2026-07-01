@@ -29,6 +29,10 @@ import {
   randomRotatingGameTipIndex,
   type GameTip,
 } from "./gameTips";
+import MobileGameFooter, {
+  type MobileGameFooterNavItem,
+  type MobileGameFooterSlot,
+} from "./MobileGameFooter";
 import type { HowToOverlayContent } from "./howToContent";
 
 export type Position = "PG" | "SG" | "SF" | "PF" | "C";
@@ -2253,6 +2257,51 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
     ? `Select a position for ${desktopPositionPickerPlayer.name}. True-position picks score higher.`
     : null;
   const desktopCourtTip = !desktopPositionPickerPlayer && hasActiveDraftSelection && !isSpinning ? activeTip : null;
+  const mobileFooterSlots: MobileGameFooterSlot[] = POSITIONS.map((position) => {
+    const slot = lineup[position];
+    const mobileSourceSlot = mobileMoveSource ? lineup[mobileMoveSource] : undefined;
+    const canReceiveMobileMove = Boolean(
+      mobileSourceSlot &&
+        mobileMoveSource !== position &&
+        placementStatus(lineup, mobileSourceSlot.player, position) !== "blocked",
+    );
+    const selected = selectedSlot === position || mobileMoveSource === position;
+    const mobileLineupBadgeAchievements =
+      (mode === "classic" || mode === "per-100") && selected && slot
+        ? selectCourtBadgeAchievements(
+            buildPlayerAchievements(
+              slot.player,
+              slot.selection,
+              statsEngineConfig,
+              supportsAdjustedStats && showAdjustedStats,
+            ),
+            courtAchievementLimit,
+            badgeScoreWeights,
+          )
+        : [];
+
+    return {
+      ariaLabel: slot ? `${slot.player.name}, ${position}` : `${position} slot`,
+      badges: mobileLineupBadgeAchievements.length ? (
+        <CourtAchievementBadges achievements={mobileLineupBadgeAchievements} />
+      ) : null,
+      canMove: canReceiveMobileMove,
+      filled: Boolean(slot),
+      key: position,
+      label: position,
+      onClick: () => handleMobileLineupSlotSelect(position),
+      selected,
+      style: slot ? teamThemeStyle(slot.selection.team) : undefined,
+      token: slot ? playerInitials(slot.player.name) : position,
+    };
+  });
+  const mobileFooterNavItems: MobileGameFooterNavItem[] = [
+    { active: true, id: "play", label: "Play" },
+    { id: "feed", label: "Feed", onClick: () => setSelectedSlot(null) },
+    { id: "leaderboard", label: "Leaderboard" },
+    { id: "challenges", label: "Challenges" },
+    { id: "profile", label: isAdmin ? "Logout" : "Profile", onClick: handleMobileProfileClick },
+  ];
   const renderAuthPanel = (className = "") => (
     <form
       className={`game-auth-panel ${className} grid w-[280px] max-w-[calc(100vw-2rem)] gap-3 rounded-lg border border-white/12 bg-[#202431] p-4 shadow-2xl shadow-black/35`}
@@ -2808,87 +2857,8 @@ export default function GameCourt({ config }: { config: GameCourtConfig }) {
 
       {calculatingResults ? <CalculatingResultsOverlay tip={activeTip} /> : null}
 
-      <footer className="mobile-game-footer" aria-label="Mobile game navigation">
-        <nav className="mobile-lineup-rail" aria-label="Lineup positions">
-          {POSITIONS.map((position) => {
-            const slot = lineup[position];
-            const mobileSourceSlot = mobileMoveSource ? lineup[mobileMoveSource] : undefined;
-            const canReceiveMobileMove = Boolean(
-              mobileSourceSlot &&
-                mobileMoveSource !== position &&
-                placementStatus(lineup, mobileSourceSlot.player, position) !== "blocked",
-            );
-            const isMobileLineupSlotSelected = selectedSlot === position || mobileMoveSource === position;
-            const mobileLineupBadgeAchievements =
-              (mode === "classic" || mode === "per-100") && isMobileLineupSlotSelected && slot
-                ? selectCourtBadgeAchievements(
-                    buildPlayerAchievements(
-                      slot.player,
-                      slot.selection,
-                      statsEngineConfig,
-                      supportsAdjustedStats && showAdjustedStats,
-                    ),
-                    courtAchievementLimit,
-                    badgeScoreWeights,
-                  )
-                : [];
-
-            return (
-              <button
-                key={position}
-                aria-label={slot ? `${slot.player.name}, ${position}` : `${position} slot`}
-                className={`mobile-lineup-slot ${isMobileLineupSlotSelected ? "mobile-lineup-slot-selected" : ""} ${
-                  canReceiveMobileMove ? "mobile-lineup-slot-can-move" : ""
-                } ${
-                  slot ? "mobile-lineup-slot-filled" : ""
-                }`}
-                style={slot ? teamThemeStyle(slot.selection.team) : undefined}
-                type="button"
-                onClick={() => handleMobileLineupSlotSelect(position)}
-              >
-                {mobileLineupBadgeAchievements.length ? (
-                  <CourtAchievementBadges achievements={mobileLineupBadgeAchievements} />
-                ) : null}
-                <span className="mobile-lineup-token">{slot ? playerInitials(slot.player.name) : position}</span>
-                <span className="mobile-lineup-label">{position}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <nav className="mobile-bottom-nav" aria-label="Primary mobile navigation">
-          <button className="mobile-bottom-nav-item mobile-bottom-nav-item-active" type="button">
-            <IconPlay />
-            <span>Play</span>
-          </button>
-          <button className="mobile-bottom-nav-item" type="button" onClick={() => setSelectedSlot(null)}>
-            <IconFeed />
-            <span>Feed</span>
-          </button>
-          <button className="mobile-bottom-nav-item" type="button">
-            <IconLeaderboard />
-            <span>Leaderboard</span>
-          </button>
-          <button className="mobile-bottom-nav-item" type="button">
-            <IconChallenges />
-            <span>Challenges</span>
-          </button>
-          <button className="mobile-bottom-nav-item" type="button" onClick={handleMobileProfileClick}>
-            <IconProfile />
-            <span>{isAdmin ? "Logout" : "Profile"}</span>
-          </button>
-        </nav>
-      </footer>
+      <MobileGameFooter navItems={mobileFooterNavItems} slots={mobileFooterSlots} />
     </main>
-  );
-}
-
-function IconProfile() {
-  return (
-    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5.2 20a6.8 6.8 0 0 1 13.6 0" />
-    </svg>
   );
 }
 
@@ -2934,42 +2904,6 @@ function IconShield() {
   return (
     <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
       <path d="M12 3 5 6v5.5c0 4.1 2.7 7.7 7 9.5 4.3-1.8 7-5.4 7-9.5V6z" />
-    </svg>
-  );
-}
-
-function IconPlay() {
-  return (
-    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="8" />
-      <path d="M12 4v16M4 12h16M6.3 7.2c3.4 1.7 8 1.7 11.4 0M6.3 16.8c3.4-1.7 8-1.7 11.4 0" />
-    </svg>
-  );
-}
-
-function IconFeed() {
-  return (
-    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
-      <path d="M5 4h11l3 3v13H5z" />
-      <path d="M16 4v4h4M8 11h8M8 15h8M8 19h5" />
-    </svg>
-  );
-}
-
-function IconLeaderboard() {
-  return (
-    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
-      <path d="M5 20V10M12 20V4M19 20v-7" />
-      <path d="M3 20h18" />
-    </svg>
-  );
-}
-
-function IconChallenges() {
-  return (
-    <svg aria-hidden="true" className="mobile-icon" fill="none" viewBox="0 0 24 24">
-      <path d="M6 4l14 14M14 4l6 6M4 14l6 6" />
-      <path d="M14 4h6v6M4 14v6h6" />
     </svg>
   );
 }

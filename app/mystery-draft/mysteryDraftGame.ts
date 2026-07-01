@@ -147,7 +147,7 @@ export const DEFAULT_MYSTERY_DRAFT_SETTINGS: MysteryDraftSettings = Object.freez
 export type MysteryDraftSettingsInput = Partial<MysteryDraftSettings>;
 export type MysteryDraftStatus = "ACTIVE" | "COMPLETE";
 export type MysteryDraftPoolSource = MysteryPoolBiasKey;
-export type MysteryDraftOfferResultType = "ACCEPTED" | "REJECTED" | "PASSED";
+export type MysteryDraftOfferResultType = "ACCEPTED" | "REJECTED" | "REJECTED_COUNTER" | "SNIPED" | "PASSED";
 
 export type MysteryNumberRange = {
   max: number;
@@ -230,10 +230,13 @@ export type MysteryDraftCard = MysteryDraftPublicCard & {
 
 export type MysteryDraftRosterCard = {
   accoladeScore: number;
+  baseScore: number;
   cardSeasonLabel: string;
   eligiblePositions: Position[];
   era: string;
   eraLabel: string;
+  finalScore: number;
+  paidAmount: number;
   paidPrice: number;
   playerImageUrl: string | null;
   playerId: string;
@@ -247,20 +250,32 @@ export type MysteryDraftRosterCard = {
   seasonEndYear: number | null;
   seasonId: string;
   seasonLabel: string;
+  scoreMultiplier: number;
   statScore: WeightedPer100SeasonScore;
   statScoreOnly: number;
   team: string;
+  truePrice: number;
+  wasSniped: boolean;
 };
 
 export type MysteryDraftOfferResult = {
   accepted: boolean;
+  acceptedSecondOffer: boolean;
   addedToRoster: boolean;
+  baseScore: number | null;
   cardLost: boolean;
+  finalScore: number | null;
+  label: string;
   minimumNeeded: number | null;
+  paidAmount: number | null;
   resultType: MysteryDraftOfferResultType;
   revealedCard: MysteryDraftRosterCard | null;
   salarySpent: number;
+  scoreMultiplier: number;
+  secondOffer: number | null;
+  truePrice: number | null;
   userOffer: number | null;
+  wasSniped: boolean;
 };
 
 export type MysteryDraftGameState = {
@@ -321,6 +336,27 @@ export type MysteryDraftSpinCandidateResult = {
 
 const MAX_WARNING_COUNT = 5;
 export const MYSTERY_LINEUP_POSITIONS = ["PG", "SG", "SF", "PF", "C"] as const satisfies readonly Position[];
+export const SNIPE_SCORE_MULTIPLIER = 1.10;
+export const SECOND_OFFER_CONFIG = Object.freeze({
+  minimumMarkupPct: 0.05,
+  distanceWeight: 1.05,
+  distanceCurve: 1.9,
+  maxMarkupPct: 0.75,
+  roundToIncrement: 1,
+});
+
+export type MysterySecondOfferConfig = typeof SECOND_OFFER_CONFIG;
+export type MysteryBidResolutionStatus = "sniped" | "accepted" | "rejected_counter";
+export type MysteryBidResolution = {
+  accepted: boolean;
+  finalPlayerScore: number;
+  label: "SNIPED!" | "Accepted" | "Rejected";
+  paidAmount: number | null;
+  scoreMultiplier: number;
+  secondOffer: number | null;
+  status: MysteryBidResolutionStatus;
+  truePrice: number;
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -328,6 +364,94 @@ function clamp(value: number, min: number, max: number) {
 
 function rounded(value: number, digits = 2) {
   return Number(value.toFixed(digits));
+}
+
+export function roundUpToIncrement(value: number, increment = 1) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  if (!Number.isFinite(increment) || increment <= 0) {
+    return Math.ceil(value);
+  }
+
+  return Math.ceil(value / increment) * increment;
+}
+
+export function calculateSecondOffer(
+  originalOffer: number,
+  truePrice: number,
+  config: MysterySecondOfferConfig = SECOND_OFFER_CONFIG,
+) {
+  if (!Number.isFinite(originalOffer) || !Number.isFinite(truePrice)) {
+    throw new Error("Invalid offer or true price");
+  }
+
+  if (truePrice <= 0) {
+    return 0;
+  }
+
+  if (originalOffer >= truePrice) {
+    return truePrice;
+  }
+
+  const gapRatio = Math.max(0, Math.min(1, (truePrice - originalOffer) / truePrice));
+  const markupPct = config.minimumMarkupPct + config.distanceWeight * Math.pow(gapRatio, config.distanceCurve);
+  const cappedMarkupPct = Math.min(markupPct, config.maxMarkupPct);
+  const rawSecondOffer = truePrice * (1 + cappedMarkupPct);
+
+  return roundUpToIncrement(rawSecondOffer, config.roundToIncrement);
+}
+
+export function resolveBid({
+  originalOffer,
+  playerScore,
+  truePrice,
+}: {
+  originalOffer: number;
+  playerScore: number;
+  truePrice: number;
+}): MysteryBidResolution {
+  const basePlayerScore = Number.isFinite(playerScore) ? playerScore : 0;
+
+  if (originalOffer === truePrice) {
+    return {
+      status: "sniped",
+      label: "SNIPED!",
+      accepted: true,
+      paidAmount: originalOffer,
+      truePrice,
+      secondOffer: null,
+      scoreMultiplier: SNIPE_SCORE_MULTIPLIER,
+      finalPlayerScore: rounded(basePlayerScore * SNIPE_SCORE_MULTIPLIER),
+    };
+  }
+
+  if (originalOffer > truePrice) {
+    return {
+      status: "accepted",
+      label: "Accepted",
+      accepted: true,
+      paidAmount: originalOffer,
+      truePrice,
+      secondOffer: null,
+      scoreMultiplier: 1.00,
+      finalPlayerScore: basePlayerScore,
+    };
+  }
+
+  const secondOffer = calculateSecondOffer(originalOffer, truePrice);
+
+  return {
+    status: "rejected_counter",
+    label: "Rejected",
+    accepted: false,
+    paidAmount: null,
+    truePrice,
+    secondOffer,
+    scoreMultiplier: 1.00,
+    finalPlayerScore: basePlayerScore,
+  };
 }
 
 function positiveInteger(value: unknown, fallback: number) {
@@ -2025,7 +2149,7 @@ export function minimumLegalOfferForCurrentCard(state: MysteryDraftGameState) {
 }
 
 export function mysteryDraftFinalScore(state: MysteryDraftGameState) {
-  return rounded(state.roster.reduce((sum, card) => sum + card.score, 0));
+  return rounded(state.roster.reduce((sum, card) => sum + (card.finalScore ?? card.score), 0));
 }
 
 function stateWithStatusForRunEnd(state: MysteryDraftGameState): MysteryDraftGameState {
@@ -2344,13 +2468,26 @@ function revealedCardFromSeason(
   card: MysteryDraftCard,
   season: MysteryScoredSeason,
   paidPrice: number,
+  options: {
+    scoreMultiplier?: number;
+    truePrice?: number;
+    wasSniped?: boolean;
+  } = {},
 ): MysteryDraftRosterCard {
+  const scoreMultiplier = options.scoreMultiplier ?? 1.00;
+  const baseScore = season.score;
+  const finalScore = rounded(baseScore * scoreMultiplier);
+  const truePrice = options.truePrice ?? season.reservePrice;
+
   return {
     accoladeScore: season.accoladeScore,
+    baseScore,
     cardSeasonLabel: season.cardSeasonLabel,
     eligiblePositions: season.eligiblePositions,
     era: card.era,
     eraLabel: card.eraLabel,
+    finalScore,
+    paidAmount: paidPrice,
     paidPrice,
     playerImageUrl: card.playerImageUrl,
     playerId: card.playerId,
@@ -2359,14 +2496,17 @@ function revealedCardFromSeason(
     rawStats: season.rawStats,
     reservePrice: season.reservePrice,
     rosterCardId: randomId("mystery-roster-card"),
-    score: season.score,
+    score: finalScore,
     seasonAchievements: season.seasonAchievements,
     seasonEndYear: season.seasonEndYear,
     seasonId: season.seasonId,
     seasonLabel: season.seasonLabel,
+    scoreMultiplier,
     statScore: season.statScore,
     statScoreOnly: season.statScoreOnly,
     team: card.team,
+    truePrice,
+    wasSniped: options.wasSniped ?? false,
   };
 }
 
@@ -2423,6 +2563,13 @@ export function submitMysteryDraftOffer(state: MysteryDraftGameState, offer: num
     };
   }
 
+  if (state.lastResult?.resultType === "REJECTED_COUNTER") {
+    return {
+      ...state,
+      warnings: appendWarnings(state, ["Accept or reject the second offer before bidding again."]),
+    };
+  }
+
   const validation = validateMysteryDraftOffer(state, offer);
 
   if (!validation.valid) {
@@ -2433,30 +2580,72 @@ export function submitMysteryDraftOffer(state: MysteryDraftGameState, offer: num
   }
 
   const hiddenSeason = hiddenSeasonForCard(state.currentCard);
-  const accepted = offer >= hiddenSeason.reservePrice;
-  const revealedCard = revealedCardFromSeason(state.currentCard, hiddenSeason, accepted ? offer : 0);
-  const roster = accepted ? [...state.roster, revealedCard] : state.roster;
-  const salaryRemaining = accepted ? state.salaryRemaining - offer : state.salaryRemaining;
-  const acquiredPlayerIds = accepted
-    ? Array.from(new Set([...state.acquiredPlayerIds, state.currentCard.playerId]))
-    : state.acquiredPlayerIds;
-  const acquiredPlayerNames = accepted
-    ? Array.from(new Set([...state.acquiredPlayerNames, normalizeName(state.currentCard.playerName)]))
-    : state.acquiredPlayerNames;
+  const bid = resolveBid({
+    originalOffer: offer,
+    playerScore: hiddenSeason.score,
+    truePrice: hiddenSeason.reservePrice,
+  });
+  const wasSniped = bid.status === "sniped";
+  const accepted = bid.accepted;
+  const paidAmount = bid.paidAmount ?? 0;
+  const revealedCard = revealedCardFromSeason(state.currentCard, hiddenSeason, paidAmount, {
+    scoreMultiplier: bid.scoreMultiplier,
+    truePrice: bid.truePrice,
+    wasSniped,
+  });
+
+  if (!accepted) {
+    return {
+      ...state,
+      lastResult: {
+        accepted: false,
+        acceptedSecondOffer: false,
+        addedToRoster: false,
+        baseScore: hiddenSeason.score,
+        cardLost: false,
+        finalScore: hiddenSeason.score,
+        label: bid.label,
+        minimumNeeded: bid.truePrice,
+        paidAmount: null,
+        resultType: "REJECTED_COUNTER",
+        revealedCard,
+        salarySpent: 0,
+        scoreMultiplier: bid.scoreMultiplier,
+        secondOffer: bid.secondOffer,
+        truePrice: bid.truePrice,
+        userOffer: offer,
+        wasSniped: false,
+      } satisfies MysteryDraftOfferResult,
+    };
+  }
+
+  const roster = [...state.roster, revealedCard];
+  const salaryRemaining = state.salaryRemaining - paidAmount;
+  const acquiredPlayerIds = Array.from(new Set([...state.acquiredPlayerIds, state.currentCard.playerId]));
+  const acquiredPlayerNames = Array.from(new Set([...state.acquiredPlayerNames, normalizeName(state.currentCard.playerName)]));
   const nextState = {
     ...state,
     acquiredPlayerIds,
     acquiredPlayerNames,
     currentCard: null,
     lastResult: {
-      accepted,
-      addedToRoster: accepted,
-      cardLost: !accepted,
-      minimumNeeded: hiddenSeason.reservePrice,
-      resultType: accepted ? "ACCEPTED" : "REJECTED",
+      accepted: true,
+      acceptedSecondOffer: false,
+      addedToRoster: true,
+      baseScore: hiddenSeason.score,
+      cardLost: false,
+      finalScore: bid.finalPlayerScore,
+      label: bid.label,
+      minimumNeeded: bid.truePrice,
+      paidAmount,
+      resultType: wasSniped ? "SNIPED" : "ACCEPTED",
       revealedCard,
-      salarySpent: accepted ? offer : 0,
+      salarySpent: paidAmount,
+      scoreMultiplier: bid.scoreMultiplier,
+      secondOffer: null,
+      truePrice: bid.truePrice,
       userOffer: offer,
+      wasSniped,
     } satisfies MysteryDraftOfferResult,
     roster,
     salaryRemaining,
@@ -2465,7 +2654,99 @@ export function submitMysteryDraftOffer(state: MysteryDraftGameState, offer: num
   return stateWithStatusForRunEnd(nextState);
 }
 
+export function acceptMysteryDraftSecondOffer(state: MysteryDraftGameState): MysteryDraftGameState {
+  const counterResult = state.lastResult;
+
+  if (!state.currentCard || counterResult?.resultType !== "REJECTED_COUNTER" || counterResult.secondOffer === null) {
+    return {
+      ...state,
+      warnings: appendWarnings(state, ["No second offer is available."]),
+    };
+  }
+
+  if (counterResult.secondOffer > maxLegalOffer(state)) {
+    return {
+      ...state,
+      warnings: appendWarnings(state, ["Not enough salary cap for the second offer."]),
+    };
+  }
+
+  const hiddenSeason = hiddenSeasonForCard(state.currentCard);
+  const truePrice = counterResult.truePrice ?? hiddenSeason.reservePrice;
+  const paidAmount = counterResult.secondOffer;
+  const revealedCard = revealedCardFromSeason(state.currentCard, hiddenSeason, paidAmount, {
+    scoreMultiplier: 1.00,
+    truePrice,
+    wasSniped: false,
+  });
+  const roster = [...state.roster, revealedCard];
+  const salaryRemaining = state.salaryRemaining - paidAmount;
+  const acquiredPlayerIds = Array.from(new Set([...state.acquiredPlayerIds, state.currentCard.playerId]));
+  const acquiredPlayerNames = Array.from(new Set([...state.acquiredPlayerNames, normalizeName(state.currentCard.playerName)]));
+  const nextState = {
+    ...state,
+    acquiredPlayerIds,
+    acquiredPlayerNames,
+    currentCard: null,
+    lastResult: {
+      ...counterResult,
+      accepted: true,
+      acceptedSecondOffer: true,
+      addedToRoster: true,
+      baseScore: hiddenSeason.score,
+      cardLost: false,
+      finalScore: hiddenSeason.score,
+      label: "Accepted",
+      minimumNeeded: truePrice,
+      paidAmount,
+      resultType: "ACCEPTED",
+      revealedCard,
+      salarySpent: paidAmount,
+      scoreMultiplier: 1.00,
+      secondOffer: paidAmount,
+      truePrice,
+      wasSniped: false,
+    } satisfies MysteryDraftOfferResult,
+    roster,
+    salaryRemaining,
+  };
+
+  return stateWithStatusForRunEnd(nextState);
+}
+
+export function declineMysteryDraftSecondOffer(state: MysteryDraftGameState): MysteryDraftGameState {
+  const counterResult = state.lastResult;
+
+  if (!state.currentCard || counterResult?.resultType !== "REJECTED_COUNTER") {
+    return state;
+  }
+
+  const nextState = {
+    ...state,
+    currentCard: null,
+    lastResult: {
+      ...counterResult,
+      accepted: false,
+      acceptedSecondOffer: false,
+      addedToRoster: false,
+      cardLost: true,
+      label: "Rejected",
+      paidAmount: null,
+      resultType: "REJECTED",
+      salarySpent: 0,
+      scoreMultiplier: 1.00,
+      wasSniped: false,
+    } satisfies MysteryDraftOfferResult,
+  };
+
+  return stateWithStatusForRunEnd(nextState);
+}
+
 export function passMysteryDraftCard(state: MysteryDraftGameState): MysteryDraftGameState {
+  if (state.lastResult?.resultType === "REJECTED_COUNTER") {
+    return declineMysteryDraftSecondOffer(state);
+  }
+
   if (!state.currentCard) {
     return state;
   }
@@ -2479,13 +2760,22 @@ export function passMysteryDraftCard(state: MysteryDraftGameState): MysteryDraft
     currentCard: null,
     lastResult: {
       accepted: false,
+      acceptedSecondOffer: false,
       addedToRoster: false,
+      baseScore: revealedCard?.baseScore ?? null,
       cardLost: true,
+      finalScore: revealedCard?.finalScore ?? null,
+      label: "Passed",
       minimumNeeded: state.settings.revealAfterPass ? hiddenSeason.reservePrice : null,
+      paidAmount: null,
       resultType: "PASSED",
       revealedCard,
       salarySpent: 0,
+      scoreMultiplier: 1.00,
+      secondOffer: null,
+      truePrice: state.settings.revealAfterPass ? hiddenSeason.reservePrice : null,
       userOffer: null,
+      wasSniped: false,
     } satisfies MysteryDraftOfferResult,
   };
 

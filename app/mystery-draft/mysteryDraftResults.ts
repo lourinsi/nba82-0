@@ -148,7 +148,7 @@ export function calculatePositionFitMultiplier(
 
 function assignmentForSlot(card: MysteryDraftRosterCard | null, slot: Position): MysteryPositionAssignment {
   const fit = calculatePositionFitMultiplier(card, slot);
-  const baseScore = card?.score ?? 0;
+  const baseScore = card?.finalScore ?? card?.score ?? 0;
   const positionAdjustedScore = rounded(baseScore * fit.multiplier);
 
   return {
