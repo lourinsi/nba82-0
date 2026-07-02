@@ -54,6 +54,8 @@ import {
   createMysteryDraftGame,
   declineMysteryDraftSecondOffer,
   generateSpinCandidates,
+  getPlayerMysteryDisplay,
+  hiddenSeasonForCard,
   minimumLegalOfferForCurrentCard,
   maxLegalOffer,
   mysteryDefaultPoolBiasForSeasonPool,
@@ -86,6 +88,14 @@ import {
   MYSTERY_RESULTS_PATH,
 } from "./mysteryDraftResultConstants";
 import { buildMysteryDraftResultsPayload } from "./mysteryDraftResults";
+import {
+  buildMysteryMultiplayerSettings,
+  createMysteryMultiplayerLobby,
+  getMysteryMultiplayerClientId,
+  joinMysteryMultiplayerLobby,
+  normalizeMysteryLobbyCode,
+  rememberMysteryMultiplayerParticipant,
+} from "./multiplayerClient";
 
 const MYSTERY_SPIN_TICK_MS = 86;
 const MYSTERY_SPIN_MAX_MS = 5000;
@@ -930,10 +940,16 @@ export default function MysteryDraftPage() {
   const [settingsDraft, setSettingsDraft] = useState<MysteryDraftSettings>({
     ...DEFAULT_MYSTERY_DRAFT_SETTINGS,
   });
+  const [setupMode, setSetupMode] = useState<"solo" | "multiplayer">("solo");
   const [game, setGame] = useState(() => createMysteryDraftGame(settingsDraft));
   const [offerText, setOfferText] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
+  const [hostName, setHostName] = useState("Host");
+  const [joinCode, setJoinCode] = useState("");
+  const [joinName, setJoinName] = useState("Player");
+  const [multiplayerAction, setMultiplayerAction] = useState<"create" | "join" | null>(null);
+  const [multiplayerError, setMultiplayerError] = useState<string | null>(null);
   const [rosterPanelOpen, setRosterPanelOpen] = useState(true);
   const [rosterViewMode, setRosterViewMode] = useState<"roster" | "court">("roster");
   const [toastWarning, setToastWarning] = useState<string | null>(null);
@@ -947,6 +963,26 @@ export default function MysteryDraftPage() {
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const publicCard = useMemo(() => publicMysteryDraftCard(game.currentCard), [game.currentCard]);
+  const currentCardDisplay = useMemo(() => {
+    if (!game.currentCard) {
+      return null;
+    }
+
+    return getPlayerMysteryDisplay({
+      hiddenPriceLabel: formatMarketRange(game.currentCard.marketMin, game.currentCard.marketMax),
+      hiddenSeasonLabel: game.currentCard.possibleYearRange,
+      playerSeason: hiddenSeasonForCard(game.currentCard),
+      possibleSeasons: game.currentCard.eligibleSeasons,
+      settings: game.settings,
+      truePrice: game.currentCard.hiddenReservePrice,
+    });
+  }, [game.currentCard, game.settings]);
+  const currentCardShowsPossibleSeasons = currentCardDisplay?.shouldShowPossibleSeasons ?? true;
+  const currentCardSeasonLabel = currentCardDisplay?.seasonLabel ?? publicCard?.possibleYearRange ?? "Unknown";
+  const currentCardPriceLabel =
+    currentCardDisplay?.priceLabel ??
+    (publicCard ? formatMarketRange(publicCard.marketMin, publicCard.marketMax) : "--");
+  const currentCardPriceCaption = game.settings.revealTruePrice ? "True Price" : "Market Range";
   const activeTip = GAME_TIPS[activeTipIndex] ?? GAME_TIPS[0];
   const displayedCardStats = publicCard ? displayStatsForCard(publicCard) : null;
   const activeSpinCandidate = spinCandidates[spinIndex] ?? null;
@@ -1176,7 +1212,11 @@ export default function MysteryDraftPage() {
 
   useEffect(() => {
     setGameHeaderState({
-      eyebrow: game.started ? (game.status === "COMPLETE" ? "Mystery Final" : "Mystery Draft") : "Mystery Lobby",
+      eyebrow: game.started
+        ? (game.status === "COMPLETE" ? "Mystery Final" : "Mystery Draft")
+        : setupMode === "multiplayer"
+          ? "Multiplayer Lobby"
+          : "Mystery Lobby",
       resetDisabled: false,
       resetLabel: "New mystery draft",
       showAdjustedStatsToggle: false,
@@ -1184,7 +1224,9 @@ export default function MysteryDraftPage() {
       title:
         game.started
           ? `${game.roster.length}/${game.rosterSize} players - ${formatMoney(game.salaryRemaining)}`
-          : `${mysterySeasonPoolLabel(settingsDraft.seasonPool)} setup`,
+          : setupMode === "multiplayer"
+            ? "Create or join lobby"
+            : `${mysterySeasonPoolLabel(settingsDraft.seasonPool)} setup`,
     });
   }, [
     game.roster.length,
@@ -1192,6 +1234,7 @@ export default function MysteryDraftPage() {
     game.salaryRemaining,
     game.started,
     game.status,
+    setupMode,
     settingsDraft.seasonPool,
   ]);
 
@@ -1456,6 +1499,66 @@ export default function MysteryDraftPage() {
     setOfferText("");
   }
 
+  async function handleCreateMultiplayerLobby() {
+    const trimmedHostName = hostName.trim();
+
+    if (!trimmedHostName) {
+      setMultiplayerError("Enter a host name.");
+      return;
+    }
+
+    try {
+      setMultiplayerAction("create");
+      setMultiplayerError(null);
+
+      const response = await createMysteryMultiplayerLobby({
+        clientId: getMysteryMultiplayerClientId(),
+        hostName: trimmedHostName,
+        settings: buildMysteryMultiplayerSettings(settingsDraft),
+      });
+
+      rememberMysteryMultiplayerParticipant(response.lobby.code, response.participant);
+      router.push(`/mystery-draft/multiplayer/${response.lobby.code}`);
+    } catch (createError) {
+      setMultiplayerError(createError instanceof Error ? createError.message : "Unable to create lobby.");
+    } finally {
+      setMultiplayerAction(null);
+    }
+  }
+
+  async function handleJoinMultiplayerLobby() {
+    const normalizedCode = normalizeMysteryLobbyCode(joinCode);
+    const trimmedJoinName = joinName.trim();
+
+    if (!normalizedCode) {
+      setMultiplayerError("Enter a lobby code.");
+      return;
+    }
+
+    if (!trimmedJoinName) {
+      setMultiplayerError("Enter a player name.");
+      return;
+    }
+
+    try {
+      setMultiplayerAction("join");
+      setMultiplayerError(null);
+
+      const response = await joinMysteryMultiplayerLobby({
+        clientId: getMysteryMultiplayerClientId(),
+        code: normalizedCode,
+        playerName: trimmedJoinName,
+      });
+
+      rememberMysteryMultiplayerParticipant(response.lobby.code, response.participant);
+      router.push(`/mystery-draft/multiplayer/${response.lobby.code}`);
+    } catch (joinError) {
+      setMultiplayerError(joinError instanceof Error ? joinError.message : "Unable to join lobby.");
+    } finally {
+      setMultiplayerAction(null);
+    }
+  }
+
   if (!game.started) {
     if (loading && !error) {
       return (
@@ -1470,8 +1573,33 @@ export default function MysteryDraftPage() {
         <section className="mystery-shell mystery-lobby-shell">
           <section className="mystery-lobby-card">
             <div className="mystery-lobby-heading">
-              <span className="mystery-kicker">Solo Mode</span>
+              <span className="mystery-kicker">{setupMode === "solo" ? "Solo Mode" : "Multiplayer Mode"}</span>
               <h1>Mystery Salary Draft</h1>
+            </div>
+
+            <div className="mystery-mode-toggle" aria-label="Mystery Draft mode">
+              <button
+                aria-pressed={setupMode === "solo"}
+                className={setupMode === "solo" ? "mystery-mode-toggle-active" : ""}
+                type="button"
+                onClick={() => {
+                  setSetupMode("solo");
+                  setMultiplayerError(null);
+                }}
+              >
+                Solo Mode
+              </button>
+              <button
+                aria-pressed={setupMode === "multiplayer"}
+                className={setupMode === "multiplayer" ? "mystery-mode-toggle-active" : ""}
+                type="button"
+                onClick={() => {
+                  setSetupMode("multiplayer");
+                  setMultiplayerError(null);
+                }}
+              >
+                Multiplayer Mode
+              </button>
             </div>
 
             <div className="mystery-lobby-main">
@@ -1529,17 +1657,81 @@ export default function MysteryDraftPage() {
                 )}
               </div>
 
-              <button
-                className="mystery-primary-button mystery-start-button"
-                disabled={loading}
-                type="button"
-                onClick={startDraft}
-              >
-                <Sparkles size={18} />
-                {loading ? "Loading..." : "Start Draft"}
-              </button>
+              {setupMode === "solo" ? (
+                <button
+                  className="mystery-primary-button mystery-start-button"
+                  disabled={loading}
+                  type="button"
+                  onClick={startDraft}
+                >
+                  <Sparkles size={18} />
+                  {loading ? "Loading..." : "Start Draft"}
+                </button>
+              ) : (
+                <div className="mystery-multiplayer-entry">
+                  <section className="mystery-multiplayer-box" aria-label="Create multiplayer lobby">
+                    <span className="mystery-kicker">Create Multiplayer Lobby</span>
+                    <label className="mystery-lobby-field">
+                      <span>Host Name</span>
+                      <input
+                        maxLength={32}
+                        type="text"
+                        value={hostName}
+                        onChange={(event) => setHostName(event.target.value)}
+                      />
+                    </label>
+                    <button
+                      className="mystery-primary-button"
+                      disabled={multiplayerAction !== null}
+                      type="button"
+                      onClick={handleCreateMultiplayerLobby}
+                    >
+                      <Sparkles size={18} />
+                      {multiplayerAction === "create" ? "Creating..." : "Create Lobby"}
+                    </button>
+                  </section>
+
+                  <section className="mystery-multiplayer-box" aria-label="Join multiplayer lobby">
+                    <span className="mystery-kicker">Join Lobby by Code</span>
+                    <label className="mystery-lobby-field">
+                      <span>Player Name</span>
+                      <input
+                        maxLength={32}
+                        type="text"
+                        value={joinName}
+                        onChange={(event) => setJoinName(event.target.value)}
+                      />
+                    </label>
+                    <label className="mystery-lobby-field">
+                      <span>Lobby Code</span>
+                      <input
+                        className="mystery-code-input"
+                        maxLength={8}
+                        type="text"
+                        value={joinCode}
+                        onChange={(event) => setJoinCode(normalizeMysteryLobbyCode(event.target.value))}
+                      />
+                    </label>
+                    <button
+                      className="mystery-secondary-button"
+                      disabled={multiplayerAction !== null}
+                      type="button"
+                      onClick={handleJoinMultiplayerLobby}
+                    >
+                      {multiplayerAction === "join" ? "Joining..." : "Join Lobby"}
+                    </button>
+                  </section>
+
+                  <div className="mystery-multiplayer-rules" aria-label="Multiplayer rules">
+                    <span>No Market Range</span>
+                    <span>Highest Bid Wins</span>
+                    <span>Live bidding comes next</span>
+                  </div>
+                </div>
+              )}
 
               {error ? <p className="mystery-validation">API error: {error}</p> : null}
+              {multiplayerError ? <p className="mystery-validation">{multiplayerError}</p> : null}
             </div>
 
             <details className="mystery-panel mystery-lobby-advanced">
@@ -1684,6 +1876,28 @@ export default function MysteryDraftPage() {
                   />
                   Reveal Passes
                 </label>
+                <label className="mystery-toggle mystery-toggle-with-copy">
+                  <input
+                    checked={settingsDraft.revealTrueSeason}
+                    type="checkbox"
+                    onChange={(event) => updateSettings({ revealTrueSeason: event.target.checked })}
+                  />
+                  <span>
+                    <strong>Reveal True Season</strong>
+                    <small>Shows the exact player season before bidding instead of possible season hints.</small>
+                  </span>
+                </label>
+                <label className="mystery-toggle mystery-toggle-with-copy">
+                  <input
+                    checked={settingsDraft.revealTruePrice}
+                    type="checkbox"
+                    onChange={(event) => updateSettings({ revealTruePrice: event.target.checked })}
+                  />
+                  <span>
+                    <strong>Reveal True Price</strong>
+                    <small>Shows the exact hidden salary price before bidding.</small>
+                  </span>
+                </label>
               </div>
             </details>
           </section>
@@ -1770,26 +1984,30 @@ export default function MysteryDraftPage() {
               <article className="mystery-current-card" style={teamThemeStyle(publicCard.team)}>
                 <div className="mystery-card-topline">
                   <span>{mysteryPoolSourceLabel(publicCard.poolSource, game.settings)}</span>
-                  <span>
-                    {publicCard.possibleSeasonLabels.length} possible season
-                    {publicCard.possibleSeasonLabels.length === 1 ? "" : "s"}
-                  </span>
+                  {currentCardShowsPossibleSeasons ? (
+                    <span>
+                      {publicCard.possibleSeasonLabels.length} possible season
+                      {publicCard.possibleSeasonLabels.length === 1 ? "" : "s"}
+                    </span>
+                  ) : (
+                    <span>{currentCardSeasonLabel} Season</span>
+                  )}
                 </div>
 
                 <div className="mystery-card-hero">
                   <div className="mystery-card-copy">
                     <PossibleBadgeChips achievements={publicCard.possibleAchievements} limit={4} />
                     <span className="mystery-card-team">
-                      {publicCard.team} {publicCard.eraLabel}
+                      {publicCard.team} {currentCardShowsPossibleSeasons ? publicCard.eraLabel : currentCardSeasonLabel}
                     </span>
                     <h2>{publicCard.playerName}</h2>
                     <PositionChips
                       eligiblePositions={publicCard.eligiblePositions}
                       primaryPosition={publicCard.primaryPosition}
                     />
-                    <div className="mystery-market-panel" aria-label="Market range">
-                      <span>Market Range</span>
-                      <strong>{formatMarketRange(publicCard.marketMin, publicCard.marketMax)}</strong>
+                    <div className="mystery-market-panel" aria-label={currentCardPriceCaption}>
+                      <span>{currentCardPriceCaption}</span>
+                      <strong>{currentCardPriceLabel}</strong>
                     </div>
                   </div>
                   <PlayerPortrait imageUrl={publicCard.playerImageUrl} playerName={publicCard.playerName} />
@@ -1797,10 +2015,17 @@ export default function MysteryDraftPage() {
 
                 <section className="mystery-details-block">
                   <div className="mystery-card-secondary-row">
-                    <span className="mystery-possible-years">
-                      <CalendarDays size={17} />
-                      Possible Years: {publicCard.possibleYearRange}
-                    </span>
+                    {currentCardShowsPossibleSeasons ? (
+                      <span className="mystery-possible-years">
+                        <CalendarDays size={17} />
+                        Possible Years: {publicCard.possibleYearRange}
+                      </span>
+                    ) : (
+                      <span className="mystery-possible-years">
+                        <CalendarDays size={17} />
+                        Season: {currentCardSeasonLabel}
+                      </span>
+                    )}
                     <button
                       aria-expanded={detailsOpen}
                       className="mystery-details-toggle"
@@ -1855,14 +2080,23 @@ export default function MysteryDraftPage() {
                           <p className="mystery-empty-copy">No known season-specific badges in this stint.</p>
                         )}
                       </div>
-                      <div className="mystery-details-section">
-                        <span className="mystery-kicker">Possible Seasons</span>
-                        <div className="mystery-season-list">
-                          {publicCard.possibleSeasonLabels.map((seasonLabel) => (
-                            <span key={seasonLabel}>{seasonLabel}</span>
-                          ))}
+                      {currentCardShowsPossibleSeasons ? (
+                        <div className="mystery-details-section">
+                          <span className="mystery-kicker">Possible Seasons</span>
+                          <div className="mystery-season-list">
+                            {publicCard.possibleSeasonLabels.map((seasonLabel) => (
+                              <span key={seasonLabel}>{seasonLabel}</span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="mystery-details-section">
+                          <span className="mystery-kicker">Exact Season</span>
+                          <div className="mystery-season-list">
+                            <span>{currentCardSeasonLabel}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : null}
                 </section>

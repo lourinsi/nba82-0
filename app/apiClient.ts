@@ -58,6 +58,37 @@ export async function loadApiJson<T>(path: string) {
   }
 }
 
+export async function requestApiJson<T>(path: string, init: RequestInit = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    cache: "no-store",
+    ...init,
+    headers: {
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
+  });
+
+  const data = (await response.json().catch(() => null)) as { error?: string } | T | null;
+
+  if (!response.ok) {
+    const message =
+      data && typeof data === "object" && "error" in data && data.error
+        ? data.error
+        : `API returned ${response.status}`;
+
+    throw new Error(message);
+  }
+
+  return data as T;
+}
+
+export function postApiJson<T>(path: string, body: unknown) {
+  return requestApiJson<T>(path, {
+    body: JSON.stringify(body),
+    method: "POST",
+  });
+}
+
 export function getCachedPlayers<T>() {
   return getCachedApiJson<T[]>(PLAYERS_PATH);
 }

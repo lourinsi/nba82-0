@@ -29,6 +29,8 @@ export type MysteryDraftSettings = {
   offerIncrement: number;
   removeOfferedStintAfterSpin: boolean;
   revealAfterPass: boolean;
+  revealTruePrice: boolean;
+  revealTrueSeason: boolean;
   rosterSize: number;
   salaryCap: number;
   scoreToPriceMultiplier: number;
@@ -150,6 +152,8 @@ export const DEFAULT_MYSTERY_DRAFT_SETTINGS: MysteryDraftSettings = Object.freez
   allowDuplicatePlayers: false,
   removeOfferedStintAfterSpin: true,
   revealAfterPass: true,
+  revealTruePrice: false,
+  revealTrueSeason: false,
   statMode: STAT_MODES.PER_100,
 });
 
@@ -344,6 +348,17 @@ export type MysteryDraftSpinCandidate = CandidateStint & {
 export type MysteryDraftSpinCandidateResult = {
   candidates: MysteryDraftSpinCandidate[];
   state: MysteryDraftGameState;
+};
+
+export type MysteryPlayerDisplaySeason = {
+  cardSeasonLabel?: string | null;
+  seasonLabel?: string | null;
+};
+
+export type MysteryPlayerMysteryDisplay = {
+  priceLabel: string | null;
+  seasonLabel: string;
+  shouldShowPossibleSeasons: boolean;
 };
 
 const MAX_WARNING_COUNT = 5;
@@ -806,6 +821,8 @@ function normalizeSettings(settings: MysteryDraftSettingsInput = {}): MysteryDra
       settings.removeOfferedStintAfterSpin ?? DEFAULT_MYSTERY_DRAFT_SETTINGS.removeOfferedStintAfterSpin,
     ),
     revealAfterPass: Boolean(settings.revealAfterPass ?? DEFAULT_MYSTERY_DRAFT_SETTINGS.revealAfterPass),
+    revealTruePrice: Boolean(settings.revealTruePrice ?? DEFAULT_MYSTERY_DRAFT_SETTINGS.revealTruePrice),
+    revealTrueSeason: Boolean(settings.revealTrueSeason ?? DEFAULT_MYSTERY_DRAFT_SETTINGS.revealTrueSeason),
   };
 }
 
@@ -2003,6 +2020,40 @@ function possibleYearRange(seasons: MysteryScoredSeason[]) {
   return min === max ? String(min) : `${min}-${max}`;
 }
 
+export function getPlayerMysteryDisplay({
+  hiddenPriceLabel = null,
+  hiddenSeasonLabel,
+  playerSeason,
+  possibleSeasons,
+  settings,
+  truePrice,
+}: {
+  hiddenPriceLabel?: string | null;
+  hiddenSeasonLabel?: string;
+  playerSeason: MysteryPlayerDisplaySeason | null | undefined;
+  possibleSeasons: MysteryPlayerDisplaySeason[];
+  settings: MysteryDraftSettingsInput;
+  truePrice: number | null | undefined;
+}): MysteryPlayerMysteryDisplay {
+  const normalizedSettings = normalizeSettings(settings);
+  const fallbackSeasonLabel =
+    hiddenSeasonLabel ||
+    possibleYearRange(
+      possibleSeasons.filter((season): season is MysteryScoredSeason => "seasonEndYear" in season),
+    ) ||
+    "Unknown";
+  const exactSeasonLabel = playerSeason?.seasonLabel || playerSeason?.cardSeasonLabel || "Unknown season";
+
+  return {
+    priceLabel:
+      normalizedSettings.revealTruePrice && typeof truePrice === "number" && Number.isFinite(truePrice)
+        ? `$${truePrice}`
+        : hiddenPriceLabel,
+    seasonLabel: normalizedSettings.revealTrueSeason ? exactSeasonLabel : fallbackSeasonLabel,
+    shouldShowPossibleSeasons: !normalizedSettings.revealTrueSeason,
+  };
+}
+
 function createCardFromStint(
   stint: CandidateStint,
   poolSource: MysteryDraftPoolSource,
@@ -2486,7 +2537,7 @@ function revealedCardFromSeason(
   };
 }
 
-function hiddenSeasonForCard(card: MysteryDraftCard) {
+export function hiddenSeasonForCard(card: MysteryDraftCard) {
   return card.eligibleSeasons.find((season) => season.seasonId === card.hiddenSeasonId) ?? card.eligibleSeasons[0];
 }
 

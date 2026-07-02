@@ -8360,6 +8360,44 @@ select {
   text-transform: uppercase;
 }
 
+.mystery-mode-toggle {
+  background: rgba(8, 11, 18, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 4px;
+}
+
+.mystery-mode-toggle button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #aeb4c2;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 12px;
+  text-transform: uppercase;
+}
+
+.mystery-mode-toggle button:hover,
+.mystery-mode-toggle button:focus-visible {
+  color: #ffffff;
+  outline: none;
+}
+
+.mystery-mode-toggle .mystery-mode-toggle-active {
+  background: rgba(49, 214, 161, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(49, 214, 161, 0.28);
+  color: #9cf9dc;
+}
+
 .mystery-lobby-main {
   align-items: end;
   display: grid;
@@ -8381,7 +8419,8 @@ select {
 
 .mystery-lobby-field select,
 .mystery-draft-years-value,
-.mystery-lobby-custom-range input {
+.mystery-lobby-custom-range input,
+.mystery-lobby-field input[type="text"] {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
@@ -8394,6 +8433,15 @@ select {
   padding: 0 12px;
   place-items: center start;
   width: 100%;
+}
+
+.mystery-lobby-field input[type="text"] {
+  text-transform: none;
+}
+
+.mystery-code-input {
+  letter-spacing: 0.14em;
+  text-transform: uppercase !important;
 }
 
 .mystery-lobby-field select option {
@@ -8410,6 +8458,729 @@ select {
 .mystery-start-button {
   align-self: stretch;
   min-width: 160px;
+}
+
+.mystery-multiplayer-entry {
+  display: grid;
+  gap: 14px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.mystery-multiplayer-box,
+.mystery-multiplayer-panel,
+.mystery-lobby-code-panel,
+.mystery-multiplayer-status,
+.mystery-multiplayer-actions {
+  background: rgba(8, 11, 18, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.mystery-multiplayer-box {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.mystery-multiplayer-box .mystery-primary-button,
+.mystery-multiplayer-box .mystery-secondary-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.mystery-multiplayer-rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.mystery-multiplayer-rules span {
+  background: rgba(49, 214, 161, 0.12);
+  border: 1px solid rgba(49, 214, 161, 0.26);
+  border-radius: 999px;
+  color: #9cf9dc;
+  font-size: 0.74rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 8px 10px;
+  text-transform: uppercase;
+}
+
+.mystery-multiplayer-lobby-card {
+  max-width: 980px;
+  width: 100%;
+}
+
+.mystery-lobby-code-panel {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.mystery-lobby-code-panel div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.mystery-lobby-code-panel strong {
+  color: #ffffff;
+  font-size: clamp(2.2rem, 7vw, 4rem);
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 0.9;
+}
+
+.mystery-lobby-code-panel p {
+  color: #aeb4c2;
+  font-size: 0.88rem;
+  font-weight: 850;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.mystery-multiplayer-status {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  padding: 28px;
+  text-align: center;
+}
+
+.mystery-multiplayer-status strong {
+  color: #ffffff;
+  font-size: 1.2rem;
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.mystery-multiplayer-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+.mystery-multiplayer-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.mystery-multiplayer-panel-title {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  min-width: 0;
+}
+
+.mystery-multiplayer-panel-title svg {
+  color: #31d6a1;
+  flex: 0 0 auto;
+}
+
+.mystery-multiplayer-panel-title h2 {
+  color: #ffffff;
+  flex: 1 1 auto;
+  font-size: 0.92rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  margin: 0;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.mystery-multiplayer-panel-title span {
+  color: #aeb4c2;
+  font-size: 0.8rem;
+  font-weight: 950;
+}
+
+.mystery-participant-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mystery-participant-row {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 9px 10px;
+}
+
+.mystery-participant-row span,
+.mystery-participant-row strong {
+  font-size: 0.86rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.mystery-participant-row span {
+  color: #ffffff;
+}
+
+.mystery-participant-row strong {
+  color: #9cf9dc;
+  text-transform: uppercase;
+}
+
+.mystery-settings-summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mystery-settings-summary span {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-height: 54px;
+  padding: 9px 10px;
+}
+
+.mystery-settings-summary small {
+  color: #aeb4c2;
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.mystery-settings-summary strong {
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 950;
+  line-height: 1.12;
+}
+
+.mystery-multiplayer-actions {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 14px;
+}
+
+.mystery-multiplayer-actions div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.mystery-multiplayer-actions strong {
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.mystery-multiplayer-game-card {
+  max-width: 1120px;
+}
+
+.mystery-game-topbar,
+.mystery-budget-strip {
+  display: grid;
+  gap: 10px;
+}
+
+.mystery-game-topbar {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+.mystery-game-code-cell {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.mystery-game-code-cell .mystery-kicker {
+  grid-column: 1 / -1;
+}
+
+.mystery-game-code-cell strong {
+  overflow-wrap: anywhere;
+}
+
+.mystery-game-code-copy {
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
+.mystery-game-topbar > div,
+.mystery-budget-strip span,
+.mystery-bid-status-grid span,
+.mystery-auction-facts span {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.mystery-game-topbar strong,
+.mystery-budget-strip strong,
+.mystery-bid-status-grid strong,
+.mystery-auction-facts strong {
+  align-items: center;
+  color: #ffffff;
+  display: flex;
+  gap: 7px;
+  font-size: 0.96rem;
+  font-weight: 950;
+  line-height: 1.05;
+  min-width: 0;
+}
+
+.mystery-budget-strip {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.mystery-budget-strip small,
+.mystery-bid-status-grid small,
+.mystery-auction-facts small {
+  color: #aeb4c2;
+  font-size: 0.64rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.mystery-budget-strip em {
+  color: #31d6a1;
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.mystery-game-grid {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+}
+
+.mystery-game-main,
+.mystery-game-side {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.mystery-auction-card {
+  align-items: stretch;
+  grid-template-columns: minmax(160px, 0.42fr) minmax(0, 1fr);
+}
+
+.mystery-auction-card-media {
+  align-items: end;
+  background: linear-gradient(145deg, rgba(49, 214, 161, 0.14), rgba(249, 115, 22, 0.1));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  min-height: 260px;
+  overflow: hidden;
+}
+
+.mystery-auction-card-media img {
+  display: block;
+  height: 100%;
+  max-height: 290px;
+  object-fit: contain;
+  width: 100%;
+}
+
+.mystery-auction-card-copy {
+  align-content: center;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mystery-auction-card-copy h2 {
+  color: #ffffff;
+  font-size: clamp(2.1rem, 5vw, 4.2rem);
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 0.92;
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.mystery-auction-card-copy p {
+  color: #c4cad6;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.mystery-possible-season-list,
+.mystery-auction-stats,
+.mystery-quick-bids,
+.mystery-feed-list,
+.mystery-roster-picks,
+.mystery-results-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mystery-possible-season-list {
+  grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+}
+
+.mystery-possible-season-list span,
+.mystery-auction-stats span {
+  background: rgba(49, 214, 161, 0.1);
+  border: 1px solid rgba(49, 214, 161, 0.22);
+  border-radius: 8px;
+  color: #9cf9dc;
+  font-size: 0.74rem;
+  font-weight: 950;
+  line-height: 1.1;
+  padding: 8px;
+  text-align: center;
+}
+
+.mystery-auction-stats span {
+  display: grid;
+  gap: 4px;
+}
+
+.mystery-auction-stats small {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.mystery-auction-stats strong {
+  color: #ffffff;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.mystery-auction-facts,
+.mystery-bid-status-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mystery-auction-facts-price {
+  grid-template-columns: minmax(0, 220px);
+}
+
+.mystery-auction-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mystery-bid-input {
+  display: grid;
+  gap: 7px;
+}
+
+.mystery-bid-input span {
+  color: #aeb4c2;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mystery-bid-input input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  color: #ffffff;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 950;
+  min-height: 50px;
+  outline: none;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.mystery-bid-input input:focus {
+  border-color: rgba(49, 214, 161, 0.7);
+  box-shadow: 0 0 0 3px rgba(49, 214, 161, 0.14);
+}
+
+.mystery-bid-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.mystery-bid-actions .mystery-primary-button,
+.mystery-bid-actions .mystery-secondary-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.mystery-quick-bids {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mystery-quick-bids button {
+  background: rgba(249, 115, 22, 0.14);
+  border: 1px solid rgba(249, 115, 22, 0.28);
+  border-radius: 8px;
+  color: #ffd7bd;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 950;
+  min-height: 38px;
+}
+
+.mystery-quick-bids button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.mystery-bid-note,
+.mystery-empty-copy {
+  color: #aeb4c2;
+  font-size: 0.84rem;
+  font-weight: 850;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.mystery-sync-banner,
+.mystery-submission-receipt {
+  align-items: start;
+  background: rgba(49, 214, 161, 0.1);
+  border: 1px solid rgba(49, 214, 161, 0.22);
+  border-radius: 8px;
+  color: #9cf9dc;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.mystery-sync-banner {
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 900;
+  margin-top: -4px;
+}
+
+.mystery-sync-banner svg,
+.mystery-submission-receipt svg {
+  color: #31d6a1;
+  flex: 0 0 auto;
+}
+
+.mystery-submission-receipt-muted {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #c4cad6;
+}
+
+.mystery-submission-receipt > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mystery-submission-receipt strong {
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.mystery-submission-receipt span,
+.mystery-submission-receipt small {
+  color: #c4cad6;
+  font-size: 0.8rem;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.mystery-submission-winner {
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid rgba(249, 115, 22, 0.28);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+}
+
+.mystery-submission-winner small {
+  color: #ffd7bd;
+  font-size: 0.64rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.mystery-submission-winner strong {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.mystery-feed-row,
+.mystery-roster-card,
+.mystery-result-row {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.mystery-feed-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+}
+
+.mystery-feed-row span,
+.mystery-feed-row strong {
+  font-size: 0.86rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.mystery-feed-row span {
+  color: #c4cad6;
+}
+
+.mystery-feed-row strong {
+  color: #ffffff;
+}
+
+.mystery-feed-row-submitted {
+  border-color: rgba(49, 214, 161, 0.22);
+}
+
+.mystery-feed-row-submitted strong {
+  color: #9cf9dc;
+}
+
+.mystery-feed-row-waiting {
+  opacity: 0.78;
+}
+
+.mystery-reveal-panel strong {
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.mystery-reveal-panel span {
+  color: #9cf9dc;
+  font-size: 0.82rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.mystery-roster-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.mystery-roster-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.mystery-roster-card header,
+.mystery-result-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+}
+
+.mystery-roster-card header {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.mystery-roster-card header div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mystery-roster-card strong,
+.mystery-result-row strong {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 950;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.mystery-roster-card span,
+.mystery-result-row span {
+  color: #aeb4c2;
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.mystery-roster-picks span {
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  color: #ffffff;
+  display: grid;
+  font-size: 0.82rem;
+  font-weight: 950;
+  gap: 3px;
+  line-height: 1.15;
+  padding: 8px;
+}
+
+.mystery-roster-picks small {
+  color: #aeb4c2;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.mystery-result-row {
+  grid-template-columns: auto minmax(0, 1fr) minmax(150px, 0.7fr);
+  padding: 12px;
+}
+
+.mystery-result-row > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mystery-result-rank {
+  align-items: center;
+  color: #31d6a1;
+  display: flex !important;
+  gap: 6px;
 }
 
 .mystery-lobby-advanced {
@@ -10466,6 +11237,35 @@ select {
   flex: 0 0 auto;
 }
 
+.mystery-toggle-with-copy {
+  align-items: start;
+  min-height: 72px;
+  padding: 12px 10px;
+}
+
+.mystery-toggle-with-copy span {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.mystery-toggle-with-copy strong {
+  color: #dfe4ee;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 1.15;
+}
+
+.mystery-toggle-with-copy small {
+  color: #aeb4c2;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: none;
+}
+
 .mystery-page-light {
   background:
     linear-gradient(180deg, rgba(255, 111, 19, 0.08), transparent 360px),
@@ -10479,7 +11279,26 @@ select {
 .mystery-page-light .mystery-empty-table h2,
 .mystery-page-light .mystery-reveal-body h2,
 .mystery-page-light .mystery-result-final-score strong,
-.mystery-page-light .mystery-panel-title h2 {
+.mystery-page-light .mystery-panel-title h2,
+.mystery-page-light .mystery-multiplayer-panel-title h2,
+.mystery-page-light .mystery-lobby-code-panel strong,
+.mystery-page-light .mystery-multiplayer-status strong,
+.mystery-page-light .mystery-participant-row span,
+.mystery-page-light .mystery-settings-summary strong,
+.mystery-page-light .mystery-multiplayer-actions strong,
+.mystery-page-light .mystery-game-topbar strong,
+.mystery-page-light .mystery-budget-strip strong,
+.mystery-page-light .mystery-bid-status-grid strong,
+.mystery-page-light .mystery-auction-facts strong,
+.mystery-page-light .mystery-auction-card-copy h2,
+.mystery-page-light .mystery-auction-stats strong,
+.mystery-page-light .mystery-feed-row strong,
+.mystery-page-light .mystery-reveal-panel strong,
+.mystery-page-light .mystery-roster-card strong,
+.mystery-page-light .mystery-result-row strong,
+.mystery-page-light .mystery-submission-receipt strong,
+.mystery-page-light .mystery-submission-winner strong,
+.mystery-page-light .mystery-bid-input input {
   color: #172033;
 }
 
@@ -10498,7 +11317,13 @@ select {
 .mystery-page-light .mystery-court-note,
 .mystery-page-light .mystery-game-tip-card,
 .mystery-page-light .mystery-roster-stat-strip,
+.mystery-page-light .mystery-mode-toggle,
 .mystery-page-light .mystery-view-toggle,
+.mystery-page-light .mystery-multiplayer-box,
+.mystery-page-light .mystery-multiplayer-panel,
+.mystery-page-light .mystery-lobby-code-panel,
+.mystery-page-light .mystery-multiplayer-status,
+.mystery-page-light .mystery-multiplayer-actions,
 .mystery-page-light .mystery-panel {
   background: rgba(255, 255, 255, 0.62);
   border-color: rgba(40, 52, 72, 0.14);
@@ -10511,7 +11336,8 @@ select {
 .mystery-page-light .mystery-result-summary strong,
 .mystery-page-light .mystery-settings-grid input[type="number"],
 .mystery-page-light .mystery-pool-bias-heading strong,
-.mystery-page-light .mystery-pool-bias-row label strong {
+.mystery-page-light .mystery-pool-bias-row label strong,
+.mystery-page-light .mystery-toggle-with-copy strong {
   color: #172033;
 }
 
@@ -10530,8 +11356,26 @@ select {
 .mystery-page-light .mystery-warmup-tip .roster-tip-copy,
 .mystery-page-light .mystery-court-note,
 .mystery-page-light .mystery-lobby-field,
+.mystery-page-light .mystery-lobby-code-panel p,
 .mystery-page-light .mystery-pool-bias-control small,
 .mystery-page-light .mystery-pool-bias-row label,
+.mystery-page-light .mystery-multiplayer-panel-title span,
+.mystery-page-light .mystery-settings-summary small,
+.mystery-page-light .mystery-toggle-with-copy small,
+.mystery-page-light .mystery-budget-strip small,
+.mystery-page-light .mystery-bid-status-grid small,
+.mystery-page-light .mystery-auction-facts small,
+.mystery-page-light .mystery-auction-card-copy p,
+.mystery-page-light .mystery-bid-input span,
+.mystery-page-light .mystery-bid-note,
+.mystery-page-light .mystery-feed-row span,
+.mystery-page-light .mystery-roster-card span,
+.mystery-page-light .mystery-result-row span,
+.mystery-page-light .mystery-roster-picks small,
+.mystery-page-light .mystery-submission-receipt span,
+.mystery-page-light .mystery-submission-receipt small,
+.mystery-page-light .mystery-sync-banner,
+.mystery-page-light .mystery-submission-winner small,
 .mystery-page-light .mystery-panel-title span {
   color: #3c4a60;
 }
@@ -10542,6 +11386,7 @@ select {
 
 .mystery-page-light .mystery-secondary-button,
 .mystery-page-light .mystery-ghost-button,
+.mystery-page-light .mystery-mode-toggle button,
 .mystery-page-light .mystery-view-toggle button,
 .mystery-page-light .mystery-details-body,
 .mystery-page-light .mystery-details-toggle,
@@ -10557,16 +11402,54 @@ select {
 .mystery-page-light .mystery-lobby-field select,
 .mystery-page-light .mystery-draft-years-value,
 .mystery-page-light .mystery-lobby-custom-range input,
+.mystery-page-light .mystery-lobby-field input[type="text"],
 .mystery-page-light .mystery-pool-bias-panel,
 .mystery-page-light .mystery-pool-bias-select select,
 .mystery-page-light .mystery-season-list span,
 .mystery-page-light .mystery-position-chip,
+.mystery-page-light .mystery-participant-row,
+.mystery-page-light .mystery-settings-summary span,
+.mystery-page-light .mystery-game-topbar > div,
+.mystery-page-light .mystery-budget-strip span,
+.mystery-page-light .mystery-bid-status-grid span,
+.mystery-page-light .mystery-auction-facts span,
+.mystery-page-light .mystery-bid-input input,
+.mystery-page-light .mystery-feed-row,
+.mystery-page-light .mystery-roster-card,
+.mystery-page-light .mystery-result-row,
+.mystery-page-light .mystery-submission-receipt,
+.mystery-page-light .mystery-submission-winner,
+.mystery-page-light .mystery-sync-banner,
 .mystery-page-light .mystery-toggle {
   background: rgba(255, 255, 255, 0.72);
   border-color: rgba(40, 52, 72, 0.15);
   color: #172033;
 }
 
+.mystery-page-light .mystery-auction-card-media {
+  background: linear-gradient(145deg, rgba(20, 160, 115, 0.12), rgba(255, 111, 19, 0.1));
+  border-color: rgba(40, 52, 72, 0.15);
+}
+
+.mystery-page-light .mystery-possible-season-list span,
+.mystery-page-light .mystery-auction-stats span {
+  background: rgba(20, 160, 115, 0.1);
+  border-color: rgba(20, 160, 115, 0.22);
+  color: #0b7e62;
+}
+
+.mystery-page-light .mystery-quick-bids button {
+  background: rgba(202, 89, 20, 0.12);
+  border-color: rgba(202, 89, 20, 0.24);
+  color: #8a3f00;
+}
+
+.mystery-page-light .mystery-roster-picks span {
+  background: rgba(23, 32, 51, 0.05);
+  color: #172033;
+}
+
+.mystery-page-light .mystery-mode-toggle .mystery-mode-toggle-active,
 .mystery-page-light .mystery-view-toggle .mystery-view-toggle-active {
   background: rgba(20, 160, 115, 0.12);
   box-shadow: inset 0 0 0 1px rgba(20, 160, 115, 0.22);
@@ -10687,6 +11570,32 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .mystery-multiplayer-entry,
+  .mystery-multiplayer-grid,
+  .mystery-multiplayer-actions,
+  .mystery-game-topbar,
+  .mystery-game-grid,
+  .mystery-auction-card {
+    grid-template-columns: 1fr;
+  }
+
+  .mystery-game-side {
+    order: -1;
+  }
+
+  .mystery-auction-card-media {
+    min-height: 220px;
+  }
+
+  .mystery-lobby-code-panel {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .mystery-settings-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .mystery-lobby-custom-range {
     grid-column: auto;
   }
@@ -10774,6 +11683,12 @@ select {
 
   .mystery-card-facts,
   .mystery-settings-grid,
+  .mystery-settings-summary,
+  .mystery-auction-stats,
+  .mystery-auction-facts,
+  .mystery-bid-status-grid,
+  .mystery-quick-bids,
+  .mystery-result-row,
   .mystery-offer-actions {
     grid-template-columns: 1fr;
   }
