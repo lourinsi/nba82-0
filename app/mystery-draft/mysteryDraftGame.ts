@@ -3,12 +3,18 @@ import { ACHIEVEMENT_TITLE_BY_ID, RESULT_BADGE_SCORE_WEIGHT_BY_ID } from "../ach
 import { getPlayerImageForMysteryCard } from "../playerImages";
 import { playerPer100AwardsScore } from "../per-100/per100GameConfig";
 import {
-  DEFAULT_PER100_SCORE_CONFIG,
-  leagueAverageForPer100Season,
-  scorePer100Season,
   seasonEndYear,
-  type WeightedPer100SeasonScore,
 } from "../per-100/per100Scoring";
+import {
+  STAT_MODE_HELPER_TEXT,
+  STAT_MODE_LABELS,
+  STAT_MODE_OPTIONS,
+  STAT_MODES,
+  calculatePlayerSeasonScore,
+  normalizeStatMode,
+  type PlayerSeasonScoreResult,
+  type StatMode,
+} from "../scoring";
 
 export type MysteryDraftSettings = {
   allowDuplicatePlayers: boolean;
@@ -27,6 +33,7 @@ export type MysteryDraftSettings = {
   salaryCap: number;
   scoreToPriceMultiplier: number;
   seasonPool: MysteryDraftSeasonPool;
+  statMode: StatMode;
   top100: number;
   wildcard: number;
 };
@@ -91,6 +98,7 @@ export const MYSTERY_SEASON_POOL_OPTIONS = [
 ] as const satisfies readonly MysteryDraftSeasonPoolOption[];
 
 export const MYSTERY_POOL_BIAS_KEYS = ["top100", "award", "activeStar", "wildcard"] as const;
+export const MYSTERY_STAT_MODE_OPTIONS = STAT_MODE_OPTIONS;
 export const MYSTERY_AWARD_FILTER_OPTIONS = [
   { label: "All-Star", value: "all_star" },
   { label: "MVP", value: "mvp" },
@@ -142,6 +150,7 @@ export const DEFAULT_MYSTERY_DRAFT_SETTINGS: MysteryDraftSettings = Object.freez
   allowDuplicatePlayers: false,
   removeOfferedStintAfterSpin: true,
   revealAfterPass: true,
+  statMode: STAT_MODES.PER_100,
 });
 
 export type MysteryDraftSettingsInput = Partial<MysteryDraftSettings>;
@@ -195,7 +204,7 @@ export type MysteryScoredSeason = {
   seasonId: string;
   seasonLabel: string;
   sourceSeason: CareerSeason;
-  statScore: WeightedPer100SeasonScore;
+  statScore: PlayerSeasonScoreResult;
   statScoreOnly: number;
 };
 
@@ -215,8 +224,9 @@ export type MysteryDraftPublicCard = {
   possibleAchievements: Achievement[];
   possibleSeasonLabels: string[];
   possibleYearRange: string;
-  rawAverageStats: MysteryDraftAverageStats;
-  rawStatRanges: MysteryDraftStatRanges;
+  statMode: StatMode;
+  statModeHelperText: string;
+  statModeLabel: string;
   statRanges: MysteryDraftStatRanges;
   team: string;
 };
@@ -251,7 +261,9 @@ export type MysteryDraftRosterCard = {
   seasonId: string;
   seasonLabel: string;
   scoreMultiplier: number;
-  statScore: WeightedPer100SeasonScore;
+  statMode: StatMode;
+  statModeLabel: string;
+  statScore: PlayerSeasonScoreResult;
   statScoreOnly: number;
   team: string;
   truePrice: number;
@@ -480,6 +492,10 @@ function allowedAwardFilter(value: unknown): MysteryAwardFilter {
   return MYSTERY_AWARD_FILTER_OPTIONS.some((option) => option.value === awardFilter)
     ? (awardFilter as MysteryAwardFilter)
     : DEFAULT_MYSTERY_DRAFT_SETTINGS.awardFilter;
+}
+
+function allowedStatMode(value: unknown): StatMode {
+  return normalizeStatMode(value);
 }
 
 function seasonEndYearSetting(value: unknown, fallback: number) {
@@ -782,6 +798,7 @@ function normalizeSettings(settings: MysteryDraftSettingsInput = {}): MysteryDra
       DEFAULT_MYSTERY_DRAFT_SETTINGS.scoreToPriceMultiplier,
     ),
     seasonPool,
+    statMode: allowedStatMode(settings.statMode),
     customStartYear: Math.min(customStartYear, customEndYear),
     customEndYear: Math.max(customStartYear, customEndYear),
     allowDuplicatePlayers: Boolean(settings.allowDuplicatePlayers ?? DEFAULT_MYSTERY_DRAFT_SETTINGS.allowDuplicatePlayers),
@@ -1821,10 +1838,11 @@ export function resolveEligibleStintSeasons(
 
   return careerSeasonsForMysterySelection(player, selection, normalizedSettings, options)
     .map((season, index) => {
-      const statScore = scorePer100Season(
-        season,
-        leagueAverageForPer100Season(statsEngineConfig, season.season),
-      );
+      const statScore = calculatePlayerSeasonScore({
+        playerSeason: season,
+        statMode: normalizedSettings.statMode,
+        statsEngineConfig,
+      });
 
       if (statScore.score === null) {
         return null;
@@ -1947,72 +1965,26 @@ function averageFrom(values: Array<number | null>, digits = 2) {
   );
 }
 
-export function weightedWs48Value(score: WeightedPer100SeasonScore) {
-  return (score.weightedOWS48 + score.weightedDWS48) / DEFAULT_PER100_SCORE_CONFIG.winShareScale;
-}
-
-export function tsStarPercentValue(score: WeightedPer100SeasonScore) {
-  if (!Number.isFinite(score.tsPct) || score.tsPct <= 0) {
-    return null;
-  }
-
-  const leagueTs = score.tsPlus > 0 ? score.tsPct / (score.tsPlus / 100) : null;
-  const tsStar =
-    leagueTs && Number.isFinite(leagueTs) && leagueTs > 0
-      ? score.tsPct * 0.5 + (score.tsPct + (score.tsPct - leagueTs)) * 0.5
-      : score.tsPct;
-
-  return tsStar * 100;
-}
-
 function statRangesForSeasons(seasons: MysteryScoredSeason[]): MysteryDraftStatRanges {
   return {
-    mpg: rangeFrom(seasons.map((season) => season.statScore.mpg), 1),
-    per100AST: rangeFrom(seasons.map((season) => season.statScore.per100AST), 1),
-    per100PTS: rangeFrom(seasons.map((season) => season.statScore.per100PTS), 1),
-    per100REB: rangeFrom(seasons.map((season) => season.statScore.per100REB), 1),
-    tsPlus: rangeFrom(seasons.map((season) => season.statScore.tsPlus), 0),
-    tsStarPct: rangeFrom(
-      seasons
-        .map((season) => tsStarPercentValue(season.statScore))
-        .filter((value): value is number => value !== null),
-      0,
-    ),
-    weightedWs48: rangeFrom(seasons.map((season) => weightedWs48Value(season.statScore)), 3),
+    mpg: rangeFrom(seasons.map((season) => season.statScore.displayStats.mpg ?? Number.NaN), 1),
+    per100AST: rangeFrom(seasons.map((season) => season.statScore.displayStats.assists ?? Number.NaN), 1),
+    per100PTS: rangeFrom(seasons.map((season) => season.statScore.displayStats.points ?? Number.NaN), 1),
+    per100REB: rangeFrom(seasons.map((season) => season.statScore.displayStats.rebounds ?? Number.NaN), 1),
+    tsPlus: null,
+    tsStarPct: rangeFrom(seasons.map((season) => season.statScore.displayStats.tsHybrid ?? Number.NaN), 0),
+    weightedWs48: rangeFrom(seasons.map((season) => season.statScore.displayStats.ws48 ?? Number.NaN), 3),
   };
 }
 
 function averageStatsForSeasons(seasons: MysteryScoredSeason[]): MysteryDraftAverageStats {
   return {
-    mpg: averageFrom(seasons.map((season) => season.statScore.mpg), 1),
-    per100AST: averageFrom(seasons.map((season) => season.statScore.per100AST), 1),
-    per100PTS: averageFrom(seasons.map((season) => season.statScore.per100PTS), 1),
-    per100REB: averageFrom(seasons.map((season) => season.statScore.per100REB), 1),
-    tsStarPct: averageFrom(seasons.map((season) => tsStarPercentValue(season.statScore)), 0),
-    weightedWs48: averageFrom(seasons.map((season) => weightedWs48Value(season.statScore)), 3),
-  };
-}
-
-function rawStatRangesForSeasons(seasons: MysteryScoredSeason[]): MysteryDraftStatRanges {
-  return {
-    mpg: rangeFrom(seasons.map((season) => season.rawStats.mpg ?? Number.NaN), 1),
-    per100AST: rangeFrom(seasons.map((season) => season.rawStats.apg ?? Number.NaN), 1),
-    per100PTS: rangeFrom(seasons.map((season) => season.rawStats.ppg ?? Number.NaN), 1),
-    per100REB: rangeFrom(seasons.map((season) => season.rawStats.rpg ?? Number.NaN), 1),
-    tsPlus: null,
-    tsStarPct: rangeFrom(seasons.map((season) => season.rawStats.tsPct ?? Number.NaN), 0),
-    weightedWs48: rangeFrom(seasons.map((season) => season.rawStats.ws48 ?? Number.NaN), 3),
-  };
-}
-
-function rawAverageStatsForSeasons(seasons: MysteryScoredSeason[]): MysteryDraftAverageStats {
-  return {
-    mpg: averageFrom(seasons.map((season) => season.rawStats.mpg), 1),
-    per100AST: averageFrom(seasons.map((season) => season.rawStats.apg), 1),
-    per100PTS: averageFrom(seasons.map((season) => season.rawStats.ppg), 1),
-    per100REB: averageFrom(seasons.map((season) => season.rawStats.rpg), 1),
-    tsStarPct: averageFrom(seasons.map((season) => season.rawStats.tsPct), 0),
-    weightedWs48: averageFrom(seasons.map((season) => season.rawStats.ws48), 3),
+    mpg: averageFrom(seasons.map((season) => season.statScore.displayStats.mpg), 1),
+    per100AST: averageFrom(seasons.map((season) => season.statScore.displayStats.assists), 1),
+    per100PTS: averageFrom(seasons.map((season) => season.statScore.displayStats.points), 1),
+    per100REB: averageFrom(seasons.map((season) => season.statScore.displayStats.rebounds), 1),
+    tsStarPct: averageFrom(seasons.map((season) => season.statScore.displayStats.tsHybrid), 0),
+    weightedWs48: averageFrom(seasons.map((season) => season.statScore.displayStats.ws48), 3),
   };
 }
 
@@ -2065,8 +2037,9 @@ function createCardFromStint(
     possibleAchievements: stint.possibleAchievements,
     possibleSeasonLabels: stint.eligibleSeasons.map((season) => season.seasonLabel),
     possibleYearRange: possibleYearRange(stint.eligibleSeasons),
-    rawAverageStats: rawAverageStatsForSeasons(stint.eligibleSeasons),
-    rawStatRanges: rawStatRangesForSeasons(stint.eligibleSeasons),
+    statMode: settings.statMode,
+    statModeHelperText: STAT_MODE_HELPER_TEXT[settings.statMode],
+    statModeLabel: STAT_MODE_LABELS[settings.statMode],
     statRanges: statRangesForSeasons(stint.eligibleSeasons),
     stintKey: stint.stintKey,
     team: stint.team,
@@ -2094,8 +2067,9 @@ export function publicMysteryDraftCard(card: MysteryDraftCard | null): MysteryDr
     possibleAchievements: card.possibleAchievements,
     possibleSeasonLabels: card.possibleSeasonLabels,
     possibleYearRange: card.possibleYearRange,
-    rawAverageStats: card.rawAverageStats,
-    rawStatRanges: card.rawStatRanges,
+    statMode: card.statMode,
+    statModeHelperText: card.statModeHelperText,
+    statModeLabel: card.statModeLabel,
     statRanges: card.statRanges,
     team: card.team,
   };
@@ -2502,6 +2476,8 @@ function revealedCardFromSeason(
     seasonId: season.seasonId,
     seasonLabel: season.seasonLabel,
     scoreMultiplier,
+    statMode: season.statScore.mode,
+    statModeLabel: STAT_MODE_LABELS[season.statScore.mode],
     statScore: season.statScore,
     statScoreOnly: season.statScoreOnly,
     team: card.team,

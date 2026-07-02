@@ -59,7 +59,7 @@ export const HOME_HOW_TO = {
     {
       eyebrow: "Playable",
       title: "Mystery Draft",
-      description: "Bid salary on hidden Per 100 season cards.",
+      description: "Bid salary on hidden season cards using the selected stat adjustment.",
       steps: [
         "The card shows the player, team, era, market range, stat ranges, and stint badges.",
         "The exact season reveals after your offer or pass.",
@@ -108,7 +108,7 @@ export const MYSTERY_DRAFT_HOW_TO = {
   eyebrow: "Mystery Draft Guide",
   title: "Mystery Salary Draft",
   intro:
-    "Spin a player/team/era card, bid from the visible range, then reveal the exact Per 100 season behind it.",
+    "Spin a player/team/era card, bid from the visible range, then reveal the exact season behind it.",
   sections: [
     {
       title: "The Bid",
@@ -122,7 +122,7 @@ export const MYSTERY_DRAFT_HOW_TO = {
       title: "The Score",
       description: "The final score is the sum of acquired revealed cards.",
       steps: [
-        "Hidden reserves use the same Per 100 mixed score source as PER 100 mode.",
+        "Hidden reserves use the stat adjustment selected in the lobby.",
         "Passed and rejected cards do not spend salary.",
       ],
     },

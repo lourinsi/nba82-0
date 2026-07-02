@@ -21,7 +21,7 @@ export default function MysteryDraftResultsPage() {
         expectedMode: MYSTERY_RESULT_MODE,
         resultBadgeMetaById: RESULT_BADGE_META_BY_ID,
         resultBadgeScoreWeightById: RESULT_BADGE_SCORE_WEIGHT_BY_ID,
-        showAdjustedStats: true,
+        showAdjustedStats: false,
         storageKey: MYSTERY_RESULT_STORAGE_KEY,
       }}
     />

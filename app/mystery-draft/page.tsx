@@ -24,10 +24,8 @@ import { RESULT_BADGE_META_BY_ID } from "../achievementMeta";
 import { getCachedPlayers, loadApiJson, loadPlayers } from "../apiClient";
 import { teamThemeStyle } from "../all-time/teamStyles";
 import {
-  adjustedStatsSnapshot,
   colorModeSnapshot,
   setGameHeaderState,
-  subscribeToAdjustedStats,
   subscribeToColorMode,
   subscribeToGameHeaderAction,
 } from "../clientPreferences";
@@ -51,6 +49,7 @@ import {
   DEFAULT_MYSTERY_DRAFT_SETTINGS,
   MYSTERY_AWARD_FILTER_OPTIONS,
   MYSTERY_SEASON_POOL_OPTIONS,
+  MYSTERY_STAT_MODE_OPTIONS,
   acceptMysteryDraftSecondOffer,
   createMysteryDraftGame,
   declineMysteryDraftSecondOffer,
@@ -68,15 +67,12 @@ import {
   selectVisibleMysteryStint,
   startMysteryDraftGame,
   submitMysteryDraftOffer,
-  tsStarPercentValue,
   validateMysteryDraftOffer,
-  weightedWs48Value,
   updateConnectedPoolWeights,
   type MysteryDraftAverageStats,
   type MysteryAwardFilter,
   type MysteryDraftOfferResult,
   type MysteryPoolBiasKey,
-  type MysteryDraftRawSeasonStats,
   type MysteryDraftRosterCard,
   type MysteryDraftSeasonPool,
   type MysteryDraftSettings,
@@ -84,6 +80,7 @@ import {
   type MysteryDraftStatRanges,
   type MysteryNumberRange,
 } from "./mysteryDraftGame";
+import type { StatMode } from "../scoring";
 import {
   MYSTERY_RESULT_STORAGE_KEY,
   MYSTERY_RESULTS_PATH,
@@ -173,53 +170,44 @@ function formatPraAverage(averages: MysteryDraftAverageStats | null | undefined)
 
 function displayStatsForCard(
   card: NonNullable<ReturnType<typeof publicMysteryDraftCard>>,
-  showAdjustedStats: boolean,
 ) {
   return {
-    averageStats: showAdjustedStats ? card.averageStats : card.rawAverageStats,
-    modeLabel: showAdjustedStats ? "Per 100" : "Raw",
-    statRanges: showAdjustedStats ? card.statRanges : card.rawStatRanges,
-    tsLabel: showAdjustedStats ? "TS*" : "TS%",
+    averageStats: card.averageStats,
+    helperText: card.statModeHelperText,
+    modeLabel: card.statModeLabel,
+    statRanges: card.statRanges,
+    tsLabel: "TS*",
     wsLabel: "WS/48",
   };
 }
 
-function formatRawSeasonPra(rawStats: MysteryDraftRawSeasonStats) {
-  return formatPraValues(rawStats.ppg, rawStats.rpg, rawStats.apg);
-}
-
-function buildSeasonMetricAchievements(card: MysteryDraftRosterCard, showAdjustedStats: boolean): Achievement[] {
-  const tsDisplayValue = showAdjustedStats ? tsStarPercentValue(card.statScore) : card.rawStats.tsPct;
-  const ws48DisplayValue = showAdjustedStats ? weightedWs48Value(card.statScore) : card.rawStats.ws48;
+function buildSeasonMetricAchievements(card: MysteryDraftRosterCard): Achievement[] {
+  const displayStats = card.statScore.displayStats;
 
   return [
     {
       id: "pra",
       label: "P/R/A",
-      title: showAdjustedStats
-        ? "Per-100 points, rebounds, assists"
-        : "Raw points, rebounds, assists per game",
-      value: showAdjustedStats
-        ? formatPraValues(card.statScore.per100PTS, card.statScore.per100REB, card.statScore.per100AST)
-        : formatRawSeasonPra(card.rawStats),
+      title: `${card.statModeLabel} points, rebounds, assists`,
+      value: formatPraValues(displayStats.points, displayStats.rebounds, displayStats.assists),
     },
     {
-      id: showAdjustedStats ? "ts-star" : "ts-pct",
-      label: showAdjustedStats ? "TS*" : "TS%",
-      title: showAdjustedStats ? "True shooting with era context" : "True shooting percentage",
-      value: tsDisplayValue === null ? "--" : `${Math.round(tsDisplayValue)}%`,
+      id: "ts-star",
+      label: "TS*",
+      title: "True shooting with era context",
+      value: displayStats.tsHybrid === null ? "--" : `${Math.round(displayStats.tsHybrid)}%`,
     },
     {
       id: "ws-48",
       label: "WS/48",
-      title: showAdjustedStats ? "Weighted win-share rate per 48 minutes" : "Win shares per 48 minutes",
-      value: ws48DisplayValue === null ? "--" : ws48DisplayValue.toFixed(3),
+      title: "Win shares per 48 minutes",
+      value: displayStats.ws48 === null ? "--" : displayStats.ws48.toFixed(3),
     },
     {
       id: "mpg",
       label: "MPG",
       title: "Minutes per game",
-      value: formatAverage(showAdjustedStats ? card.statScore.mpg : card.rawStats.mpg, 1),
+      value: formatAverage(displayStats.mpg, 1),
     },
   ];
 }
@@ -620,7 +608,6 @@ function MysteryResultCard({
   onViewResults,
   result,
   runComplete,
-  showAdjustedStats,
 }: {
   canAcceptSecondOffer?: boolean;
   canSpin: boolean;
@@ -633,7 +620,6 @@ function MysteryResultCard({
   onViewResults: () => void;
   result: MysteryDraftOfferResult;
   runComplete: boolean;
-  showAdjustedStats: boolean;
 }) {
   const revealedCard = result.revealedCard;
   const deltaText = revealDeltaText(result);
@@ -727,8 +713,8 @@ function MysteryResultCard({
       {revealedCard ? (
         <div className={`mystery-result-details ${resultDetailsOpen ? "mystery-result-details-open" : ""}`}>
           <div className="mystery-result-detail-block">
-            <span className="mystery-kicker">Exact Season Stats</span>
-            <AchievementStrip achievements={buildSeasonMetricAchievements(revealedCard, showAdjustedStats)} />
+            <span className="mystery-kicker">{revealedCard.statModeLabel} Season Stats</span>
+            <AchievementStrip achievements={buildSeasonMetricAchievements(revealedCard)} />
           </div>
           <div className="mystery-result-detail-block">
             <span className="mystery-kicker">Exact Season Badges</span>
@@ -802,13 +788,11 @@ function MysteryResultCard({
 function RosterCard({
   card,
   rank,
-  showAdjustedStats,
 }: {
   card: MysteryDraftRosterCard;
   rank: number;
-  showAdjustedStats: boolean;
 }) {
-  const statAchievements = buildSeasonMetricAchievements(card, showAdjustedStats);
+  const statAchievements = buildSeasonMetricAchievements(card);
 
   return (
     <article className="mystery-roster-card" style={teamThemeStyle(card.team)}>
@@ -938,7 +922,6 @@ function MysteryGameTipCard({ tip }: { tip: GameTip }) {
 export default function MysteryDraftPage() {
   const router = useRouter();
   const lightMode = useSyncExternalStore(subscribeToColorMode, colorModeSnapshot, () => false);
-  const adjustedStatsEnabled = useSyncExternalStore(subscribeToAdjustedStats, adjustedStatsSnapshot, () => false);
   const [players, setPlayers] = useState<Player[]>(() => getCachedPlayers<Player>() ?? []);
   const [statsEngineConfig, setStatsEngineConfig] =
     useState<StatsEngineConfig>(FALLBACK_STATS_ENGINE_CONFIG);
@@ -965,7 +948,7 @@ export default function MysteryDraftPage() {
 
   const publicCard = useMemo(() => publicMysteryDraftCard(game.currentCard), [game.currentCard]);
   const activeTip = GAME_TIPS[activeTipIndex] ?? GAME_TIPS[0];
-  const displayedCardStats = publicCard ? displayStatsForCard(publicCard, adjustedStatsEnabled) : null;
+  const displayedCardStats = publicCard ? displayStatsForCard(publicCard) : null;
   const activeSpinCandidate = spinCandidates[spinIndex] ?? null;
   const legalMaxOffer = maxLegalOffer(game);
   const currentMinimumOffer = minimumLegalOfferForCurrentCard(game);
@@ -1108,11 +1091,11 @@ export default function MysteryDraftPage() {
       return;
     }
 
-    const payload = buildMysteryDraftResultsPayload(game, adjustedStatsEnabled);
+    const payload = buildMysteryDraftResultsPayload(game);
 
     sessionStorage.setItem(MYSTERY_RESULT_STORAGE_KEY, JSON.stringify(payload));
     router.push(MYSTERY_RESULTS_PATH);
-  }, [adjustedStatsEnabled, game, router]);
+  }, [game, router]);
 
   useEffect(() => {
     let active = true;
@@ -1196,7 +1179,7 @@ export default function MysteryDraftPage() {
       eyebrow: game.started ? (game.status === "COMPLETE" ? "Mystery Final" : "Mystery Draft") : "Mystery Lobby",
       resetDisabled: false,
       resetLabel: "New mystery draft",
-      showAdjustedStatsToggle: true,
+      showAdjustedStatsToggle: false,
       showReset: game.started,
       title:
         game.started
@@ -1305,6 +1288,14 @@ export default function MysteryDraftPage() {
     }
 
     updateSettings({ [key]: value as MysteryAwardFilter } as Partial<MysteryDraftSettings>);
+  }
+
+  function updateStatMode(value: string) {
+    if (!MYSTERY_STAT_MODE_OPTIONS.some((option) => option.value === value)) {
+      return;
+    }
+
+    updateSettings({ statMode: value as StatMode });
   }
 
   function updateSeasonPool(value: string) {
@@ -1491,6 +1482,20 @@ export default function MysteryDraftPage() {
                   onChange={(event) => updateSeasonPool(event.target.value)}
                 >
                   {MYSTERY_SEASON_POOL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="mystery-lobby-field">
+                <span>Stat Adjustment</span>
+                <select
+                  value={settingsDraft.statMode}
+                  onChange={(event) => updateStatMode(event.target.value)}
+                >
+                  {MYSTERY_STAT_MODE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -1760,7 +1765,6 @@ export default function MysteryDraftPage() {
                 onViewResults={viewResults}
                 result={counterOfferResult}
                 runComplete={game.status === "COMPLETE"}
-                showAdjustedStats={adjustedStatsEnabled}
               />
             ) : publicCard ? (
               <article className="mystery-current-card" style={teamThemeStyle(publicCard.team)}>
@@ -1813,6 +1817,7 @@ export default function MysteryDraftPage() {
                       <div className="mystery-detail-stat-groups">
                         <div className="mystery-detail-stat-group">
                           <span className="mystery-kicker">{displayedCardStats.modeLabel} Averages</span>
+                          <p className="mystery-empty-copy">{displayedCardStats.helperText}</p>
                           <div className="mystery-card-facts mystery-card-facts-compact">
                             <StatTile label="Avg P/R/A" value={formatPraAverage(displayedCardStats.averageStats)} />
                             <StatTile
@@ -1905,7 +1910,6 @@ export default function MysteryDraftPage() {
                 onViewResults={viewResults}
                 result={game.lastResult}
                 runComplete={game.status === "COMPLETE"}
-                showAdjustedStats={adjustedStatsEnabled}
               />
             ) : (
               <article className="mystery-empty-table">
@@ -2029,7 +2033,6 @@ export default function MysteryDraftPage() {
                         card={card}
                         key={card.rosterCardId}
                         rank={index + 1}
-                        showAdjustedStats={adjustedStatsEnabled}
                       />
                     ))
                   ) : (

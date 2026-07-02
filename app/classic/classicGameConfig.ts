@@ -9,8 +9,6 @@ import {
   type ClassicStatKey,
   type ClassicStatLine,
   type GameCourtConfig,
-  type LeagueAverage,
-  type LeagueAverages,
   type LineupSlot,
   type Player,
   type Position,
@@ -27,6 +25,16 @@ import {
   RESULT_BADGE_SCORE_WEIGHT_BY_ID,
 } from "../achievementMeta";
 import { CLASSIC_HOW_TO, HOW_TO_STORAGE_KEYS, YOU_KNOW_BALL_HOW_TO } from "../howToContent";
+import {
+  adjustedVolumeStatsForSelection as scoringAdjustedVolumeStatsForSelection,
+  calculateLeagueAdjustedStintPointsForBlock,
+  isClassicVolumeMetric as scoringIsClassicVolumeMetric,
+  leagueAdjustedTsHybridPercentForSeason,
+  tsHybridPercentNumberForSelection,
+  weightedAdjustedMetricForSelection as scoringWeightedAdjustedMetricForSelection,
+  weightedRawTsPercentForSelection as scoringWeightedRawTsPercentForSelection,
+  weightedTsPercentForSelection as scoringWeightedTsPercentForSelection,
+} from "../scoring";
 
 const DEFAULT_ERAS = ["60's", "90's", "00's", "10's", "20's"];
 
@@ -76,19 +84,7 @@ export const CLASSIC_BADGE_SCORE_WEIGHTS_BY_ID = RESULT_BADGE_SCORE_WEIGHT_BY_ID
 const CLASSIC_ACCOLADE_SCORE_MULTIPLIER = 0.5;
 // Stored JSON points are fallback data; this is the scale baked into those cached points.
 const STORED_CLASSIC_STINT_SCALING_FACTOR = 250;
-const CLASSIC_STAT_WEIGHTS = {
-  ppg: 0.8,
-  rpg: 0.3,
-  apg: 0.45,
-  spg: 0.2,
-  bpg: 0.2,
-  ts_impact: 0.5,
-  ts_peer_weight: 0.5,
-  ts_skill_weight: 0.5,
-  ws_impact: 1.25,
-};
 const CLASSIC_STINT_SCALING_FACTOR = 250;
-const CLASSIC_WS_48_BASELINE = 0.1;
 const LEGACY_ENGINE_FACTORS = {
   descentExponent: 0.2,
   descentNumerator: 3.2,
@@ -176,35 +172,6 @@ const CLASSIC_STAT_TOOLTIPS: Record<ClassicStatKey, string> = {
 };
 const CLASSIC_BASE_METRICS = ["ppg", "rpg", "apg"] as const satisfies readonly ClassicVolumeMetric[];
 const CLASSIC_DEFENSIVE_METRICS = ["spg", "bpg"] as const satisfies readonly ClassicVolumeMetric[];
-const CLASSIC_VOLUME_METRICS = [
-  ...CLASSIC_BASE_METRICS,
-  ...CLASSIC_DEFENSIVE_METRICS,
-] as const satisfies readonly ClassicVolumeMetric[];
-const PLAYER_DIRECT_STAT_KEYS: Record<ClassicStatKey, string[]> = {
-  ppg: ["ppg", "PPG", "points_per_game", "pointsPerGame", "pts_per_game", "ptsPerGame"],
-  rpg: ["rpg", "RPG", "rebounds_per_game", "reboundsPerGame", "reb_per_game", "rebPerGame", "trb_per_game"],
-  apg: ["apg", "APG", "assists_per_game", "assistsPerGame", "ast_per_game", "astPerGame"],
-  spg: ["spg", "SPG", "steals_per_game", "stealsPerGame", "stl_per_game", "stlPerGame"],
-  bpg: ["bpg", "BPG", "blocks_per_game", "blocksPerGame", "blk_per_game", "blkPerGame"],
-  ts_pct: ["ts_pct", "TS_PCT", "tsPct", "true_shooting_pct", "trueShootingPct", "true_shooting_percentage"],
-  ws_48: ["ws_48", "WS_48", "ws_per_48", "WS_PER_48", "wsPer48", "win_shares_per_48", "winSharesPer48"],
-};
-const PLAYER_TOTAL_STAT_KEYS: Record<ClassicVolumeMetric, string[]> = {
-  ppg: ["pts", "PTS", "points", "total_points"],
-  rpg: ["reb", "REB", "trb", "TRB", "rebounds", "total_rebounds"],
-  apg: ["ast", "AST", "assists", "total_assists"],
-  spg: ["stl", "STL", "steals", "total_steals"],
-  bpg: ["blk", "BLK", "blocks", "total_blocks"],
-};
-const LEAGUE_AVERAGE_KEYS: Record<ClassicVolumeMetric | "ts_pct", string[]> = {
-  ppg: ["PPG", "ppg"],
-  rpg: ["RPG", "rpg"],
-  apg: ["APG", "apg"],
-  spg: ["SPG", "spg"],
-  bpg: ["BPG", "bpg"],
-  ts_pct: ["league_ts_pct", "leagueTsPct", "TS_PCT", "ts_pct", "TS%", "true_shooting_pct", "trueShootingPct"],
-};
-const GAMES_KEYS = ["games_played", "gamesPlayed", "gp", "GP"];
 const ACHIEVEMENT_DISPLAY_ORDER: AchievementDisplay[] = [
   // {
   //   id: "goat",
@@ -634,14 +601,6 @@ function positiveNumber(value: unknown) {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function roundWeight(value: number) {
-  return Number(value.toFixed(4));
-}
-
 function scaledClassicStintPoints(points: unknown) {
   const numeric = Number(points ?? 0);
 
@@ -665,151 +624,8 @@ function numericValue(value: unknown) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-function resolveTsWeights(weights: Partial<typeof CLASSIC_STAT_WEIGHTS> = CLASSIC_STAT_WEIGHTS) {
-  const peerWeight = numericValue(weights.ts_peer_weight);
-  const skillWeight = numericValue(weights.ts_skill_weight);
-  const peer = clamp(
-    peerWeight !== null
-      ? peerWeight
-      : skillWeight !== null
-        ? 1 - skillWeight
-        : CLASSIC_STAT_WEIGHTS.ts_peer_weight,
-    0,
-    1,
-  );
-
-  return { peer: roundWeight(peer), skill: roundWeight(1 - peer) };
-}
-
-function eraAdjustedTsPct(playerTs: number, leagueTs: number) {
-  return playerTs + (playerTs - leagueTs);
-}
-
-function tsHybridPct(playerTs: number, leagueTs: number, weights = CLASSIC_STAT_WEIGHTS) {
-  const tsWeights = resolveTsWeights(weights);
-  const adjustedTs = eraAdjustedTsPct(playerTs, leagueTs);
-
-  return adjustedTs * tsWeights.peer + playerTs * tsWeights.skill;
-}
-
-function firstNumericValue(source: Record<string, unknown> | undefined | null, keys: string[]) {
-  if (!source) {
-    return null;
-  }
-
-  for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(source, key)) {
-      const numeric = numericValue(source[key]);
-
-      if (numeric !== null) {
-        return numeric;
-      }
-    }
-  }
-
-  return null;
-}
-
-function firstPositiveNumericValue(source: Record<string, unknown> | undefined | null, keys: string[]) {
-  const numeric = firstNumericValue(source, keys);
-
-  return numeric !== null && numeric > 0 ? numeric : null;
-}
-
 function isClassicVolumeMetric(metric: ClassicStatKey): metric is ClassicVolumeMetric {
-  return CLASSIC_VOLUME_METRICS.includes(metric as ClassicVolumeMetric);
-}
-
-function playerMetricValue(season: CareerSeason, metric: ClassicStatKey) {
-  const direct = firstNumericValue(season as Record<string, unknown>, PLAYER_DIRECT_STAT_KEYS[metric]);
-
-  if (direct !== null) {
-    return direct;
-  }
-
-  if (!isClassicVolumeMetric(metric)) {
-    return null;
-  }
-
-  const total = firstNumericValue(season as Record<string, unknown>, PLAYER_TOTAL_STAT_KEYS[metric]);
-  const gamesPlayed = firstPositiveNumericValue(season as Record<string, unknown>, GAMES_KEYS);
-
-  if (total === null || !gamesPlayed) {
-    return null;
-  }
-
-  return total / gamesPlayed;
-}
-
-function leagueMetricValue(leagueAverage: LeagueAverage | null | undefined, metric: ClassicVolumeMetric | "ts_pct") {
-  return firstPositiveNumericValue(leagueAverage, LEAGUE_AVERAGE_KEYS[metric]);
-}
-
-function hasDefensiveLeagueAverages(leagueAverage: LeagueAverage | null | undefined) {
-  return CLASSIC_DEFENSIVE_METRICS.every((metric) => leagueMetricValue(leagueAverage, metric) !== null);
-}
-
-function metricWeightsForSeason(leagueAverage: LeagueAverage | null | undefined) {
-  if (!hasDefensiveLeagueAverages(leagueAverage)) {
-    const totalWeight = CLASSIC_VOLUME_METRICS.reduce(
-      (sum, metric) => sum + Number(CLASSIC_STAT_WEIGHTS[metric] || 0),
-      0,
-    );
-    const balancedWeight = totalWeight / CLASSIC_BASE_METRICS.length;
-
-    return Object.fromEntries(CLASSIC_BASE_METRICS.map((metric) => [metric, balancedWeight])) as Partial<
-      Record<ClassicVolumeMetric, number>
-    >;
-  }
-
-  return Object.fromEntries(
-    CLASSIC_VOLUME_METRICS.map((metric) => [metric, Number(CLASSIC_STAT_WEIGHTS[metric] || 0)]),
-  ) as Partial<Record<ClassicVolumeMetric, number>>;
-}
-
-function scoreClassicSeasonAgainstLeague(season: CareerSeason, leagueAverage: LeagueAverage) {
-  const weights = metricWeightsForSeason(leagueAverage);
-  let baseVolumeIndex = 0;
-
-  for (const metric of CLASSIC_VOLUME_METRICS) {
-    if (!Object.prototype.hasOwnProperty.call(weights, metric)) {
-      continue;
-    }
-
-    const weight = weights[metric] ?? 0;
-    const playerValue = playerMetricValue(season, metric);
-    const leagueValue = leagueMetricValue(leagueAverage, metric);
-
-    if (playerValue === null || leagueValue === null) {
-      return null;
-    }
-
-    baseVolumeIndex += (playerValue / leagueValue) * weight;
-  }
-
-  let efficiencyModifier = 1;
-  const playerTs = playerMetricValue(season, "ts_pct");
-  const leagueTs = leagueMetricValue(leagueAverage, "ts_pct");
-
-  if (playerTs !== null && leagueTs !== null) {
-    const tsHybrid = tsHybridPct(playerTs, leagueTs);
-
-    if (Number.isFinite(tsHybrid)) {
-      efficiencyModifier += (tsHybrid - leagueTs) * Number(CLASSIC_STAT_WEIGHTS.ts_impact || 0);
-    }
-  }
-
-  const playerWs48 = playerMetricValue(season, "ws_48");
-
-  if (playerWs48 !== null) {
-    const wsBonus = playerWs48 - CLASSIC_WS_48_BASELINE;
-
-    if (Number.isFinite(wsBonus)) {
-      efficiencyModifier += wsBonus * Number(CLASSIC_STAT_WEIGHTS.ws_impact || 0);
-    }
-  }
-
-  return baseVolumeIndex * efficiencyModifier;
+  return scoringIsClassicVolumeMetric(metric);
 }
 
 function seasonEndYear(season: unknown) {
@@ -834,49 +650,6 @@ function seasonEndYear(season: unknown) {
   const singleYear = value.match(/\d{4}/);
 
   return singleYear ? Number(singleYear[0]) : null;
-}
-
-function seasonKeyCandidates(season: unknown) {
-  const rawSeason = String(season || "").trim();
-
-  if (!rawSeason) {
-    return [];
-  }
-
-  const candidates = [rawSeason];
-  const endYear = seasonEndYear(rawSeason);
-  const startYear = Number(rawSeason.match(/^(\d{4})/)?.[1]);
-
-  if (startYear && endYear) {
-    candidates.push(`${startYear}-${String(endYear).slice(-2)}`);
-    candidates.push(`${startYear}-${endYear}`);
-  }
-
-  return Array.from(new Set(candidates));
-}
-
-function leagueAverageForSeason(leagueAverages: LeagueAverages, season: unknown): LeagueAverage | null {
-  for (const key of seasonKeyCandidates(season)) {
-    if (leagueAverages[key]) {
-      return leagueAverages[key];
-    }
-  }
-
-  return null;
-}
-
-function latestLeagueAverageForMetrics(
-  leagueAverages: LeagueAverages,
-  metrics: readonly (ClassicVolumeMetric | "ts_pct")[],
-) {
-  return Object.entries(leagueAverages)
-    .map(([season, leagueAverage]) => ({
-      leagueAverage,
-      sortValue: seasonEndYear(season) ?? Number.NEGATIVE_INFINITY,
-    }))
-    .sort((a, b) => b.sortValue - a.sortValue)
-    .find(({ leagueAverage }) => metrics.every((metric) => leagueMetricValue(leagueAverage, metric) !== null))
-    ?.leagueAverage ?? null;
 }
 
 function careerSeasonsForSelection(player: Player, selection: TeamEra) {
@@ -979,36 +752,7 @@ function runtimeClassicStintPointsForBlock(
   block: ClassicPointBlock,
   statsEngineConfig: StatsEngineConfig | undefined,
 ) {
-  if (!statsEngineConfig?.leagueAverages || !Object.keys(statsEngineConfig.leagueAverages).length) {
-    return null;
-  }
-
-  const matchingSeasons = careerSeasonsForClassicBlock(player, block);
-  let indexTotal = 0;
-  let scoredSeasons = 0;
-
-  for (const season of matchingSeasons) {
-    const leagueAverage = leagueAverageForSeason(statsEngineConfig.leagueAverages, season.season);
-
-    if (!leagueAverage) {
-      continue;
-    }
-
-    const index = scoreClassicSeasonAgainstLeague(season, leagueAverage);
-
-    if (index === null) {
-      continue;
-    }
-
-    indexTotal += index;
-    scoredSeasons += 1;
-  }
-
-  if (!scoredSeasons) {
-    return null;
-  }
-
-  return (indexTotal / scoredSeasons) * CLASSIC_STINT_SCALING_FACTOR;
+  return calculateLeagueAdjustedStintPointsForBlock(player, block, statsEngineConfig);
 }
 
 function classicBlockPoints(
@@ -1019,14 +763,8 @@ function classicBlockPoints(
   return runtimeClassicStintPointsForBlock(player, block, statsEngineConfig) ?? scaledClassicStintPoints(block.points);
 }
 
-function leagueTsValue(leagueAverage: LeagueAverage | null) {
-  return firstPositiveNumericValue(leagueAverage, ["league_ts_pct", "leagueTsPct", "TS_PCT", "ts_pct", "TS%"]);
-}
-
 function tsHybridPercentForSeason(playerTs: number, leagueTs: number) {
-  const tsHybrid = tsHybridPct(playerTs, leagueTs);
-
-  return Number.isFinite(tsHybrid) ? tsHybrid * 100 : null;
+  return leagueAdjustedTsHybridPercentForSeason(playerTs, leagueTs);
 }
 
 function weightedAdjustedMetricForSelection(
@@ -1035,58 +773,7 @@ function weightedAdjustedMetricForSelection(
   statsEngineConfig: StatsEngineConfig,
   metric: ClassicVolumeMetric,
 ) {
-  const targetLeagueAverage = latestLeagueAverageForMetrics(statsEngineConfig.leagueAverages, [metric]);
-
-  if (!targetLeagueAverage) {
-    return null;
-  }
-
-  const targetValue = leagueMetricValue(targetLeagueAverage, metric);
-
-  if (targetValue === null) {
-    return null;
-  }
-
-  let weightedTotal = 0;
-  let weightTotal = 0;
-  let sampleTotal = 0;
-  let sampleCount = 0;
-
-  for (const season of careerSeasonsForSelection(player, selection)) {
-    const playerValue = playerMetricValue(season, metric);
-    const leagueAverage = leagueAverageForSeason(statsEngineConfig.leagueAverages, season.season);
-    const leagueValue = leagueMetricValue(leagueAverage, metric);
-
-    if (playerValue === null || leagueValue === null) {
-      continue;
-    }
-
-    const adjustedValue = (playerValue / leagueValue) * targetValue;
-
-    if (!Number.isFinite(adjustedValue)) {
-      continue;
-    }
-
-    const gamesPlayed = positiveNumber(season.games_played);
-
-    if (gamesPlayed) {
-      weightedTotal += adjustedValue * gamesPlayed;
-      weightTotal += gamesPlayed;
-    } else {
-      sampleTotal += adjustedValue;
-      sampleCount += 1;
-    }
-  }
-
-  if (weightTotal > 0) {
-    return weightedTotal / weightTotal;
-  }
-
-  if (sampleCount > 0) {
-    return sampleTotal / sampleCount;
-  }
-
-  return null;
+  return scoringWeightedAdjustedMetricForSelection(player, selection, statsEngineConfig, metric);
 }
 
 function adjustedVolumeStatsForSelection(
@@ -1094,12 +781,7 @@ function adjustedVolumeStatsForSelection(
   selection: TeamEra,
   statsEngineConfig: StatsEngineConfig,
 ): ClassicStatLine {
-  return Object.fromEntries(
-    CLASSIC_VOLUME_METRICS.map((metric) => [
-      metric,
-      weightedAdjustedMetricForSelection(player, selection, statsEngineConfig, metric),
-    ]),
-  ) as ClassicStatLine;
+  return scoringAdjustedVolumeStatsForSelection(player, selection, statsEngineConfig);
 }
 
 function weightedTsPercentForSelection(
@@ -1108,81 +790,11 @@ function weightedTsPercentForSelection(
   statsEngineConfig: StatsEngineConfig,
   valueForSeason: (playerTs: number, leagueTs: number) => number | null,
 ) {
-  let weightedTotal = 0;
-  let weightTotal = 0;
-  let sampleTotal = 0;
-  let sampleCount = 0;
-
-  for (const season of careerSeasonsForSelection(player, selection)) {
-    const playerTs = firstPositiveNumericValue(season as Record<string, unknown>, ["ts_pct", "TS_PCT"]);
-    const leagueTs = leagueTsValue(leagueAverageForSeason(statsEngineConfig.leagueAverages, season.season));
-
-    if (!playerTs || !leagueTs) {
-      continue;
-    }
-
-    const tsPercent = valueForSeason(playerTs, leagueTs);
-
-    if (tsPercent === null) {
-      continue;
-    }
-
-    const gamesPlayed = positiveNumber(season.games_played);
-
-    if (gamesPlayed) {
-      weightedTotal += tsPercent * gamesPlayed;
-      weightTotal += gamesPlayed;
-    } else {
-      sampleTotal += tsPercent;
-      sampleCount += 1;
-    }
-  }
-
-  if (weightTotal > 0) {
-    return weightedTotal / weightTotal;
-  }
-
-  if (sampleCount > 0) {
-    return sampleTotal / sampleCount;
-  }
-
-  return null;
+  return scoringWeightedTsPercentForSelection(player, selection, statsEngineConfig, valueForSeason);
 }
 
 function weightedRawTsPercentForSelection(player: Player, selection: TeamEra) {
-  let weightedTotal = 0;
-  let weightTotal = 0;
-  let sampleTotal = 0;
-  let sampleCount = 0;
-
-  for (const season of careerSeasonsForSelection(player, selection)) {
-    const playerTs = firstPositiveNumericValue(season as Record<string, unknown>, ["ts_pct", "TS_PCT"]);
-
-    if (!playerTs) {
-      continue;
-    }
-
-    const tsPercent = playerTs * 100;
-    const gamesPlayed = positiveNumber(season.games_played);
-
-    if (gamesPlayed) {
-      weightedTotal += tsPercent * gamesPlayed;
-      weightTotal += gamesPlayed;
-    } else {
-      sampleTotal += tsPercent;
-      sampleCount += 1;
-    }
-  }
-
-  if (weightTotal > 0) {
-    return weightedTotal / weightTotal;
-  }
-
-  if (sampleCount > 0) {
-    return sampleTotal / sampleCount;
-  }
-
-  return null;
+  return scoringWeightedRawTsPercentForSelection(player, selection);
 }
 
 function rawTsPercentValue(player: Player, selection: TeamEra, block: ClassicPointBlock) {
@@ -1212,12 +824,7 @@ function tsHybridPercentNumber(
   selection: TeamEra,
   statsEngineConfig: StatsEngineConfig,
 ) {
-  return weightedTsPercentForSelection(
-    player,
-    selection,
-    statsEngineConfig,
-    tsHybridPercentForSeason,
-  );
+  return tsHybridPercentNumberForSelection(player, selection, statsEngineConfig);
 }
 
 function classicBlocksForSelection(player: Player | undefined, selection: TeamEra | undefined) {

@@ -2,12 +2,11 @@ import type { Achievement, Position, SeasonTier } from "../GameCourt";
 import { CLASSIC_SEASON_TIERS } from "../classic/classicGameConfig";
 import {
   MYSTERY_LINEUP_POSITIONS,
-  tsStarPercentValue,
-  weightedWs48Value,
   type MysteryDraftGameState,
   type MysteryDraftRosterCard,
 } from "./mysteryDraftGame";
 import { MYSTERY_RESULT_MODE } from "./mysteryDraftResultConstants";
+import { STAT_MODE_LABELS, normalizeStatMode } from "../scoring";
 
 type SeasonProjection = {
   description: string;
@@ -295,44 +294,39 @@ function projectMysterySeasonRecord(score: number, seasonTiers: SeasonTier[] = C
   };
 }
 
-function buildSeasonMetricAchievements(card: MysteryDraftRosterCard, showAdjustedStats: boolean): Achievement[] {
-  const tsDisplayValue = showAdjustedStats ? tsStarPercentValue(card.statScore) : card.rawStats.tsPct;
-  const ws48DisplayValue = showAdjustedStats ? weightedWs48Value(card.statScore) : card.rawStats.ws48;
+function buildSeasonMetricAchievements(card: MysteryDraftRosterCard): Achievement[] {
+  const displayStats = card.statScore.displayStats;
 
   return [
     {
       id: "pra",
       label: "P/R/A",
-      title: showAdjustedStats
-        ? "Per-100 points, rebounds, assists"
-        : "Raw points, rebounds, assists per game",
-      value: showAdjustedStats
-        ? formatPraValues(card.statScore.per100PTS, card.statScore.per100REB, card.statScore.per100AST)
-        : formatPraValues(card.rawStats.ppg, card.rawStats.rpg, card.rawStats.apg),
+      title: `${card.statModeLabel} points, rebounds, assists`,
+      value: formatPraValues(displayStats.points, displayStats.rebounds, displayStats.assists),
     },
     {
-      id: showAdjustedStats ? "ts-star" : "ts-pct",
-      label: showAdjustedStats ? "TS*" : "TS%",
-      title: showAdjustedStats ? "True shooting with era context" : "True shooting percentage",
-      value: tsDisplayValue === null ? "--" : `${Math.round(tsDisplayValue)}%`,
+      id: "ts-star",
+      label: "TS*",
+      title: "True shooting with era context",
+      value: displayStats.tsHybrid === null ? "--" : `${Math.round(displayStats.tsHybrid)}%`,
     },
     {
       id: "ws-48",
       label: "WS/48",
-      title: showAdjustedStats ? "Weighted win-share rate per 48 minutes" : "Win shares per 48 minutes",
-      value: ws48DisplayValue === null ? "--" : ws48DisplayValue.toFixed(3),
+      title: "Win shares per 48 minutes",
+      value: displayStats.ws48 === null ? "--" : displayStats.ws48.toFixed(3),
     },
     {
       id: "mpg",
       label: "MPG",
       title: "Minutes per game",
-      value: formatAverage(showAdjustedStats ? card.statScore.mpg : card.rawStats.mpg, 1),
+      value: formatAverage(displayStats.mpg, 1),
     },
   ];
 }
 
-function resultAchievementsForCard(card: MysteryDraftRosterCard, showAdjustedStats: boolean) {
-  return [...buildSeasonMetricAchievements(card, showAdjustedStats), ...card.seasonAchievements];
+function resultAchievementsForCard(card: MysteryDraftRosterCard) {
+  return [...buildSeasonMetricAchievements(card), ...card.seasonAchievements];
 }
 
 function emptySlotAchievement(slot: Position): Achievement {
@@ -344,15 +338,13 @@ function emptySlotAchievement(slot: Position): Achievement {
   };
 }
 
-export function buildMysteryDraftResultsPayload(
-  game: MysteryDraftGameState,
-  showAdjustedStats: boolean,
-): ResultPayload {
+export function buildMysteryDraftResultsPayload(game: MysteryDraftGameState): ResultPayload {
   const optimization = optimizeMysteryDraftPositions(game.roster);
   const draftBaseScore = optimization.draftBaseScore;
   const finalOptimizedScore = optimization.finalOptimizedScore;
   const totalPaid = game.roster.reduce((sum, card) => sum + card.paidPrice, 0);
   const fitDelta = rounded(finalOptimizedScore - draftBaseScore);
+  const statMode = normalizeStatMode(game.settings.statMode);
   const totals: Achievement[] = [
     {
       id: "final-score",
@@ -398,14 +390,14 @@ export function buildMysteryDraftResultsPayload(
     lineup: optimization.assignments.map((assignment) => {
       const card = assignment.card;
       const originalAchievements = card
-        ? resultAchievementsForCard(card, false)
+        ? resultAchievementsForCard(card)
         : [emptySlotAchievement(assignment.slot)];
       const adjustedAchievements = card
-        ? resultAchievementsForCard(card, true)
+        ? resultAchievementsForCard(card)
         : [emptySlotAchievement(assignment.slot)];
 
       return {
-        achievements: showAdjustedStats ? adjustedAchievements : originalAchievements,
+        achievements: originalAchievements,
         adjustedAchievements,
         baseScore: assignment.baseScore,
         eligiblePositions: assignment.eligiblePositions,
@@ -455,7 +447,7 @@ export function buildMysteryDraftResultsPayload(
     mode: MYSTERY_RESULT_MODE,
     originalTotals: totals,
     adjustedTotals: totals,
-    resultModeLabel: "Mystery Salary Draft",
+    resultModeLabel: `Mystery Salary Draft - ${STAT_MODE_LABELS[statMode]}`,
     resultSummary: [
       { label: "Final Score", value: formatScore(finalOptimizedScore) },
       { label: "Draft Score", value: formatScore(draftBaseScore) },
@@ -467,7 +459,7 @@ export function buildMysteryDraftResultsPayload(
     returnPath: "/mystery-draft",
     selectedEraLabel: "Salary Draft",
     selectedTeam: "Mystery",
-    showAdjustedStats,
+    showAdjustedStats: false,
     simulationResult: projectMysterySeasonRecord(finalOptimizedScore),
     totals,
   };
