@@ -624,21 +624,27 @@ function MultiplayerSyncBanner({
   gameState,
   hasRecentFailure,
   isRefreshing,
+  nowMs,
 }: {
   error: string | null;
   gameState: MultiplayerGameState;
   hasRecentFailure: boolean;
   isRefreshing: boolean;
+  nowMs: number;
 }) {
-  if (!error && !hasRecentFailure && (!isRefreshing || gameState.game?.status === "completed")) {
+  const revealHasExpired =
+    gameState.currentRound?.status === "revealed" &&
+    gameState.currentRound.revealEndsAt &&
+    secondsUntil(gameState.currentRound.revealEndsAt, nowMs) <= 0;
+  const showTransitionSync = Boolean(isRefreshing && revealHasExpired && gameState.game?.status !== "completed");
+
+  if (!error && !hasRecentFailure && !showTransitionSync) {
     return null;
   }
 
   const message = error || hasRecentFailure
     ? "Having trouble syncing. Keeping the latest game state on screen."
-    : gameState.currentRound?.status === "revealed"
-      ? "Loading the next player..."
-      : "Syncing game state...";
+    : "Loading the next player...";
 
   return (
     <section className="mystery-sync-banner" role={error ? "status" : undefined}>
@@ -1039,6 +1045,7 @@ export default function MysteryMultiplayerLobbyPage() {
                     gameState={gameState}
                     hasRecentFailure={fetchFailureCount > 0}
                     isRefreshing={isRefreshing}
+                    nowMs={nowMs}
                   />
                   <MultiplayerGameScreen
                     actionError={actionError}
