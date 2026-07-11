@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Clipboard,
   Clock3,
-  Crown,
   Gavel,
   Hourglass,
   LogOut,
@@ -16,7 +15,6 @@ import {
   RefreshCw,
   Send,
   Sparkles,
-  Trophy,
   Users,
 } from "lucide-react";
 import {
@@ -455,7 +453,10 @@ function MultiplayerSubmissionPanel({
   const submissionTotal = activeSubmissionTotal(gameState);
   const revealAllAmounts = Boolean(round && round.status !== "bidding");
   const winnerName =
-    revealAllAmounts && !round?.noBid ? participantName(gameState.participants, round?.winnerParticipantId) : null;
+    revealAllAmounts && round?.winnerParticipantId
+      ? participantName(gameState.participants, round.winnerParticipantId)
+      : null;
+  const winnerLabel = round?.awardReason === "richest_no_bid" ? "No-bid Award" : "Highest Bidder";
 
   return (
     <section className="mystery-multiplayer-panel mystery-submission-panel">
@@ -468,7 +469,7 @@ function MultiplayerSubmissionPanel({
       </div>
       {winnerName ? (
         <div className="mystery-submission-winner">
-          <small>Highest Bidder</small>
+          <small>{winnerLabel}</small>
           <strong>
             {winnerName} - {formatMoney(round?.winningBid)}
           </strong>
@@ -521,6 +522,7 @@ function MultiplayerRevealPanel({
   }
 
   const winnerName = participantName(gameState.participants, round.winnerParticipantId);
+  const noBidAward = round.awardReason === "richest_no_bid" || (round.noBid && round.winnerParticipantId);
 
   return (
     <section className="mystery-multiplayer-panel mystery-reveal-panel">
@@ -528,14 +530,26 @@ function MultiplayerRevealPanel({
         <Sparkles size={18} />
         <h2>Result</h2>
       </div>
-      {round.noBid ? (
+      {round.noBid && !round.winnerParticipantId ? (
         <strong>No bids. Player skipped.</strong>
+      ) : noBidAward ? (
+        <strong>
+          {winnerName} gets {currentPlayer?.playerName ?? "the player"} for {formatMoney(round.winningBid)}
+        </strong>
       ) : (
         <strong>
           {winnerName} wins {currentPlayer?.playerName ?? "the player"} for {formatMoney(round.winningBid)}
         </strong>
       )}
-      {gameState.game?.status === "completed" ? <span>Game complete.</span> : <span>Next player coming...</span>}
+      {round.noBid && !round.winnerParticipantId ? (
+        <span>No eligible participant could receive this player.</span>
+      ) : noBidAward ? (
+        <span>No positive bids. Richest remaining budget wins.</span>
+      ) : gameState.game?.status === "completed" ? (
+        <span>Game complete.</span>
+      ) : (
+        <span>Next player coming...</span>
+      )}
     </section>
   );
 }
@@ -577,41 +591,6 @@ function MultiplayerRosterBoard({ rosters }: { rosters: MultiplayerRoster[] }) {
             ) : (
               <p className="mystery-empty-copy">No drafted players yet.</p>
             )}
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function MultiplayerResults({ gameState }: { gameState: MultiplayerGameState }) {
-  if (gameState.game?.status !== "completed") {
-    return null;
-  }
-
-  return (
-    <section className="mystery-multiplayer-panel mystery-results-panel">
-      <div className="mystery-multiplayer-panel-title">
-        <Trophy size={18} />
-        <h2>Final Results</h2>
-      </div>
-      <div className="mystery-results-list">
-        {gameState.standings.map((standing) => (
-          <article className="mystery-result-row" key={standing.participantId}>
-            <div className="mystery-result-rank">
-              {standing.rank === 1 ? <Crown size={18} /> : null}
-              <strong>#{standing.rank}</strong>
-            </div>
-            <div>
-              <strong>{standing.participantName}</strong>
-              <span>
-                {formatScore(standing.totalScore)} pts - {formatMoney(standing.remainingBudget)} left
-              </span>
-            </div>
-            <div>
-              <span>Best: {standing.bestPick?.playerName ?? "--"}</span>
-              <span>Price: {standing.mostExpensivePick ? formatMoney(standing.mostExpensivePick.paidAmount) : "--"}</span>
-            </div>
           </article>
         ))}
       </div>
@@ -725,7 +704,6 @@ function MultiplayerGameScreen({
           <MultiplayerAuctionCard currentPlayer={gameState.currentPlayer} gameState={gameState} round={round} />
           <MultiplayerRevealPanel currentPlayer={gameState.currentPlayer} gameState={gameState} />
           <MultiplayerRosterBoard rosters={gameState.rosters} />
-          <MultiplayerResults gameState={gameState} />
         </div>
         <aside className="mystery-game-side">
           <MultiplayerBidPanel
@@ -785,6 +763,7 @@ export default function MysteryMultiplayerLobbyPage() {
   const viewerParticipantId = participantSession?.participantId ?? null;
   const shouldPoll = gameState?.game?.status !== "completed";
   const pollMs = gameState?.game?.status === "active" ? ACTIVE_POLL_MS : WAITING_POLL_MS;
+  const completedResultsPath = code ? `/mystery-draft/multiplayer/${encodeURIComponent(code)}/results` : "";
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -908,6 +887,12 @@ export default function MysteryMultiplayerLobbyPage() {
   }, [code, gameState?.currentRound?.roundIndex, gameState?.game, gameState?.rosters.length]);
 
   useEffect(() => {
+    if (gameState?.game?.status === "completed" && completedResultsPath) {
+      router.replace(completedResultsPath);
+    }
+  }, [completedResultsPath, gameState?.game?.status, router]);
+
+  useEffect(() => {
     const initialFetch = window.setTimeout(() => {
       void fetchLobbyOrGame({ silent: Boolean(gameStateRef.current || snapshotRef.current) });
     }, 0);
@@ -1021,6 +1006,11 @@ export default function MysteryMultiplayerLobbyPage() {
               <button className="mystery-secondary-button" type="button" onClick={() => router.push("/mystery-draft")}>
                 Back
               </button>
+            </div>
+          ) : gameState?.game?.status === "completed" ? (
+            <div className="mystery-multiplayer-status">
+              <RefreshCw className="mystery-warmup-spinner" size={34} />
+              <strong>Game complete. Loading results...</strong>
             </div>
           ) : displaySnapshot ? (
             <>

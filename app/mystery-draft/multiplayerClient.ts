@@ -93,6 +93,7 @@ export type MultiplayerAuctionPlayer = {
 };
 
 export type MultiplayerRound = {
+  awardReason: "highest_bid" | "richest_no_bid" | "skipped" | null;
   bidEndsAt: string;
   bidStartedAt: string;
   gameId: string;
@@ -130,6 +131,7 @@ export type MultiplayerGame = {
 };
 
 export type MultiplayerRosterPick = {
+  awardReason?: "highest_bid" | "richest_no_bid" | "skipped" | null;
   baseScore: number;
   createdAt: string;
   finalScore: number;
@@ -187,6 +189,64 @@ export type MultiplayerGameState = {
 export type MultiplayerParticipantSession = {
   clientId: string | null;
   participantId: string;
+};
+
+export type MultiplayerResultsPick = {
+  awardReason: "highest_bid" | "richest_no_bid" | "skipped" | null;
+  baseScore: number;
+  finalScore: number;
+  paidAmount: number;
+  playerName: string;
+  playerSeasonId: string;
+  seasonLabel: string | null;
+  stats?: {
+    assists: number | null;
+    points: number | null;
+    pra: number | null;
+    rebounds: number | null;
+    tsStarPct: number | null;
+    ws48: number | null;
+  };
+  team: string | null;
+};
+
+export type MultiplayerProjectedRecord = {
+  losses: number;
+  wins: number;
+};
+
+export type MultiplayerResultsStanding = {
+  bestPick: MultiplayerResultsPick | null;
+  mostExpensivePick: MultiplayerResultsPick | null;
+  name: string;
+  participantId: string;
+  projectedRecord: MultiplayerProjectedRecord;
+  rank: number;
+  remainingBudget: number;
+  rosterCount: number;
+  totalScore: number;
+  totalSpent: number;
+};
+
+export type MultiplayerResultsRoster = {
+  name: string;
+  participantId: string;
+  picks: MultiplayerResultsPick[];
+  projectedRecord: MultiplayerProjectedRecord;
+  rank: number | null;
+  remainingBudget: number;
+  rosterCount: number;
+  rosterSize: number;
+  totalScore: number;
+  totalSpent: number;
+};
+
+export type MultiplayerResultsResponse = {
+  game: MultiplayerGame;
+  lobby: MultiplayerLobby;
+  participants: MultiplayerParticipant[];
+  rosters: MultiplayerResultsRoster[];
+  standings: MultiplayerResultsStanding[];
 };
 
 function browserStorage(kind: "localStorage" | "sessionStorage") {
@@ -387,6 +447,12 @@ export function getMysteryMultiplayerGameState(codeOrId: string, participantId?:
 
   return requestApiJson<MultiplayerGameState>(
     `/api/mystery-draft/multiplayer/games/${encodeURIComponent(codeOrId)}/state${query}`,
+  );
+}
+
+export function getMysteryMultiplayerResults(codeOrId: string) {
+  return requestApiJson<MultiplayerResultsResponse>(
+    `/api/mystery-draft/multiplayer/games/${encodeURIComponent(codeOrId)}/results`,
   );
 }
 
