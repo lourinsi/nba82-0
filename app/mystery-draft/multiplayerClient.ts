@@ -26,23 +26,18 @@ export type MysteryDraftMultiplayerSettings = MysteryDraftSettings & {
 };
 
 export type MultiplayerParticipant = {
-  clientId: string | null;
   id: string;
+  isActive: boolean;
   isHost: boolean;
   joinedAt: string;
-  lobbyId: string;
   name: string;
-  userId: string | null;
 };
 
 export type MultiplayerLobby = {
   code: string;
-  createdAt: string;
-  hostUserId: string | null;
   id: string;
   settings: MysteryDraftMultiplayerSettings;
   status: MultiplayerLobbyStatus;
-  updatedAt: string;
 };
 
 export type MultiplayerLobbySnapshot = {
@@ -52,28 +47,16 @@ export type MultiplayerLobbySnapshot = {
 
 export type MultiplayerLobbyResponse = MultiplayerLobbySnapshot & {
   participant: MultiplayerParticipant;
+  participantToken: string;
 };
 
 export type MultiplayerGameStatus = "active" | "completed";
 export type MultiplayerRoundStatus = "bidding" | "revealed" | "completed";
 
 export type MultiplayerAuctionPlayer = {
-  accoladeScore: number;
-  baseScore: number;
-  cardSeasonLabel: string;
-  eligiblePositions: string[];
-  era: string;
-  eraLabel: string;
-  finalScore: number;
-  hiddenSeasonId: string;
-  playerId: string;
   playerImageUrl: string | null;
   playerName: string;
-  playerSeasonId: string;
-  poolIndex: number;
-  possibleSeasonLabels: string[];
   possibleYearRange: string;
-  primaryPosition: string | null;
   rawStats?: {
     apg: number | null;
     mpg: number | null;
@@ -82,26 +65,17 @@ export type MultiplayerAuctionPlayer = {
     tsStarPct: number | null;
     weightedWs48: number | null;
   };
-  seasonEndYear: number | null;
-  seasonId: string;
-  seasonLabel: string;
-  statMode: MysteryDraftSettings["statMode"];
-  statModeLabel: string;
-  stintKey: string;
-  team: string;
-  truePrice: number;
+  seasonLabel: string | null;
+  team: string | null;
+  truePrice: number | null;
 };
 
 export type MultiplayerRound = {
   awardReason: "highest_bid" | "richest_no_bid" | "skipped" | null;
   bidEndsAt: string;
-  bidStartedAt: string;
-  gameId: string;
   id: string;
   noBid: boolean;
-  playerSeasonId: string;
   revealEndsAt: string | null;
-  resolvedAt: string | null;
   roundIndex: number;
   status: MultiplayerRoundStatus;
   winnerParticipantId: string | null;
@@ -110,94 +84,58 @@ export type MultiplayerRound = {
 
 export type MultiplayerBid = {
   amount: number | null;
-  createdAt: string;
-  id: string;
+  hasSubmittedBid: boolean;
   isOwnSubmission: boolean;
   isPass: boolean | null;
   participantId: string;
-  participantName: string;
-  roundId: string;
 };
 
 export type MultiplayerGame = {
-  createdAt: string;
-  currentRoundIndex: number;
-  id: string;
-  lobbyId: string;
   poolSize: number;
   settings: MysteryDraftMultiplayerSettings;
   status: MultiplayerGameStatus;
-  updatedAt: string;
 };
 
 export type MultiplayerRosterPick = {
-  awardReason?: "highest_bid" | "richest_no_bid" | "skipped" | null;
-  baseScore: number;
-  createdAt: string;
-  finalScore: number;
   id: string;
   paidAmount: number;
-  player: MultiplayerAuctionPlayer | null;
   playerName: string;
-  playerSeasonId: string;
-  roundId: string;
   seasonLabel: string | null;
   team: string | null;
 };
 
 export type MultiplayerRoster = {
-  bestPick: MultiplayerRosterPick | null;
   count: number;
   isFull: boolean;
-  mostExpensivePick: MultiplayerRosterPick | null;
   participantId: string;
   participantName: string;
   picks: MultiplayerRosterPick[];
   remainingBudget: number;
   rosterSize: number;
-  spent: number;
-  totalScore: number;
-};
-
-export type MultiplayerStanding = {
-  bestPick: MultiplayerRosterPick | null;
-  isTie: boolean;
-  mostExpensivePick: MultiplayerRosterPick | null;
-  participantId: string;
-  participantName: string;
-  rank: number;
-  remainingBudget: number;
-  roster: MultiplayerRosterPick[];
-  spent: number;
   totalScore: number;
 };
 
 export type MultiplayerGameState = {
   bids: MultiplayerBid[];
-  budgets: Record<string, number>;
   currentPlayer: MultiplayerAuctionPlayer | null;
   currentRound: MultiplayerRound | null;
   game: MultiplayerGame | null;
-  highestBid: MultiplayerBid | null;
   lobby: MultiplayerLobby;
   participants: MultiplayerParticipant[];
   rosters: MultiplayerRoster[];
   serverTime: string;
-  standings: MultiplayerStanding[];
 };
 
 export type MultiplayerParticipantSession = {
-  clientId: string | null;
+  clientId: string;
   participantId: string;
+  participantToken: string;
 };
 
 export type MultiplayerResultsPick = {
-  awardReason: "highest_bid" | "richest_no_bid" | "skipped" | null;
-  baseScore: number;
   finalScore: number;
   paidAmount: number;
   playerName: string;
-  playerSeasonId: string;
   seasonLabel: string | null;
   stats?: {
     assists: number | null;
@@ -216,16 +154,12 @@ export type MultiplayerProjectedRecord = {
 };
 
 export type MultiplayerResultsStanding = {
-  bestPick: MultiplayerResultsPick | null;
-  mostExpensivePick: MultiplayerResultsPick | null;
   name: string;
   participantId: string;
   projectedRecord: MultiplayerProjectedRecord;
   rank: number;
   remainingBudget: number;
-  rosterCount: number;
   totalScore: number;
-  totalSpent: number;
 };
 
 export type MultiplayerResultsRoster = {
@@ -235,15 +169,15 @@ export type MultiplayerResultsRoster = {
   projectedRecord: MultiplayerProjectedRecord;
   rank: number | null;
   remainingBudget: number;
-  rosterCount: number;
-  rosterSize: number;
   totalScore: number;
-  totalSpent: number;
 };
 
 export type MultiplayerResultsResponse = {
-  game: MultiplayerGame;
-  lobby: MultiplayerLobby;
+  game: Pick<MultiplayerGame, "poolSize" | "status"> & {
+    currentRoundIndex: number;
+    id: string;
+  };
+  lobby: Pick<MultiplayerLobby, "code" | "id" | "status">;
   participants: MultiplayerParticipant[];
   rosters: MultiplayerResultsRoster[];
   standings: MultiplayerResultsStanding[];
@@ -286,7 +220,13 @@ export function getMysteryMultiplayerClientId() {
     return randomClientId();
   }
 
-  const existingClientId = localStorage.getItem(CLIENT_ID_STORAGE_KEY);
+  let existingClientId: string | null = null;
+
+  try {
+    existingClientId = localStorage.getItem(CLIENT_ID_STORAGE_KEY);
+  } catch {
+    return randomClientId();
+  }
 
   if (existingClientId) {
     return existingClientId;
@@ -303,17 +243,17 @@ function participantSessionKey(code: string) {
   return `${PARTICIPANT_SESSION_PREFIX}${code.trim().toUpperCase()}`;
 }
 
-export function rememberMysteryMultiplayerParticipant(code: string, participant: MultiplayerParticipant) {
+export function rememberMysteryMultiplayerParticipant(
+  code: string,
+  participantSession: MultiplayerParticipantSession,
+) {
   const sessionStorage = browserStorage("sessionStorage");
 
   if (!sessionStorage) {
     return;
   }
 
-  const value = JSON.stringify({
-    clientId: participant.clientId,
-    participantId: participant.id,
-  } satisfies MultiplayerParticipantSession);
+  const value = JSON.stringify(participantSession);
 
   safeStorage(sessionStorage, (storage) => storage.setItem(participantSessionKey(code), value));
 }
@@ -329,7 +269,12 @@ export function readMysteryMultiplayerParticipantSession(code: string): Multipla
     const rawValue = sessionStorage.getItem(participantSessionKey(code));
     const parsedValue = rawValue ? JSON.parse(rawValue) : null;
 
-    return parsedValue && typeof parsedValue.participantId === "string" ? parsedValue : null;
+    return parsedValue &&
+      typeof parsedValue.clientId === "string" &&
+      typeof parsedValue.participantId === "string" &&
+      typeof parsedValue.participantToken === "string"
+      ? parsedValue
+      : null;
   } catch {
     return null;
   }
@@ -410,69 +355,102 @@ export function joinMysteryMultiplayerLobby({
   });
 }
 
-export function getMysteryMultiplayerLobby(codeOrId: string) {
+export function getMysteryMultiplayerLobby(codeOrId: string, signal?: AbortSignal) {
   return requestApiJson<MultiplayerLobbySnapshot>(
     `/api/mystery-draft/multiplayer/lobbies/${encodeURIComponent(codeOrId)}`,
+    { signal },
   );
 }
 
 export function leaveMysteryMultiplayerLobby({
   lobbyId,
-  participantId,
+  participantToken,
+  signal,
 }: {
   lobbyId: string;
-  participantId: string;
+  participantToken: string;
+  signal?: AbortSignal;
 }) {
-  return postApiJson<MultiplayerLobbySnapshot>(
+  return requestApiJson<MultiplayerLobbySnapshot>(
     `/api/mystery-draft/multiplayer/lobbies/${encodeURIComponent(lobbyId)}/leave`,
-    { participantId },
+    {
+      body: JSON.stringify({ participantToken }),
+      method: "POST",
+      signal,
+    },
   );
 }
 
 export function startMysteryMultiplayerLobby({
   lobbyId,
-  participantId,
+  participantToken,
+  signal,
 }: {
   lobbyId: string;
-  participantId: string;
+  participantToken: string;
+  signal?: AbortSignal;
 }) {
-  return postApiJson<MultiplayerGameState>(
-    `/api/mystery-draft/multiplayer/lobbies/${encodeURIComponent(lobbyId)}/start`,
-    { participantId },
-  );
-}
-
-export function getMysteryMultiplayerGameState(codeOrId: string, participantId?: string | null) {
-  const query = participantId ? `?participantId=${encodeURIComponent(participantId)}` : "";
-
   return requestApiJson<MultiplayerGameState>(
-    `/api/mystery-draft/multiplayer/games/${encodeURIComponent(codeOrId)}/state${query}`,
+    `/api/mystery-draft/multiplayer/lobbies/${encodeURIComponent(lobbyId)}/start`,
+    {
+      body: JSON.stringify({ participantToken }),
+      method: "POST",
+      signal,
+    },
   );
 }
 
-export function getMysteryMultiplayerResults(codeOrId: string) {
+export function getMysteryMultiplayerGameState(
+  codeOrId: string,
+  {
+    participantToken,
+    signal,
+  }: {
+    participantToken?: string | null;
+    signal?: AbortSignal;
+  } = {},
+) {
+  return requestApiJson<MultiplayerGameState>(
+    `/api/mystery-draft/multiplayer/games/${encodeURIComponent(codeOrId)}/state`,
+    {
+      headers: participantToken
+        ? { "X-Multiplayer-Participant-Token": participantToken }
+        : undefined,
+      signal,
+    },
+  );
+}
+
+export function getMysteryMultiplayerResults(codeOrId: string, signal?: AbortSignal) {
   return requestApiJson<MultiplayerResultsResponse>(
     `/api/mystery-draft/multiplayer/games/${encodeURIComponent(codeOrId)}/results`,
+    { signal },
   );
 }
 
 export function submitMysteryMultiplayerBid({
   amount,
   codeOrId,
-  participantId,
+  participantToken,
   roundId,
+  signal,
 }: {
   amount: number;
   codeOrId: string;
-  participantId: string;
+  participantToken: string;
   roundId: string;
+  signal?: AbortSignal;
 }) {
-  return postApiJson<MultiplayerGameState>(
+  return requestApiJson<MultiplayerGameState>(
     `/api/mystery-draft/multiplayer/games/${encodeURIComponent(codeOrId)}/bids`,
     {
-      amount,
-      participantId,
-      roundId,
+      body: JSON.stringify({
+        amount,
+        participantToken,
+        roundId,
+      }),
+      method: "POST",
+      signal,
     },
   );
 }

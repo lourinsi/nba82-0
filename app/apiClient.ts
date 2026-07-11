@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "./apiConfig";
 
 const CLIENT_CACHE_TTL_MS = 10 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 15 * 1000;
 const PLAYERS_PATH = "/api/players";
 
 type CacheEntry = {
@@ -10,6 +11,16 @@ type CacheEntry = {
 
 const apiCache = new Map<string, CacheEntry>();
 const apiRequests = new Map<string, Promise<unknown>>();
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 function cachedApiValue<T>(path: string) {
   const entry = apiCache.get(path);
@@ -59,14 +70,43 @@ export async function loadApiJson<T>(path: string) {
 }
 
 export async function requestApiJson<T>(path: string, init: RequestInit = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    cache: "no-store",
-    ...init,
-    headers: {
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
-      ...init.headers,
-    },
-  });
+  const controller = new AbortController();
+  const externalSignal = init.signal;
+  let timedOut = false;
+  const abortFromCaller = () => controller.abort(externalSignal?.reason);
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, REQUEST_TIMEOUT_MS);
+
+  if (externalSignal?.aborted) {
+    abortFromCaller();
+  } else {
+    externalSignal?.addEventListener("abort", abortFromCaller, { once: true });
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      cache: "no-store",
+      ...init,
+      headers: {
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...init.headers,
+      },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (timedOut) {
+      throw new ApiError("The API request timed out. Retrying may help.", 408);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    externalSignal?.removeEventListener("abort", abortFromCaller);
+  }
 
   const data = (await response.json().catch(() => null)) as { error?: string } | T | null;
 
@@ -76,7 +116,7 @@ export async function requestApiJson<T>(path: string, init: RequestInit = {}) {
         ? data.error
         : `API returned ${response.status}`;
 
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
 
   return data as T;

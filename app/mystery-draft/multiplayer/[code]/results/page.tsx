@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Trophy,
 } from "lucide-react";
+import { ApiError } from "../../../../apiClient";
 import { setGameHeaderState } from "../../../../clientPreferences";
 import {
   getMysteryMultiplayerResults,
@@ -119,7 +120,9 @@ export default function MysteryMultiplayerResultsPage() {
   const code = normalizeMysteryLobbyCode(String(params.code || ""));
   const [results, setResults] = useState<MultiplayerResultsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [showFullStats, setShowFullStats] = useState(false);
   const activeGamePath = `/mystery-draft/multiplayer/${encodeURIComponent(code)}`;
 
@@ -138,6 +141,7 @@ export default function MysteryMultiplayerResultsPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
 
     async function loadResults() {
       if (!code) {
@@ -148,34 +152,35 @@ export default function MysteryMultiplayerResultsPage() {
 
       try {
         setLoading(true);
+        setRedirecting(false);
         setError(null);
-        const nextResults = await getMysteryMultiplayerResults(code);
+        const nextResults = await getMysteryMultiplayerResults(code, controller.signal);
 
         if (cancelled) {
           return;
         }
 
         if (nextResults.game.status !== "completed") {
+          setRedirecting(true);
           router.replace(activeGamePath);
           return;
         }
 
         setResults(nextResults);
       } catch (loadError) {
-        if (cancelled) {
+        if (cancelled || (loadError instanceof Error && loadError.name === "AbortError")) {
           return;
         }
 
-        const message = loadError instanceof Error ? loadError.message : "Results not found.";
-
-        if (message.toLowerCase().includes("progress")) {
+        if (loadError instanceof ApiError && loadError.status === 409) {
+          setRedirecting(true);
           router.replace(activeGamePath);
           return;
         }
 
-        setError("Results not found.");
+        setError(loadError instanceof Error ? loadError.message : "Results not found.");
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !controller.signal.aborted) {
           setLoading(false);
         }
       }
@@ -185,8 +190,9 @@ export default function MysteryMultiplayerResultsPage() {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [activeGamePath, code, router]);
+  }, [activeGamePath, code, loadAttempt, router]);
 
   const champion = results?.standings[0] ?? null;
   const orderedRosters = useMemo(() => {
@@ -202,10 +208,6 @@ export default function MysteryMultiplayerResultsPage() {
     });
   }, [results]);
 
-  function backToLobby() {
-    router.push(activeGamePath);
-  }
-
   function playAgain() {
     router.push("/mystery-draft");
   }
@@ -214,13 +216,13 @@ export default function MysteryMultiplayerResultsPage() {
     router.push("/");
   }
 
-  if (loading) {
+  if (loading || redirecting) {
     return (
       <main className="multiplayer-results-page">
         <section className="multiplayer-results-shell">
           <div className="multiplayer-results-state">
             <span className="multiplayer-results-spinner" aria-hidden="true" />
-            <strong>Loading results...</strong>
+            <strong>{redirecting ? "Returning to the active game..." : "Loading results..."}</strong>
           </div>
         </section>
       </main>
@@ -239,7 +241,15 @@ export default function MysteryMultiplayerResultsPage() {
             <p>Final Standings</p>
           </header>
           <div className="multiplayer-results-state">
-            <strong>Results not found.</strong>
+            <strong>{error || "Results not found."}</strong>
+            <button
+              className="multiplayer-results-action multiplayer-results-action-teal"
+              type="button"
+              onClick={() => setLoadAttempt((currentAttempt) => currentAttempt + 1)}
+            >
+              <RotateCcw size={18} />
+              Retry
+            </button>
             <button className="multiplayer-results-action multiplayer-results-action-secondary" type="button" onClick={playAgain}>
               <ArrowLeft size={18} />
               Back to Mystery Draft
@@ -289,10 +299,6 @@ export default function MysteryMultiplayerResultsPage() {
         </p>
 
         <section className="multiplayer-results-actions" aria-label="Results actions">
-          <button className="multiplayer-results-action multiplayer-results-action-secondary" type="button" onClick={backToLobby}>
-            <ArrowLeft size={20} />
-            Back to Lobby
-          </button>
           <button className="multiplayer-results-action multiplayer-results-action-teal" type="button" onClick={playAgain}>
             <RotateCcw size={20} />
             Play Again
@@ -383,8 +389,12 @@ function RosterCard({
 
       <div className="multiplayer-player-list">
         {roster.picks.length ? (
-          roster.picks.map((pick) => (
-            <RosterPlayerRow expanded={expanded} key={`${roster.participantId}-${pick.playerSeasonId}`} pick={pick} />
+          roster.picks.map((pick, pickIndex) => (
+            <RosterPlayerRow
+              expanded={expanded}
+              key={`${roster.participantId}-${pick.playerName}-${pickIndex}`}
+              pick={pick}
+            />
           ))
         ) : (
           <p>No drafted players.</p>

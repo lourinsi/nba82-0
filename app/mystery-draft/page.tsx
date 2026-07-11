@@ -1510,14 +1510,19 @@ export default function MysteryDraftPage() {
     try {
       setMultiplayerAction("create");
       setMultiplayerError(null);
+      const clientId = getMysteryMultiplayerClientId();
 
       const response = await createMysteryMultiplayerLobby({
-        clientId: getMysteryMultiplayerClientId(),
+        clientId,
         hostName: trimmedHostName,
         settings: buildMysteryMultiplayerSettings(settingsDraft),
       });
 
-      rememberMysteryMultiplayerParticipant(response.lobby.code, response.participant);
+      rememberMysteryMultiplayerParticipant(response.lobby.code, {
+        clientId,
+        participantId: response.participant.id,
+        participantToken: response.participantToken,
+      });
       router.push(`/mystery-draft/multiplayer/${response.lobby.code}`);
     } catch (createError) {
       setMultiplayerError(createError instanceof Error ? createError.message : "Unable to create lobby.");
@@ -1543,14 +1548,19 @@ export default function MysteryDraftPage() {
     try {
       setMultiplayerAction("join");
       setMultiplayerError(null);
+      const clientId = getMysteryMultiplayerClientId();
 
       const response = await joinMysteryMultiplayerLobby({
-        clientId: getMysteryMultiplayerClientId(),
+        clientId,
         code: normalizedCode,
         playerName: trimmedJoinName,
       });
 
-      rememberMysteryMultiplayerParticipant(response.lobby.code, response.participant);
+      rememberMysteryMultiplayerParticipant(response.lobby.code, {
+        clientId,
+        participantId: response.participant.id,
+        participantToken: response.participantToken,
+      });
       router.push(`/mystery-draft/multiplayer/${response.lobby.code}`);
     } catch (joinError) {
       setMultiplayerError(joinError instanceof Error ? joinError.message : "Unable to join lobby.");

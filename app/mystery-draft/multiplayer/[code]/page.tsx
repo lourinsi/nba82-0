@@ -78,7 +78,9 @@ function secondsUntil(value: string | null | undefined, nowMs: number) {
     return 0;
   }
 
-  return Math.max(0, Math.ceil((new Date(value).getTime() - nowMs) / 1000));
+  const targetMs = new Date(value).getTime();
+
+  return Number.isFinite(targetMs) ? Math.max(0, Math.ceil((targetMs - nowMs) / 1000)) : 0;
 }
 
 function settingChips(snapshot: MultiplayerLobbySnapshot) {
@@ -114,13 +116,13 @@ function playerSeasonDisplay(player: MultiplayerAuctionPlayer, state: Multiplaye
 
   if (settings.revealTrueSeason) {
     return {
-      seasonLabel: `${player.team} ${player.seasonLabel}`,
+      seasonLabel: [player.team, player.seasonLabel].filter(Boolean).join(" ") || "Mystery season",
       shouldShowPossibleSeasons: false,
     };
   }
 
   return {
-    seasonLabel: `${player.team} - Possible seasons: ${player.possibleYearRange}`,
+    seasonLabel: `${player.team ? `${player.team} - ` : ""}Possible seasons: ${player.possibleYearRange}`,
     shouldShowPossibleSeasons: true,
   };
 }
@@ -130,16 +132,22 @@ function statLabel(value: number | null | undefined) {
 }
 
 function submissionForParticipant(gameState: MultiplayerGameState, participantId: string | null | undefined) {
-  return gameState.bids.find((bid) => bid.participantId === participantId) ?? null;
+  return gameState.bids.find((bid) => bid.participantId === participantId && bid.hasSubmittedBid) ?? null;
 }
 
 function activeSubmissionTotal(gameState: MultiplayerGameState) {
   const settings = gameState.game?.settings ?? gameState.lobby.settings;
+  const activeParticipantIds = new Set(
+    gameState.participants.filter((participant) => participant.isActive).map((participant) => participant.id),
+  );
   const openRosters = gameState.rosters.filter(
-    (roster) => !roster.isFull && roster.remainingBudget >= settings.minimumBid,
+    (roster) =>
+      activeParticipantIds.has(roster.participantId) &&
+      !roster.isFull &&
+      roster.remainingBudget >= settings.minimumBid,
   );
 
-  return openRosters.length || gameState.participants.length;
+  return openRosters.length;
 }
 
 function bidPanelMessage({
@@ -147,6 +155,7 @@ function bidPanelMessage({
   hasSubmitted,
   isBidding,
   minimumBid,
+  participantActive,
   remainingBudget,
   rosterFull,
   secondsLeft,
@@ -155,12 +164,17 @@ function bidPanelMessage({
   hasSubmitted: boolean;
   isBidding: boolean;
   minimumBid: number;
+  participantActive: boolean;
   remainingBudget: number;
   rosterFull: boolean;
   secondsLeft: number;
 }) {
   if (hasSubmitted) {
     return "Bid already submitted.";
+  }
+
+  if (!participantActive) {
+    return "You are no longer active in this lobby.";
   }
 
   if (rosterFull) {
@@ -171,7 +185,7 @@ function bidPanelMessage({
     return "Bidding is closed.";
   }
 
-  if (!Number.isFinite(bidAmount)) {
+  if (!Number.isInteger(bidAmount)) {
     return "Enter a whole-dollar bid.";
   }
 
@@ -265,14 +279,14 @@ function MultiplayerBidPanel({
   currentParticipant,
   gameState,
   nowMs,
-  onBidSubmitted,
+  onSubmitBid,
   setActionError,
 }: {
   actionError: string | null;
   currentParticipant: MultiplayerParticipant | null;
   gameState: MultiplayerGameState;
   nowMs: number;
-  onBidSubmitted: (state: MultiplayerGameState) => void;
+  onSubmitBid: (request: { amount: number; roundId: string; signal: AbortSignal }) => Promise<void>;
   setActionError: (message: string | null) => void;
 }) {
   const settings = gameState.game?.settings ?? gameState.lobby.settings;
@@ -280,18 +294,20 @@ function MultiplayerBidPanel({
   const myRoster = gameState.rosters.find((roster) => roster.participantId === currentParticipant?.id) ?? null;
   const remainingBudget = myRoster?.remainingBudget ?? 0;
   const rosterFull = Boolean(myRoster?.isFull);
+  const participantActive = currentParticipant ? currentParticipant.isActive : true;
   const minimumBid = settings.minimumBid;
   const secondsLeft = secondsUntil(round?.bidEndsAt, nowMs);
   const ownSubmission = submissionForParticipant(gameState, currentParticipant?.id);
   const hasSubmitted = Boolean(ownSubmission);
   const isBidding = round?.status === "bidding" && gameState.game?.status === "active" && secondsLeft > 0;
-  const submittedCount = gameState.bids.length;
+  const submittedCount = gameState.bids.filter((bid) => bid.hasSubmittedBid).length;
   const submissionTotal = activeSubmissionTotal(gameState);
   const [bidDraft, setBidDraft] = useState<{ roundId: string | null; value: string }>({
     roundId: null,
     value: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const submitControllerRef = useRef<AbortController | null>(null);
   const bidText = bidDraft.roundId === round?.id ? bidDraft.value : String(minimumBid);
   const bidAmount = Number(bidText);
   const validationMessage = bidPanelMessage({
@@ -299,12 +315,16 @@ function MultiplayerBidPanel({
     hasSubmitted,
     isBidding,
     minimumBid,
+    participantActive,
     remainingBudget,
     rosterFull,
     secondsLeft,
   });
   const submitDisabled = submitting || !currentParticipant || !round || Boolean(validationMessage);
-  const passDisabled = submitting || !currentParticipant || !round || !isBidding || rosterFull || hasSubmitted;
+  const passDisabled =
+    submitting || !currentParticipant || !participantActive || !round || !isBidding || rosterFull || hasSubmitted;
+
+  useEffect(() => () => submitControllerRef.current?.abort(), []);
 
   async function submitAmount(amount: number) {
     if (!currentParticipant || !round || submitting) {
@@ -314,18 +334,27 @@ function MultiplayerBidPanel({
     try {
       setSubmitting(true);
       setActionError(null);
-      const nextState = await submitMysteryMultiplayerBid({
-        amount,
-        codeOrId: gameState.lobby.code,
-        participantId: currentParticipant.id,
-        roundId: round.id,
-      });
+      const controller = new AbortController();
 
-      onBidSubmitted(nextState);
+      submitControllerRef.current?.abort();
+      submitControllerRef.current = controller;
+      await onSubmitBid({
+        amount,
+        roundId: round.id,
+        signal: controller.signal,
+      });
     } catch (submitError) {
-      setActionError(submitError instanceof Error ? submitError.message : "Unable to submit bid.");
+      if (!(submitError instanceof DOMException && submitError.name === "AbortError")) {
+        setActionError(submitError instanceof Error ? submitError.message : "Unable to submit bid.");
+      }
     } finally {
-      setSubmitting(false);
+      const controller = submitControllerRef.current;
+
+      if (controller && !controller.signal.aborted) {
+        setSubmitting(false);
+      }
+
+      submitControllerRef.current = null;
     }
   }
 
@@ -401,7 +430,7 @@ function MultiplayerBidPanel({
           <label className="mystery-bid-input">
             <span>Bid Amount</span>
             <input
-              disabled={!isBidding || rosterFull || submitting}
+              disabled={!currentParticipant || !participantActive || !isBidding || rosterFull || submitting}
               inputMode="numeric"
               min={minimumBid}
               step={settings.bidIncrement}
@@ -449,11 +478,12 @@ function MultiplayerSubmissionPanel({
   const round = gameState.currentRound;
   const bidByParticipantId = new Map(gameState.bids.map((bid) => [bid.participantId, bid]));
   const rosterByParticipantId = new Map(gameState.rosters.map((roster) => [roster.participantId, roster]));
-  const submittedCount = gameState.bids.length;
+  const submittedCount = gameState.bids.filter((bid) => bid.hasSubmittedBid).length;
   const submissionTotal = activeSubmissionTotal(gameState);
-  const revealAllAmounts = Boolean(round && round.status !== "bidding");
+  const roundResolved = Boolean(round && round.status !== "bidding");
+  const revealAllAmounts = Boolean(roundResolved && settings.revealAllBidsAfterRound);
   const winnerName =
-    revealAllAmounts && round?.winnerParticipantId
+    roundResolved && round?.winnerParticipantId
       ? participantName(gameState.participants, round.winnerParticipantId)
       : null;
   const winnerLabel = round?.awardReason === "richest_no_bid" ? "No-bid Award" : "Highest Bidder";
@@ -462,7 +492,7 @@ function MultiplayerSubmissionPanel({
     <section className="mystery-multiplayer-panel mystery-submission-panel">
       <div className="mystery-multiplayer-panel-title">
         <Activity size={18} />
-        <h2>{revealAllAmounts ? "Final Bids" : "Submissions"}</h2>
+        <h2>{revealAllAmounts ? "Final Bids" : roundResolved ? "Bid Result" : "Submissions"}</h2>
         <span>
           {submittedCount}/{submissionTotal}
         </span>
@@ -479,20 +509,21 @@ function MultiplayerSubmissionPanel({
         {gameState.participants.map((participant) => {
           const bid = bidByParticipantId.get(participant.id) ?? null;
           const roster = rosterByParticipantId.get(participant.id) ?? null;
-          const canShowAmount = Boolean(bid && (revealAllAmounts || bid.isOwnSubmission));
+          const hasSubmittedBid = Boolean(bid?.hasSubmittedBid);
+          const canShowAmount = Boolean(hasSubmittedBid && bid && (revealAllAmounts || bid.isOwnSubmission));
           const amountLabel = bid?.amount && bid.amount > 0 ? formatMoney(bid.amount) : "No bid/pass";
-          const statusLabel = bid
+          const statusLabel = hasSubmittedBid
             ? canShowAmount
               ? amountLabel
               : "Submitted"
-            : roster?.isFull || (roster && roster.remainingBudget < settings.minimumBid)
+            : !participant.isActive || roster?.isFull || (roster && roster.remainingBudget < settings.minimumBid)
               ? "Inactive"
               : "Waiting";
           const isCurrentParticipant = participant.id === currentParticipant?.id;
 
           return (
             <div
-              className={`mystery-feed-row ${bid ? "mystery-feed-row-submitted" : "mystery-feed-row-waiting"}`}
+              className={`mystery-feed-row ${hasSubmittedBid ? "mystery-feed-row-submitted" : "mystery-feed-row-waiting"}`}
               key={participant.id}
             >
               <span>
@@ -615,15 +646,29 @@ function MultiplayerSyncBanner({
     gameState.currentRound?.status === "revealed" &&
     gameState.currentRound.revealEndsAt &&
     secondsUntil(gameState.currentRound.revealEndsAt, nowMs) <= 0;
-  const showTransitionSync = Boolean(isRefreshing && revealHasExpired && gameState.game?.status !== "completed");
+  const biddingHasExpired =
+    gameState.currentRound?.status === "bidding" &&
+    secondsUntil(gameState.currentRound.bidEndsAt, nowMs) <= 0;
+  const gameIsActive = gameState.game?.status !== "completed";
+  const transitionMessage = gameIsActive
+    ? biddingHasExpired
+      ? "Resolving secret bids..."
+      : revealHasExpired
+        ? "Loading the next player..."
+        : isRefreshing && !gameState.currentRound
+          ? "Syncing game state..."
+          : null
+    : null;
 
-  if (!error && !hasRecentFailure && !showTransitionSync) {
+  if (!error && !hasRecentFailure && !transitionMessage) {
     return null;
   }
 
-  const message = error || hasRecentFailure
+  const message = error
     ? "Having trouble syncing. Keeping the latest game state on screen."
-    : "Loading the next player...";
+    : hasRecentFailure
+      ? "Syncing game state..."
+      : transitionMessage;
 
   return (
     <section className="mystery-sync-banner" role={error ? "status" : undefined}>
@@ -640,7 +685,7 @@ function MultiplayerGameScreen({
   gameState,
   nowMs,
   onCopyCode,
-  onBidSubmitted,
+  onSubmitBid,
   setActionError,
 }: {
   actionError: string | null;
@@ -649,7 +694,7 @@ function MultiplayerGameScreen({
   gameState: MultiplayerGameState;
   nowMs: number;
   onCopyCode: () => void;
-  onBidSubmitted: (state: MultiplayerGameState) => void;
+  onSubmitBid: (request: { amount: number; roundId: string; signal: AbortSignal }) => Promise<void>;
   setActionError: (message: string | null) => void;
 }) {
   const round = gameState.currentRound;
@@ -710,8 +755,9 @@ function MultiplayerGameScreen({
             actionError={actionError}
             currentParticipant={currentParticipant}
             gameState={gameState}
+            key={round?.id ?? "no-round"}
             nowMs={nowMs}
-            onBidSubmitted={onBidSubmitted}
+            onSubmitBid={onSubmitBid}
             setActionError={setActionError}
           />
           <MultiplayerSubmissionPanel currentParticipant={currentParticipant} gameState={gameState} />
@@ -728,7 +774,10 @@ export default function MysteryMultiplayerLobbyPage() {
   const code = normalizeMysteryLobbyCode(String(params.code || ""));
   const [snapshot, setSnapshot] = useState<MultiplayerLobbySnapshot | null>(null);
   const [gameState, setGameState] = useState<MultiplayerGameState | null>(null);
-  const [participantSession, setParticipantSession] = useState<MultiplayerParticipantSession | null>(null);
+  const [participantIdentity, setParticipantIdentity] = useState<{
+    code: string;
+    session: MultiplayerParticipantSession | null;
+  }>({ code: "", session: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -738,10 +787,19 @@ export default function MysteryMultiplayerLobbyPage() {
   const [nowMs, setNowMs] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [fetchFailureCount, setFetchFailureCount] = useState(0);
+  const [clientCanPoll, setClientCanPoll] = useState(true);
   const inFlightRef = useRef(false);
   const requestIdRef = useRef(0);
+  const pollControllerRef = useRef<AbortController | null>(null);
+  const actionControllerRef = useRef<AbortController | null>(null);
+  const actionInFlightRef = useRef(false);
+  const mountedRef = useRef(false);
+  const serverClockOffsetRef = useRef(0);
+  const copiedTimeoutRef = useRef<number | null>(null);
   const gameStateRef = useRef<MultiplayerGameState | null>(null);
   const snapshotRef = useRef<MultiplayerLobbySnapshot | null>(null);
+  const participantSession = participantIdentity.code === code ? participantIdentity.session : null;
+  const identityResolved = participantIdentity.code === code;
   const displaySnapshot = gameState ? snapshotFromGameState(gameState) : snapshot;
 
   const currentParticipant = useMemo(() => {
@@ -749,31 +807,78 @@ export default function MysteryMultiplayerLobbyPage() {
       return null;
     }
 
-    return (
-      displaySnapshot.participants.find((participant) => participant.id === participantSession.participantId) ||
-      displaySnapshot.participants.find(
-        (participant) => participantSession.clientId && participant.clientId === participantSession.clientId,
-      ) ||
-      null
-    );
+    return displaySnapshot.participants.find((participant) => participant.id === participantSession.participantId) ?? null;
   }, [displaySnapshot, participantSession]);
   const hostParticipant = displaySnapshot?.participants.find((participant) => participant.isHost) ?? null;
   const isHost = Boolean(currentParticipant?.isHost);
   const settingsSummary = displaySnapshot ? settingChips(displaySnapshot) : [];
-  const viewerParticipantId = participantSession?.participantId ?? null;
-  const shouldPoll = gameState?.game?.status !== "completed";
+  const viewerParticipantToken = participantSession?.participantToken ?? null;
+  const gameCompleted =
+    gameState?.game?.status === "completed" || displaySnapshot?.lobby.status === "completed";
+  const shouldPoll = identityResolved && clientCanPoll && !gameCompleted && !leaving;
   const pollMs = gameState?.game?.status === "active" ? ACTIVE_POLL_MS : WAITING_POLL_MS;
   const completedResultsPath = code ? `/mystery-draft/multiplayer/${encodeURIComponent(code)}/results` : "";
 
-  useEffect(() => {
-    gameStateRef.current = gameState;
-  }, [gameState]);
+  const invalidatePollRequest = useCallback(() => {
+    requestIdRef.current += 1;
+    pollControllerRef.current?.abort();
+    pollControllerRef.current = null;
+    inFlightRef.current = false;
+  }, []);
 
-  useEffect(() => {
-    snapshotRef.current = snapshot;
-  }, [snapshot]);
+  const applyLobbySnapshot = useCallback((nextSnapshot: MultiplayerLobbySnapshot) => {
+    if (!mountedRef.current) {
+      return;
+    }
+
+    snapshotRef.current = nextSnapshot;
+    setSnapshot(nextSnapshot);
+  }, []);
+
+  const applyGameState = useCallback((nextGameState: MultiplayerGameState, requestStartedAt = Date.now()) => {
+    if (!mountedRef.current) {
+      return;
+    }
+
+    const receivedAt = Date.now();
+    const serverTimeMs = new Date(nextGameState.serverTime).getTime();
+
+    if (Number.isFinite(serverTimeMs)) {
+      serverClockOffsetRef.current = serverTimeMs - (requestStartedAt + receivedAt) / 2;
+      setNowMs(receivedAt + serverClockOffsetRef.current);
+    }
+
+    if (gameStateRef.current?.currentRound?.id !== nextGameState.currentRound?.id) {
+      setActionError(null);
+    }
+
+    gameStateRef.current = nextGameState;
+    snapshotRef.current = snapshotFromGameState(nextGameState);
+    setGameState(nextGameState);
+    setFetchFailureCount(0);
+    setError(null);
+  }, []);
+
+  const beginAuthoritativeAction = useCallback(() => {
+    if (actionInFlightRef.current) {
+      return false;
+    }
+
+    actionInFlightRef.current = true;
+    invalidatePollRequest();
+    setIsRefreshing(false);
+    return true;
+  }, [invalidatePollRequest]);
+
+  const endAuthoritativeAction = useCallback(() => {
+    actionInFlightRef.current = false;
+  }, []);
 
   const fetchLobbyOrGame = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!identityResolved || !clientCanPoll || actionInFlightRef.current) {
+      return;
+    }
+
     if (!code) {
       setError("Lobby code is missing.");
       setLoading(false);
@@ -786,11 +891,14 @@ export default function MysteryMultiplayerLobbyPage() {
 
     const currentGameState = gameStateRef.current;
     const currentSnapshot = snapshotRef.current;
-    const hasUsableState = Boolean(currentGameState || currentSnapshot);
+    let hasUsableState = Boolean(currentGameState || currentSnapshot);
     const requestId = requestIdRef.current + 1;
+    const controller = new AbortController();
+    const requestStartedAt = Date.now();
 
     requestIdRef.current = requestId;
     inFlightRef.current = true;
+    pollControllerRef.current = controller;
 
     if (!silent && !hasUsableState) {
       setLoading(true);
@@ -803,42 +911,53 @@ export default function MysteryMultiplayerLobbyPage() {
     try {
       const shouldFetchGame =
         currentGameState?.game ||
-        currentSnapshot?.lobby.status === "started" ||
-        currentSnapshot?.lobby.status === "completed";
+        currentSnapshot?.lobby.status === "started";
       if (shouldFetchGame) {
-        const nextGameState = await getMysteryMultiplayerGameState(code, viewerParticipantId);
+        const nextGameState = await getMysteryMultiplayerGameState(code, {
+          participantToken: viewerParticipantToken,
+          signal: controller.signal,
+        });
 
-        if (requestId !== requestIdRef.current) {
+        if (!mountedRef.current || requestId !== requestIdRef.current) {
           return;
         }
 
-        setGameState(nextGameState);
-        setSnapshot(snapshotFromGameState(nextGameState));
+        applyGameState(nextGameState, requestStartedAt);
       } else {
-        const lobbySnapshot = await getMysteryMultiplayerLobby(code);
+        const lobbySnapshot = await getMysteryMultiplayerLobby(code, controller.signal);
 
-        if (requestId !== requestIdRef.current) {
+        if (!mountedRef.current || requestId !== requestIdRef.current) {
           return;
         }
 
-        if (lobbySnapshot.lobby.status === "started" || lobbySnapshot.lobby.status === "completed") {
-          const nextGameState = await getMysteryMultiplayerGameState(code, viewerParticipantId);
+        applyLobbySnapshot(lobbySnapshot);
+        hasUsableState = true;
 
-          if (requestId !== requestIdRef.current) {
+        if (lobbySnapshot.lobby.status === "started") {
+          setIsRefreshing(true);
+          const nextGameState = await getMysteryMultiplayerGameState(code, {
+            participantToken: viewerParticipantToken,
+            signal: controller.signal,
+          });
+
+          if (!mountedRef.current || requestId !== requestIdRef.current) {
             return;
           }
 
-          setGameState(nextGameState);
-          setSnapshot(snapshotFromGameState(nextGameState));
-        } else {
-          setSnapshot(lobbySnapshot);
+          applyGameState(nextGameState, requestStartedAt);
         }
       }
 
-      setFetchFailureCount(0);
-      setError(null);
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setFetchFailureCount(0);
+        setError(null);
+      }
     } catch (fetchError) {
-      if (requestId !== requestIdRef.current) {
+      if (
+        !mountedRef.current ||
+        requestId !== requestIdRef.current ||
+        (fetchError instanceof Error && fetchError.name === "AbortError")
+      ) {
         return;
       }
 
@@ -854,22 +973,79 @@ export default function MysteryMultiplayerLobbyPage() {
         return nextCount;
       });
     } finally {
-      if (requestId === requestIdRef.current) {
+      if (mountedRef.current && requestId === requestIdRef.current) {
         setLoading(false);
         setIsRefreshing(false);
+        inFlightRef.current = false;
+        pollControllerRef.current = null;
       }
-
-      inFlightRef.current = false;
     }
-  }, [code, viewerParticipantId]);
+  }, [applyGameState, applyLobbySnapshot, clientCanPoll, code, identityResolved, viewerParticipantToken]);
 
   useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      invalidatePollRequest();
+      actionControllerRef.current?.abort();
+      if (copiedTimeoutRef.current) {
+        window.clearTimeout(copiedTimeoutRef.current);
+      }
+    };
+  }, [invalidatePollRequest]);
+
+  useEffect(() => {
+    invalidatePollRequest();
+    gameStateRef.current = null;
+    snapshotRef.current = null;
     const timeout = window.setTimeout(() => {
-      setParticipantSession(readMysteryMultiplayerParticipantSession(code));
+      setGameState(null);
+      setSnapshot(null);
+      setLoading(true);
+      setError(null);
+      setFetchFailureCount(0);
+      setParticipantIdentity({
+        code,
+        session: readMysteryMultiplayerParticipantSession(code),
+      });
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [code]);
+  }, [code, invalidatePollRequest]);
+
+  useEffect(() => {
+    invalidatePollRequest();
+  }, [invalidatePollRequest, viewerParticipantToken]);
+
+  useEffect(() => {
+    const updateAvailability = () => {
+      const nextCanPoll = !document.hidden && navigator.onLine;
+
+      if (!nextCanPoll) {
+        invalidatePollRequest();
+        setIsRefreshing(false);
+
+        if (!gameStateRef.current && !snapshotRef.current) {
+          setLoading(false);
+          setError(navigator.onLine ? "Game sync is paused while this tab is hidden." : "You appear to be offline.");
+        }
+      }
+
+      setClientCanPoll(nextCanPoll);
+    };
+
+    updateAvailability();
+    document.addEventListener("visibilitychange", updateAvailability);
+    window.addEventListener("online", updateAvailability);
+    window.addEventListener("offline", updateAvailability);
+
+    return () => {
+      document.removeEventListener("visibilitychange", updateAvailability);
+      window.removeEventListener("online", updateAvailability);
+      window.removeEventListener("offline", updateAvailability);
+    };
+  }, [invalidatePollRequest]);
 
   useEffect(() => {
     setGameHeaderState({
@@ -887,21 +1063,20 @@ export default function MysteryMultiplayerLobbyPage() {
   }, [code, gameState?.currentRound?.roundIndex, gameState?.game, gameState?.rosters.length]);
 
   useEffect(() => {
-    if (gameState?.game?.status === "completed" && completedResultsPath) {
+    if (gameCompleted && completedResultsPath) {
+      invalidatePollRequest();
       router.replace(completedResultsPath);
     }
-  }, [completedResultsPath, gameState?.game?.status, router]);
+  }, [completedResultsPath, gameCompleted, invalidatePollRequest, router]);
 
   useEffect(() => {
+    if (!shouldPoll) {
+      return;
+    }
+
     const initialFetch = window.setTimeout(() => {
       void fetchLobbyOrGame({ silent: Boolean(gameStateRef.current || snapshotRef.current) });
     }, 0);
-
-    if (!shouldPoll) {
-      return () => {
-        window.clearTimeout(initialFetch);
-      };
-    }
 
     // TODO: Replace polling with realtime events in a later multiplayer step.
     const interval = window.setInterval(() => {
@@ -915,47 +1090,69 @@ export default function MysteryMultiplayerLobbyPage() {
   }, [fetchLobbyOrGame, pollMs, shouldPoll]);
 
   useEffect(() => {
-    const updateNow = () => setNowMs(Date.now());
+    if (!clientCanPoll) {
+      return;
+    }
+
+    const updateNow = () => setNowMs(Date.now() + serverClockOffsetRef.current);
     const timeout = window.setTimeout(updateNow, 0);
     const interval = window.setInterval(() => {
       updateNow();
-    }, 500);
+    }, 1000);
 
     return () => {
       window.clearTimeout(timeout);
       window.clearInterval(interval);
     };
-  }, []);
+  }, [clientCanPoll]);
 
   async function handleCopyCode() {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      if (copiedTimeoutRef.current) {
+        window.clearTimeout(copiedTimeoutRef.current);
+      }
+      copiedTimeoutRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copiedTimeoutRef.current = null;
+      }, 1600);
     } catch {
       setActionError("Unable to copy lobby code.");
     }
   }
 
   async function handleStartLobby() {
-    if (!displaySnapshot || !currentParticipant) {
+    if (!displaySnapshot || !currentParticipant || !participantSession || !beginAuthoritativeAction()) {
       return;
     }
+
+    const controller = new AbortController();
+    const requestStartedAt = Date.now();
+    actionControllerRef.current = controller;
 
     try {
       setStarting(true);
       setActionError(null);
       const nextGameState = await startMysteryMultiplayerLobby({
         lobbyId: displaySnapshot.lobby.id,
-        participantId: currentParticipant.id,
+        participantToken: participantSession.participantToken,
+        signal: controller.signal,
       });
 
-      setGameState(nextGameState);
-      setSnapshot(snapshotFromGameState(nextGameState));
+      if (!controller.signal.aborted) {
+        applyGameState(nextGameState, requestStartedAt);
+      }
     } catch (startError) {
-      setActionError(startError instanceof Error ? startError.message : "Unable to start lobby.");
+      if (!(startError instanceof Error && startError.name === "AbortError")) {
+        setActionError(startError instanceof Error ? startError.message : "Unable to start lobby.");
+      }
     } finally {
-      setStarting(false);
+      if (mountedRef.current && actionControllerRef.current === controller) {
+        setStarting(false);
+        actionControllerRef.current = null;
+      }
+      endAuthoritativeAction();
     }
   }
 
@@ -965,26 +1162,70 @@ export default function MysteryMultiplayerLobbyPage() {
       return;
     }
 
+    if (!participantSession || !beginAuthoritativeAction()) {
+      return;
+    }
+
+    const controller = new AbortController();
+    actionControllerRef.current = controller;
+
     try {
       setLeaving(true);
       setActionError(null);
       await leaveMysteryMultiplayerLobby({
         lobbyId: displaySnapshot.lobby.id,
-        participantId: currentParticipant.id,
+        participantToken: participantSession.participantToken,
+        signal: controller.signal,
       });
-      forgetMysteryMultiplayerParticipant(displaySnapshot.lobby.code);
-      router.push("/mystery-draft");
+
+      if (!controller.signal.aborted) {
+        forgetMysteryMultiplayerParticipant(displaySnapshot.lobby.code);
+        router.push("/mystery-draft");
+      }
     } catch (leaveError) {
-      setActionError(leaveError instanceof Error ? leaveError.message : "Unable to leave lobby.");
+      if (!(leaveError instanceof Error && leaveError.name === "AbortError")) {
+        setActionError(leaveError instanceof Error ? leaveError.message : "Unable to leave lobby.");
+      }
     } finally {
-      setLeaving(false);
+      if (mountedRef.current && actionControllerRef.current === controller) {
+        setLeaving(false);
+        actionControllerRef.current = null;
+      }
+      endAuthoritativeAction();
     }
   }
 
-  function handleBidSubmitted(nextGameState: MultiplayerGameState) {
-    setGameState(nextGameState);
-    setSnapshot(snapshotFromGameState(nextGameState));
-  }
+  const handleSubmitBid = useCallback(async ({
+    amount,
+    roundId,
+    signal,
+  }: {
+    amount: number;
+    roundId: string;
+    signal: AbortSignal;
+  }) => {
+    if (!participantSession || !beginAuthoritativeAction()) {
+      throw new Error("Another multiplayer action is already in progress.");
+    }
+
+    const requestStartedAt = Date.now();
+
+    try {
+      const nextGameState = await submitMysteryMultiplayerBid({
+        amount,
+        codeOrId: code,
+        participantToken: participantSession.participantToken,
+        roundId,
+        signal,
+      });
+
+      if (!signal.aborted) {
+        applyGameState(nextGameState, requestStartedAt);
+      }
+    } finally {
+      endAuthoritativeAction();
+    }
+  }, [applyGameState, beginAuthoritativeAction, code, endAuthoritativeAction, participantSession]);
 
   return (
     <main className={`mystery-page ${lightMode ? "mystery-page-light" : ""}`}>
@@ -1003,17 +1244,37 @@ export default function MysteryMultiplayerLobbyPage() {
           ) : error && !displaySnapshot ? (
             <div className="mystery-multiplayer-status">
               <strong>{error}</strong>
+              <button
+                className="mystery-primary-button"
+                disabled={!clientCanPoll}
+                type="button"
+                onClick={() => void fetchLobbyOrGame()}
+              >
+                Retry
+              </button>
               <button className="mystery-secondary-button" type="button" onClick={() => router.push("/mystery-draft")}>
                 Back
               </button>
             </div>
-          ) : gameState?.game?.status === "completed" ? (
+          ) : gameCompleted ? (
             <div className="mystery-multiplayer-status">
               <RefreshCw className="mystery-warmup-spinner" size={34} />
               <strong>Game complete. Loading results...</strong>
             </div>
           ) : displaySnapshot ? (
             <>
+              {!gameState?.game && (error || fetchFailureCount > 0 || displaySnapshot.lobby.status === "started") ? (
+                <section className="mystery-sync-banner" role={error ? "status" : undefined}>
+                  <Hourglass size={16} />
+                  <span>
+                    {error
+                      ? "Having trouble syncing. Keeping the latest lobby state on screen."
+                      : displaySnapshot.lobby.status === "started"
+                        ? "Syncing game state..."
+                        : "Syncing lobby..."}
+                  </span>
+                </section>
+              ) : null}
               {!gameState?.game ? (
                 <section className="mystery-lobby-code-panel" aria-label="Lobby code">
                 <div>
@@ -1044,7 +1305,7 @@ export default function MysteryMultiplayerLobbyPage() {
                     gameState={gameState}
                     nowMs={nowMs}
                     onCopyCode={handleCopyCode}
-                    onBidSubmitted={handleBidSubmitted}
+                    onSubmitBid={handleSubmitBid}
                     setActionError={setActionError}
                   />
                   <section className="mystery-multiplayer-actions">
@@ -1054,7 +1315,7 @@ export default function MysteryMultiplayerLobbyPage() {
                     </div>
                     <button
                       className="mystery-ghost-button"
-                      disabled={leaving}
+                      disabled={leaving || starting}
                       type="button"
                       onClick={handleLeaveLobby}
                     >
@@ -1106,7 +1367,7 @@ export default function MysteryMultiplayerLobbyPage() {
                     {isHost ? (
                       <button
                         className="mystery-primary-button"
-                        disabled={starting}
+                        disabled={starting || leaving}
                         type="button"
                         onClick={handleStartLobby}
                       >
@@ -1120,7 +1381,7 @@ export default function MysteryMultiplayerLobbyPage() {
                     )}
                     <button
                       className="mystery-ghost-button"
-                      disabled={leaving}
+                      disabled={leaving || starting}
                       type="button"
                       onClick={handleLeaveLobby}
                     >
