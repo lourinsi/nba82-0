@@ -13,11 +13,13 @@ const apiCache = new Map<string, CacheEntry>();
 const apiRequests = new Map<string, Promise<unknown>>();
 
 export class ApiError extends Error {
+  retryAfterSeconds: number | null;
   status: number;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, retryAfterSeconds: number | null = null) {
     super(message);
     this.name = "ApiError";
+    this.retryAfterSeconds = retryAfterSeconds;
     this.status = status;
   }
 }
@@ -108,7 +110,11 @@ export async function requestApiJson<T>(path: string, init: RequestInit = {}) {
     externalSignal?.removeEventListener("abort", abortFromCaller);
   }
 
-  const data = (await response.json().catch(() => null)) as { error?: string } | T | null;
+  if (response.status === 204) {
+    return null as T;
+  }
+
+  const data = (await response.json().catch(() => null)) as { error?: string; retryAfterSeconds?: number } | T | null;
 
   if (!response.ok) {
     const message =
@@ -116,7 +122,11 @@ export async function requestApiJson<T>(path: string, init: RequestInit = {}) {
         ? data.error
         : `API returned ${response.status}`;
 
-    throw new ApiError(message, response.status);
+    const retryAfterSeconds = data && typeof data === "object" && "retryAfterSeconds" in data
+      ? Number(data.retryAfterSeconds) || null
+      : Number(response.headers.get("Retry-After")) || null;
+
+    throw new ApiError(message, response.status, retryAfterSeconds);
   }
 
   return data as T;

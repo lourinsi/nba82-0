@@ -37,6 +37,7 @@ export type MultiplayerLobby = {
   code: string;
   id: string;
   settings: MysteryDraftMultiplayerSettings;
+  stateVersion: number;
   status: MultiplayerLobbyStatus;
 };
 
@@ -71,7 +72,7 @@ export type MultiplayerAuctionPlayer = {
 };
 
 export type MultiplayerRound = {
-  awardReason: "highest_bid" | "richest_no_bid" | "skipped" | null;
+  awardReason: "highest_bid" | "richest_no_bid" | "sole_incomplete_auto_assign" | "skipped" | null;
   bidEndsAt: string;
   id: string;
   noBid: boolean;
@@ -92,8 +93,11 @@ export type MultiplayerBid = {
 
 export type MultiplayerGame = {
   poolSize: number;
+  rosterSize: number;
   settings: MysteryDraftMultiplayerSettings;
+  stateVersion: number;
   status: MultiplayerGameStatus;
+  totalRounds: number;
 };
 
 export type MultiplayerRosterPick = {
@@ -119,11 +123,18 @@ export type MultiplayerGameState = {
   bids: MultiplayerBid[];
   currentPlayer: MultiplayerAuctionPlayer | null;
   currentRound: MultiplayerRound | null;
+  fastForward: {
+    active: boolean;
+    assignmentPrice?: number;
+    participantId?: string;
+    participantName?: string;
+  };
   game: MultiplayerGame | null;
   lobby: MultiplayerLobby;
   participants: MultiplayerParticipant[];
   rosters: MultiplayerRoster[];
   serverTime: string;
+  stateVersion: number;
 };
 
 export type MultiplayerParticipantSession = {
@@ -173,7 +184,7 @@ export type MultiplayerResultsRoster = {
 };
 
 export type MultiplayerResultsResponse = {
-  game: Pick<MultiplayerGame, "poolSize" | "status"> & {
+  game: Pick<MultiplayerGame, "poolSize" | "rosterSize" | "status" | "totalRounds"> & {
     currentRoundIndex: number;
     id: string;
   };
@@ -317,7 +328,7 @@ export function buildMysteryMultiplayerSettings(
       revealDurationSeconds,
     },
     noMarketRange: true,
-    poolSize: 30,
+    poolSize: 0,
     revealAllBidsAfterRound: false,
     revealDurationSeconds,
   };
@@ -355,10 +366,15 @@ export function joinMysteryMultiplayerLobby({
   });
 }
 
-export function getMysteryMultiplayerLobby(codeOrId: string, signal?: AbortSignal) {
-  return requestApiJson<MultiplayerLobbySnapshot>(
+export function getMysteryMultiplayerLobby(codeOrId: string, signal?: AbortSignal, knownStateVersion?: number | null) {
+  return requestApiJson<MultiplayerLobbySnapshot | null>(
     `/api/mystery-draft/multiplayer/lobbies/${encodeURIComponent(codeOrId)}`,
-    { signal },
+    {
+      headers: Number.isSafeInteger(knownStateVersion)
+        ? { "X-Known-State-Version": String(knownStateVersion) }
+        : undefined,
+      signal,
+    },
   );
 }
 
@@ -405,17 +421,22 @@ export function getMysteryMultiplayerGameState(
   {
     participantToken,
     signal,
+    knownStateVersion,
   }: {
     participantToken?: string | null;
     signal?: AbortSignal;
+    knownStateVersion?: number | null;
   } = {},
 ) {
-  return requestApiJson<MultiplayerGameState>(
+  return requestApiJson<MultiplayerGameState | null>(
     `/api/mystery-draft/multiplayer/games/${encodeURIComponent(codeOrId)}/state`,
     {
-      headers: participantToken
-        ? { "X-Multiplayer-Participant-Token": participantToken }
-        : undefined,
+      headers: {
+        ...(Number.isSafeInteger(knownStateVersion)
+          ? { "X-Known-State-Version": String(knownStateVersion) }
+          : {}),
+        ...(participantToken ? { "X-Multiplayer-Participant-Token": participantToken } : {}),
+      },
       signal,
     },
   );

@@ -17,6 +17,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import { ApiError } from "../../../apiClient";
 import {
   colorModeSnapshot,
   setGameHeaderState,
@@ -170,7 +171,7 @@ function bidPanelMessage({
   secondsLeft: number;
 }) {
   if (hasSubmitted) {
-    return "Bid already submitted.";
+    return "Your bid is already locked in.";
   }
 
   if (!participantActive) {
@@ -414,7 +415,7 @@ function MultiplayerBidPanel({
           <div>
             <strong>Bid submitted</strong>
             <span>{ownSubmissionLabel}</span>
-            {gameState.currentRound?.status === "bidding" ? <small>Waiting for other players.</small> : null}
+            {gameState.currentRound?.status === "bidding" ? <small>Your bid is already locked in.</small> : null}
           </div>
         </div>
       ) : !isBidding ? (
@@ -553,7 +554,9 @@ function MultiplayerRevealPanel({
   }
 
   const winnerName = participantName(gameState.participants, round.winnerParticipantId);
-  const noBidAward = round.awardReason === "richest_no_bid" || (round.noBid && round.winnerParticipantId);
+  const automaticAssignment = round.awardReason === "sole_incomplete_auto_assign";
+  const noBidAward = round.awardReason === "richest_no_bid" ||
+    (round.noBid && round.winnerParticipantId && !automaticAssignment);
 
   return (
     <section className="mystery-multiplayer-panel mystery-reveal-panel">
@@ -561,7 +564,11 @@ function MultiplayerRevealPanel({
         <Sparkles size={18} />
         <h2>Result</h2>
       </div>
-      {round.noBid && !round.winnerParticipantId ? (
+      {automaticAssignment ? (
+        <strong>
+          {winnerName} gets {currentPlayer?.playerName ?? "the player"} for $1
+        </strong>
+      ) : round.noBid && !round.winnerParticipantId ? (
         <strong>No bids. Player skipped.</strong>
       ) : noBidAward ? (
         <strong>
@@ -572,7 +579,9 @@ function MultiplayerRevealPanel({
           {winnerName} wins {currentPlayer?.playerName ?? "the player"} for {formatMoney(round.winningBid)}
         </strong>
       )}
-      {round.noBid && !round.winnerParticipantId ? (
+      {automaticAssignment ? (
+        <span>Only one roster remains incomplete. Next player coming...</span>
+      ) : round.noBid && !round.winnerParticipantId ? (
         <span>No eligible participant could receive this player.</span>
       ) : noBidAward ? (
         <span>No positive bids. Richest remaining budget wins.</span>
@@ -581,6 +590,29 @@ function MultiplayerRevealPanel({
       ) : (
         <span>Next player coming...</span>
       )}
+    </section>
+  );
+}
+
+function MultiplayerFastForwardPanel({ gameState, nowMs }: { gameState: MultiplayerGameState; nowMs: number }) {
+  const fastForward = gameState.fastForward;
+  const playerName = gameState.currentPlayer?.playerName ?? "The current player";
+  const secondsLeft = secondsUntil(gameState.currentRound?.revealEndsAt, nowMs);
+
+  return (
+    <section className="mystery-multiplayer-panel mystery-bid-panel">
+      <div className="mystery-multiplayer-panel-title">
+        <Sparkles size={18} />
+        <h2>Fast Forward</h2>
+      </div>
+      <div className="mystery-submission-receipt">
+        <CheckCircle2 size={20} />
+        <div>
+          <strong>Only {fastForward.participantName ?? "one player"} still needs players.</strong>
+          <span>{playerName} is being assigned for {formatMoney(fastForward.assignmentPrice ?? 1)}.</span>
+          <small>Next player in {secondsLeft} seconds...</small>
+        </div>
+      </div>
     </section>
   );
 }
@@ -667,7 +699,7 @@ function MultiplayerSyncBanner({
   const message = error
     ? "Having trouble syncing. Keeping the latest game state on screen."
     : hasRecentFailure
-      ? "Syncing game state..."
+      ? "Syncing the latest round..."
       : transitionMessage;
 
   return (
@@ -720,14 +752,18 @@ function MultiplayerGameScreen({
         <div>
           <span className="mystery-kicker">Round</span>
           <strong>
-            {round ? round.roundIndex + 1 : 0}/{game?.poolSize ?? 0}
+            {round ? round.roundIndex + 1 : 0}/{game?.totalRounds ?? game?.poolSize ?? 0}
           </strong>
         </div>
         <div>
           <span className="mystery-kicker">Timer</span>
           <strong>
             <Clock3 size={18} />
-            {round?.status === "revealed" ? formatTimer(revealSecondsLeft) : formatTimer(secondsLeft)}
+            {gameState.fastForward.active
+              ? `Auto ${formatTimer(revealSecondsLeft)}`
+              : round?.status === "revealed"
+                ? formatTimer(revealSecondsLeft)
+                : formatTimer(secondsLeft)}
           </strong>
         </div>
       </section>
@@ -751,16 +787,22 @@ function MultiplayerGameScreen({
           <MultiplayerRosterBoard rosters={gameState.rosters} />
         </div>
         <aside className="mystery-game-side">
-          <MultiplayerBidPanel
-            actionError={actionError}
-            currentParticipant={currentParticipant}
-            gameState={gameState}
-            key={round?.id ?? "no-round"}
-            nowMs={nowMs}
-            onSubmitBid={onSubmitBid}
-            setActionError={setActionError}
-          />
-          <MultiplayerSubmissionPanel currentParticipant={currentParticipant} gameState={gameState} />
+          {gameState.fastForward.active ? (
+            <MultiplayerFastForwardPanel gameState={gameState} nowMs={nowMs} />
+          ) : (
+            <>
+              <MultiplayerBidPanel
+                actionError={actionError}
+                currentParticipant={currentParticipant}
+                gameState={gameState}
+                key={round?.id ?? "no-round"}
+                nowMs={nowMs}
+                onSubmitBid={onSubmitBid}
+                setActionError={setActionError}
+              />
+              <MultiplayerSubmissionPanel currentParticipant={currentParticipant} gameState={gameState} />
+            </>
+          )}
         </aside>
       </section>
     </>
@@ -795,6 +837,7 @@ export default function MysteryMultiplayerLobbyPage() {
   const actionInFlightRef = useRef(false);
   const mountedRef = useRef(false);
   const serverClockOffsetRef = useRef(0);
+  const rateLimitUntilRef = useRef(0);
   const copiedTimeoutRef = useRef<number | null>(null);
   const gameStateRef = useRef<MultiplayerGameState | null>(null);
   const snapshotRef = useRef<MultiplayerLobbySnapshot | null>(null);
@@ -817,7 +860,7 @@ export default function MysteryMultiplayerLobbyPage() {
     gameState?.game?.status === "completed" || displaySnapshot?.lobby.status === "completed";
   const shouldPoll = identityResolved && clientCanPoll && !gameCompleted && !leaving;
   const pollMs = gameState?.game?.status === "active" ? ACTIVE_POLL_MS : WAITING_POLL_MS;
-  const completedResultsPath = code ? `/mystery-draft/multiplayer/${encodeURIComponent(code)}/results` : "";
+  const completedResultsPath = code ? `/mystery-draft/${encodeURIComponent(code)}/results` : "";
 
   const invalidatePollRequest = useCallback(() => {
     requestIdRef.current += 1;
@@ -879,6 +922,10 @@ export default function MysteryMultiplayerLobbyPage() {
       return;
     }
 
+    if (Date.now() < rateLimitUntilRef.current) {
+      return;
+    }
+
     if (!code) {
       setError("Lobby code is missing.");
       setLoading(false);
@@ -914,6 +961,7 @@ export default function MysteryMultiplayerLobbyPage() {
         currentSnapshot?.lobby.status === "started";
       if (shouldFetchGame) {
         const nextGameState = await getMysteryMultiplayerGameState(code, {
+          knownStateVersion: currentGameState?.stateVersion ?? null,
           participantToken: viewerParticipantToken,
           signal: controller.signal,
         });
@@ -922,18 +970,26 @@ export default function MysteryMultiplayerLobbyPage() {
           return;
         }
 
-        applyGameState(nextGameState, requestStartedAt);
+        if (nextGameState) {
+          applyGameState(nextGameState, requestStartedAt);
+        }
       } else {
-        const lobbySnapshot = await getMysteryMultiplayerLobby(code, controller.signal);
+        const lobbySnapshot = await getMysteryMultiplayerLobby(
+          code,
+          controller.signal,
+          currentSnapshot?.lobby.stateVersion ?? null,
+        );
 
         if (!mountedRef.current || requestId !== requestIdRef.current) {
           return;
         }
 
-        applyLobbySnapshot(lobbySnapshot);
-        hasUsableState = true;
+        if (lobbySnapshot) {
+          applyLobbySnapshot(lobbySnapshot);
+          hasUsableState = true;
+        }
 
-        if (lobbySnapshot.lobby.status === "started") {
+        if (lobbySnapshot?.lobby.status === "started") {
           setIsRefreshing(true);
           const nextGameState = await getMysteryMultiplayerGameState(code, {
             participantToken: viewerParticipantToken,
@@ -944,7 +1000,9 @@ export default function MysteryMultiplayerLobbyPage() {
             return;
           }
 
-          applyGameState(nextGameState, requestStartedAt);
+          if (nextGameState) {
+            applyGameState(nextGameState, requestStartedAt);
+          }
         }
       }
 
@@ -961,7 +1019,15 @@ export default function MysteryMultiplayerLobbyPage() {
         return;
       }
 
-      const message = fetchError instanceof Error ? fetchError.message : "Unable to load lobby.";
+      const message = fetchError instanceof ApiError && fetchError.status === 429
+        ? `Sync paused by the server. Retrying in ${fetchError.retryAfterSeconds ?? "a few"} seconds.`
+        : fetchError instanceof Error
+          ? fetchError.message
+          : "Unable to load lobby.";
+
+      if (fetchError instanceof ApiError && fetchError.status === 429) {
+        rateLimitUntilRef.current = Date.now() + (fetchError.retryAfterSeconds ?? 3) * 1000;
+      }
 
       setFetchFailureCount((previousCount) => {
         const nextCount = previousCount + 1;
@@ -1239,7 +1305,7 @@ export default function MysteryMultiplayerLobbyPage() {
           {loading ? (
             <div className="mystery-multiplayer-status">
               <RefreshCw className="mystery-warmup-spinner" size={34} />
-              <strong>Loading Lobby</strong>
+              <strong>{participantSession ? "Restoring your game..." : "Reconnecting to lobby..."}</strong>
             </div>
           ) : error && !displaySnapshot ? (
             <div className="mystery-multiplayer-status">
